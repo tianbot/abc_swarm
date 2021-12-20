@@ -1,0 +1,9 @@
+<launch>
+
+  <node pkg="abc_swarm" type="tianbot_mini_tf.py" name="tianbot_mini_tf" >
+    <param name="target_frame" value="tianbot_1/base_link" />
+    <param name="follower_robot_name" value="tianbot_2" />
+    <param name="set_distance" value="0.5" />
+  </node>
+
+</launch>

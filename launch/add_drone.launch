@@ -1,0 +1,16 @@
+<launch>
+  <arg name="drone_name" default="rmtt_01" /> 
+  <arg name="drone_ip" default="192.168.10.1"/>
+  
+  <include file="$(find rmtt_driver)/launch/rmtt_bringup.launch">
+    <arg name="drone_name" value="$(arg drone_name)" />
+    <!-- drone ip can be set using env RMTT_DRONE_IP -->
+    <arg name="drone_ip" value="$(arg drone_ip)" />
+  </include>
+  <include file="$(find rmtt_description)/launch/rmtt_description.launch" >
+    <arg name="drone_name" value="$(arg drone_name)" />
+  </include>
+
+  <node pkg="tf" type="static_transform_publisher" name="world_to_global_2" args="0 0 0 0 0 0 world $(arg drone_name)/map 20" />
+
+</launch>

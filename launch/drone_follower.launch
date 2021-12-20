@@ -1,0 +1,12 @@
+<launch>
+  <arg name="robot_name" default="mini_01" />
+  <arg name="drone_name" default="rmtt_01" /> 
+  <node pkg="tf" type="static_transform_publisher" name="world_to_global_1" args="1 0 0 0 0 0 world $(arg robot_name)/map 20" />
+  <node pkg="tf" type="static_transform_publisher" name="drone_target" args="-0.3 0 0 0 0 0 $(arg robot_name_1)/base_link $(arg drone_name)/target 20" />
+  <node pkg="abc_swarm" type="rmtt_tf.py" name="rmtt_tf" >
+    <param name="target_frame" value="world" />
+    <param name="follower_robot_name" value="$(arg drone_name)" />
+    <param name="set_distance" value="0.0" />
+  </node>
+
+</launch>

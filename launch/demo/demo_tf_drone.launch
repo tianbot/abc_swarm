@@ -1,0 +1,42 @@
+<launch>
+  <arg name="robot_name" default="tianbot_1" />
+  <arg name="drone_name" default="rmtt_01" />
+  <arg name="robot_port" default="/dev/ttyUSB0" />
+  <arg name="drone_ip" default="192.168.10.1" />
+
+  <include file="$(find tianbot_mini)/launch/bringup.launch" >
+    <arg name="robot_name" value="$(arg robot_name)" />
+  </include>
+  <include file="$(find tianbot_mini)/launch/lidar.launch" >
+    <arg name="robot_name" value="$(arg robot_name)" />
+    <arg name="port" value="$(arg robot_port)" />
+  </include>
+
+  <include file="$(find rmtt_driver)/launch/rmtt_bringup.launch">
+    <arg name="drone_name" value="$(arg drone_name)" />
+    <!-- drone ip can be set using env RMTT_DRONE_IP -->
+    <arg name="drone_ip" value="$(arg drone_ip)" />
+  </include>
+  <include file="$(find rmtt_description)/launch/rmtt_description.launch" >
+    <arg name="drone_name" value="$(arg drone_name)" />
+  </include>
+
+  <include file="$(find tianbot_mini)/launch/amcl.launch">
+    <arg name="robot_name" value="$(arg robot_name)" />
+    <arg name="initial_pose_x"  default="0.0"/>
+    <arg name="initial_pose_y"  default="0.0"/>  
+  </include>
+
+  <node pkg="tf" type="static_transform_publisher" name="world_to_global_1" args="1 0 0 0 0 0 world $(arg robot_name)/map 20" />
+  <node pkg="tf" type="static_transform_publisher" name="world_to_global_2" args="0 0 0 0 0 0 world $(arg drone_name)/map 20" />
+  <node pkg="tf" type="static_transform_publisher" name="drone_target" args="-0.3 0 0 0 0 0 $(arg robot_name)/base_link $(arg drone_name)/target 20" />
+  
+  <node pkg="abc_swarm" type="rmtt_tf.py" name="rmtt_tf" >
+    <param name="target_frame" value="$(arg drone_name)/target" />
+    <param name="follower_robot_name" value="$(arg drone_name)" />
+    <param name="set_distance" value="0.0" />
+  </node>
+
+  <!-- RVIZ可视化调试工具 -->
+  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find abc_swarm)/rviz/demo_tf.rviz" />
+</launch>

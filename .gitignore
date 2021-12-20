@@ -1,0 +1,53 @@
+# Prerequisites
+*.d
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+# Something else
+*.DS_Store
+*.swp
+*.log
+
+# office docs
+*.doc
+*.docx
+
+# python compiled
+*.pyc
+
+# map file
+*.pgm
+
+# speciic cfg
+
+# unused file
+imgui.ini
+.vscode

@@ -7,6 +7,8 @@ Panels:
         - /Global Options1
         - /Status1
         - /TF1/Frames1
+        - /RobotModel1
+        - /RobotModel2
       Splitter Ratio: 0.5
     Tree Height: 719
   - Class: rviz/Selection
@@ -58,46 +60,45 @@ Visualization Manager:
       Frame Timeout: 15
       Frames:
         All Enabled: false
-        tianbot_1/base_link:
+        tbmn_01/base_link:
           Value: true
-        tianbot_1/caster_wheel_link:
-          Value: false
-        tianbot_1/casterball_link:
-          Value: false
-        tianbot_1/chassis:
-          Value: false
-        tianbot_1/chassis_inertia:
-          Value: false
-        tianbot_1/laser:
-          Value: false
-        tianbot_1/left_wheel_link:
-          Value: false
-        tianbot_1/odom:
-          Value: false
-        tianbot_1/right_wheel_link:
-          Value: false
-        tianbot_1/target:
+        tbmn_01/caster_wheel_link:
           Value: true
-        tianbot_2/base_link:
+        tbmn_01/casterball_link:
           Value: true
-        tianbot_2/caster_wheel_link:
-          Value: false
-        tianbot_2/casterball_link:
-          Value: false
-        tianbot_2/chassis:
-          Value: false
-        tianbot_2/chassis_inertia:
-          Value: false
-        tianbot_2/laser:
-          Value: false
-        tianbot_2/left_wheel_link:
-          Value: false
-        tianbot_2/odom:
-          Value: false
-        tianbot_2/right_wheel_link:
-          Value: false
+        tbmn_01/chassis:
+          Value: true
+        tbmn_01/chassis_inertia:
+          Value: true
+        tbmn_01/laser:
+          Value: true
+        tbmn_01/left_wheel_link:
+          Value: true
+        tbmn_01/odom:
+          Value: true
+        tbmn_01/right_wheel_link:
+          Value: true
+        tbmn_02/base_link:
+          Value: true
+        tbmn_02/caster_wheel_link:
+          Value: true
+        tbmn_02/casterball_link:
+          Value: true
+        tbmn_02/chassis:
+          Value: true
+        tbmn_02/chassis_inertia:
+          Value: true
+        tbmn_02/laser:
+          Value: true
+        tbmn_02/left_wheel_link:
+          Value: true
+        tbmn_02/odom:
+          Value: true
+        tbmn_02/right_wheel_link:
+          Value: true
         world:
           Value: true
+      Marker Alpha: 1
       Marker Scale: 1
       Name: TF
       Show Arrows: true
@@ -105,35 +106,33 @@ Visualization Manager:
       Show Names: true
       Tree:
         world:
-          tianbot_1/odom:
-            tianbot_1/base_link:
-              tianbot_1/chassis:
-                tianbot_1/caster_wheel_link:
-                  tianbot_1/casterball_link:
+          tbmn_01/odom:
+            tbmn_01/base_link:
+              tbmn_01/chassis:
+                tbmn_01/caster_wheel_link:
+                  tbmn_01/casterball_link:
                     {}
-                tianbot_1/chassis_inertia:
+                tbmn_01/chassis_inertia:
                   {}
-                tianbot_1/left_wheel_link:
+                tbmn_01/left_wheel_link:
                   {}
-                tianbot_1/right_wheel_link:
+                tbmn_01/right_wheel_link:
                   {}
-              tianbot_1/laser:
+              tbmn_01/laser:
                 {}
-              tianbot_1/target:
-                {}
-          tianbot_2/odom:
-            tianbot_2/base_link:
-              tianbot_2/chassis:
-                tianbot_2/caster_wheel_link:
-                  tianbot_2/casterball_link:
+          tbmn_02/odom:
+            tbmn_02/base_link:
+              tbmn_02/chassis:
+                tbmn_02/caster_wheel_link:
+                  tbmn_02/casterball_link:
                     {}
-                tianbot_2/chassis_inertia:
+                tbmn_02/chassis_inertia:
                   {}
-                tianbot_2/left_wheel_link:
+                tbmn_02/left_wheel_link:
                   {}
-                tianbot_2/right_wheel_link:
+                tbmn_02/right_wheel_link:
                   {}
-              tianbot_2/laser:
+              tbmn_02/laser:
                 {}
       Update Interval: 0
       Value: true
@@ -147,46 +146,46 @@ Visualization Manager:
         Expand Link Details: false
         Expand Tree: false
         Link Tree Style: Links in Alphabetic Order
-        tianbot_1/base_link:
+        tbmn_01/base_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-        tianbot_1/caster_wheel_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        tianbot_1/casterball_link:
+        tbmn_01/caster_wheel_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        tianbot_1/chassis:
+        tbmn_01/casterball_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        tianbot_1/chassis_inertia:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        tianbot_1/laser:
+        tbmn_01/chassis:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        tianbot_1/left_wheel_link:
+        tbmn_01/chassis_inertia:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        tbmn_01/laser:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        tianbot_1/right_wheel_link:
+        tbmn_01/left_wheel_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        tbmn_01/right_wheel_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
       Name: RobotModel
-      Robot Description: tianbot_1/robot_description
+      Robot Description: tbmn_01/robot_description
       TF Prefix: ""
       Update Interval: 0
       Value: true
@@ -201,46 +200,46 @@ Visualization Manager:
         Expand Link Details: false
         Expand Tree: false
         Link Tree Style: Links in Alphabetic Order
-        tianbot_2/base_link:
+        tbmn_02/base_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-        tianbot_2/caster_wheel_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        tianbot_2/casterball_link:
+        tbmn_02/caster_wheel_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        tianbot_2/chassis:
+        tbmn_02/casterball_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        tianbot_2/chassis_inertia:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        tianbot_2/laser:
+        tbmn_02/chassis:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        tianbot_2/left_wheel_link:
+        tbmn_02/chassis_inertia:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        tbmn_02/laser:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        tianbot_2/right_wheel_link:
+        tbmn_02/left_wheel_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        tbmn_02/right_wheel_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
       Name: RobotModel
-      Robot Description: tianbot_2/robot_description
+      Robot Description: tbmn_02/robot_description
       TF Prefix: ""
       Update Interval: 0
       Value: true
@@ -273,12 +272,13 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 2.5761866569519043
+      Distance: 0.6656402349472046
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
+      Field of View: 0.7853981852531433
       Focal Point:
         X: 0
         Y: 0
@@ -290,7 +290,6 @@ Visualization Manager:
       Near Clip Distance: 0.009999999776482582
       Pitch: 0.7903980016708374
       Target Frame: <Fixed Frame>
-      Value: Orbit (rviz)
       Yaw: 0.785398006439209
     Saved: ~
 Window Geometry:

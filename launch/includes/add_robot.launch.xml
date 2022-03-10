@@ -2,13 +2,13 @@
 
   <!-- 迷你机器人，基础参数 -->
   <arg name="robot_name"/>
-  <arg name="port"/>
+  <arg name="port" default=""/>
   <!-- 迷你机器人模型 -->
   <include ns="$(arg robot_name)" file="$(find tianbot_mini)/launch/includes/model.launch.xml">
     <arg name="robot_name" value="$(arg robot_name)" />
   </include>
 
-  <include ns="$(arg robot_name)" file="$(find tianbot_mini)/launch/lidar.launch" >
+  <include unless="$(eval port=='')"  ns="$(arg robot_name)" file="$(find tianbot_mini)/launch/lidar.launch" >
     <arg name="robot_name" value="$(arg robot_name)" />
     <arg name="port" value="$(arg port)" />
   </include>

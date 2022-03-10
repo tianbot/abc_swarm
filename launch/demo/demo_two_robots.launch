@@ -1,0 +1,26 @@
+<launch>
+  <arg name="robot_name_1" default="tbmn_01" />
+  <arg name="robot_name_2" default="tbmn_02" /> 
+
+  <include file="$(find tianbot_mini)/launch/bringup.launch" >
+    <arg name="robot_name" value="$(arg robot_name_1)" />
+  </include>
+  <include file="$(find tianbot_mini)/launch/lidar.launch" >
+    <arg name="robot_name" value="$(arg robot_name_1)" />
+    <arg name="port" value="/dev/ttyUSB0" />
+  </include>
+
+  <include file="$(find abc_swarm)/launch/add_robot.launch">
+    <arg name="robot_name" value="$(arg robot_name_2)" />
+  </include>
+  <include file="$(find tianbot_mini)/launch/lidar.launch" >
+    <arg name="robot_name" value="$(arg robot_name_2)" />
+    <arg name="port" value="/dev/ttyUSB1" />
+  </include>
+
+    <node pkg="tf" type="static_transform_publisher" name="world_to_global_1" args="0 0 0 0 0 0 world $(arg robot_name_1)/odom 20" />
+    <node pkg="tf" type="static_transform_publisher" name="world_to_global_2" args="0 0 0 0 0 0 world $(arg robot_name_2)/odom 20" />
+
+    <!-- RVIZ可视化调试工具 -->
+  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find abc_swarm)/rviz/demo_tf.rviz" />
+</launch>

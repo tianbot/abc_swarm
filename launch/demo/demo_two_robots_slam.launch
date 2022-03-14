@@ -1,0 +1,23 @@
+<launch>
+  <arg name="robot_name_1" default="tbmn_01" />
+  <arg name="robot_name_2" default="tbmn_02" /> 
+
+  <include file="$(find abc_swarm)/launch/includes/two_robots.launch.xml" >
+    <arg name="robot_name_1" value="$(arg robot_name_1)" />
+    <arg name="robot_name_2" value="$(arg robot_name_2)" /> 
+  </include>
+
+  <include file="$(find tianbot_mini)/launch/slam.launch" >
+    <arg name="robot_name" value="$(arg robot_name_1)" />
+  </include>
+
+  <include file="$(find tianbot_mini)/launch/slam.launch" >
+    <arg name="robot_name" value="$(arg robot_name_2)" />
+  </include>
+
+  <node pkg="tf" type="static_transform_publisher" name="world_to_global_1" args="0 0 0 0 0 0 world $(arg robot_name_1)/map 20" />
+  <node pkg="tf" type="static_transform_publisher" name="world_to_global_2" args="0 0 0 0 0 0 world $(arg robot_name_2)/map 20" />
+
+</launch>
+
+<!-- http://wiki.ros.org/multirobot_map_merge -->

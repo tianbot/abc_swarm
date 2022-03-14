@@ -1,0 +1,38 @@
+<launch>
+  <arg name="robot_name_1" default="tbmn_01" />
+  <arg name="robot_name_2" default="tbmn_02" /> 
+
+  <arg name="tbmn_01_x" default="0.0"/>
+  <arg name="tbmn_01_y" default="0.0"/>
+  <arg name="tbmn_01_a" default="0.0"/>
+
+  <arg name="tbmn_02_x" default="0.0"/>
+  <arg name="tbmn_02_y" default="0.6"/>
+  <arg name="tbmn_02_a" default="0.0"/>
+
+  <group ns="$(arg robot_name_1)/map_merge">
+    <param name="init_pose_x"   value="$(arg tbmn_01_x)"/>
+    <param name="init_pose_y"   value="$(arg tbmn_01_y)"/>
+    <param name="init_pose_z"   value="0"/>
+    <param name="init_pose_yaw" value="$(arg tbmn_01_a)"  />
+  </group>
+
+  <group ns="$(arg robot_name_2)/map_merge">
+    <param name="init_pose_x"   value="$(arg tbmn_02_x)"/>
+    <param name="init_pose_y"   value="$(arg tbmn_02_y)"/>
+    <param name="init_pose_z"   value="0"/>
+    <param name="init_pose_yaw" value="$(arg tbmn_02_a)"  />
+  </group>
+
+  <node pkg="multirobot_map_merge" type="map_merge" respawn="false" name="map_merge" output="screen">
+    <param name="robot_map_topic" value="map"/>
+    <param name="robot_namespace" value="tbmn"/>
+    <param name="merged_map_topic" value="map"/>
+    <param name="world_frame" value="world"/>
+    <param name="known_init_poses" value="true"/>
+    <param name="merging_rate" value="0.5"/>
+    <param name="discovery_rate" value="0.05"/>
+    <param name="estimation_rate" value="0.1"/>
+    <param name="estimation_confidence" value="1.0"/>
+  </node>
+</launch>

@@ -11,6 +11,7 @@ def get_ip_x():
     try:
         s.connect(('10.255.255.255', 1))
         IP = s.getsockname()[0]
+        print("rmip:"+IP)
     except:
         IP = '127.0.0.1'
     finally:
@@ -20,13 +21,17 @@ def get_ip_x():
 if __name__ == '__main__':    
     sock_server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock_server.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-    sock_server.bind(('192.168.8.149', 5000))
-
+    ip = get_ip_x()
+    sock_server.bind((ip, 5000))
+    
+    ip_for_cmd=ip.replace("."," ")
+    cmd = '*:*:setrmip '+ ip_for_cmd
+    sock_server.sendto(bytes(cmd, encoding='utf-8'), ('<broadcast>', 5000))
 
     cmd = '*:*:echo'
-    sock_server.sendto(bytes(cmd, encoding='utf-8'), ('192.168.8.255', 5000))
+    sock_server.sendto(bytes(cmd, encoding='utf-8'), ('<broadcast>', 5000))
 
-    sock_server.settimeout(1)
+    sock_server.settimeout(10)
     while True:
         try:
             data, addr = sock_server.recvfrom(1024)

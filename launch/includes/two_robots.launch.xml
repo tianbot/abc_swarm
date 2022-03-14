@@ -1,0 +1,20 @@
+<launch>
+  <arg name="robot_name_1" />
+  <arg name="robot_name_2" /> 
+
+  <include file="$(find tianbot_mini)/launch/bringup.launch" >
+    <arg name="robot_name" value="$(arg robot_name_1)" />
+  </include>
+  <include file="$(find tianbot_mini)/launch/lidar.launch" >
+    <arg name="robot_name" value="$(arg robot_name_1)" />
+    <arg name="port" value="/dev/ttyUSB0" />
+  </include>
+
+  <include file="$(find abc_swarm)/launch/add_robot.launch">
+    <arg name="robot_name" value="$(arg robot_name_2)" />
+  </include>
+  <include file="$(find tianbot_mini)/launch/lidar.launch" >
+    <arg name="robot_name" value="$(arg robot_name_2)" />
+    <arg name="port" value="/dev/ttyUSB1" />
+  </include>
+</launch>

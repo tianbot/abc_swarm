@@ -1,6 +1,7 @@
 <launch>
   <arg name="robot_name_1" default="tbmn_01" />
   <arg name="robot_name_2" default="tbmn_02" /> 
+  <arg name="map" default="$(find tianbot_mini)/maps/maze.yaml"
 
   <include file="$(find tianbot_mini)/launch/bringup.launch" >
     <arg name="robot_name" value="$(arg robot_name_1)" />
@@ -22,11 +23,13 @@
     <arg name="robot_name" value="$(arg robot_name_1)" />
     <arg name="initial_pose_x"  default="0.0"/>
     <arg name="initial_pose_y"  default="0.0"/>  
+    <arg name="map" value="$(arg map)" />
   </include>
   <include file="$(find tianbot_mini)/launch/amcl.launch">
     <arg name="robot_name" value="$(arg robot_name_2)" />
     <arg name="initial_pose_x"  default="-0.5"/>
     <arg name="initial_pose_y"  default="0.0"/>  
+    <arg name="map" value="$(arg map)" />
   </include>
   <node pkg="tf" type="static_transform_publisher" name="world_to_global_1" args="0 0 0 0 0 0 world $(arg robot_name_1)/map 20" />
   <node pkg="tf" type="static_transform_publisher" name="world_to_global_2" args="0 0 0 0 0 0 world $(arg robot_name_2)/map 20" />

@@ -1,6 +1,6 @@
 <launch>
-  <arg name="robot_name_1" default="tianbot_1" />
-  <arg name="robot_name_2" default="tianbot_2" /> 
+  <arg name="robot_name_1" default="tbmn_01" />
+  <arg name="robot_name_2" default="tbmn_02" /> 
 
   <include file="$(find tianbot_mini)/launch/simulation.launch" >
     <arg name="robot_name" value="$(arg robot_name_1)" />

@@ -1,10 +1,11 @@
 <launch>
-  <arg name="robot_name_1" default="tianbot_1" />
-  <arg name="robot_name_2" default="tianbot_2" /> 
-  <arg name="robot_name_3" default="tianbot_3" /> 
+  <arg name="robot_name_1" default="tbmn_01" />
+  <arg name="robot_name_2" default="tbmn_02" /> 
+  <arg name="robot_name_3" default="tbmn_03" /> 
 
   <include file="$(find tianbot_mini)/launch/simulation.launch" >
     <arg name="robot_name" value="$(arg robot_name_1)" />
+    <arg name="world_name" value="$(find gazebo_ros)/launch/empty_world.launch" />
   </include>
 
   <include file="$(find abc_swarm)/launch/spawn_robot.launch">
@@ -24,8 +25,8 @@
   <node pkg="tf" type="static_transform_publisher" name="world_to_odom_1" args="0 0 0 0 0 0 world $(arg robot_name_1)/odom 20" />
   <node pkg="tf" type="static_transform_publisher" name="world_to_odom_2" args="0 0 0 0 0 0 world $(arg robot_name_2)/odom 20" />
   <node pkg="tf" type="static_transform_publisher" name="world_to_odom_3" args="0 0 0 0 0 0 world $(arg robot_name_3)/odom 20" />
-  <node pkg="tf" type="static_transform_publisher" name="robot_2_target" args="-0.666 0.5 0 0 0 0 $(arg robot_name_1)/base_link $(arg robot_name_2)/target 20" />
-  <node pkg="tf" type="static_transform_publisher" name="robot_3_target" args="-0.666 -0.5 0 0 0 0 $(arg robot_name_1)/base_link $(arg robot_name_3)/target 20" />
+  <node pkg="tf" type="static_transform_publisher" name="robot_2_target" args="-0.866 0.5 0 0 0 0 $(arg robot_name_1)/base_link $(arg robot_name_2)/target 20" />
+  <node pkg="tf" type="static_transform_publisher" name="robot_3_target" args="-0.866 -0.5 0 0 0 0 $(arg robot_name_1)/base_link $(arg robot_name_3)/target 20" />
 
   <node pkg="abc_swarm" type="tianbot_mini_tf.py" name="tianbot_2_follower" >
     <param name="target_frame" value="$(arg robot_name_2)/target" />

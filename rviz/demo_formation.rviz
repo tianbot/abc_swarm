@@ -7,6 +7,9 @@ Panels:
         - /Global Options1
         - /Status1
         - /TF1/Frames1
+        - /RobotModel1
+        - /RobotModel2
+        - /RobotModel3
       Splitter Ratio: 0.5
     Tree Height: 719
   - Class: rviz/Selection
@@ -54,125 +57,20 @@ Visualization Manager:
       Reference Frame: <Fixed Frame>
       Value: true
     - Class: rviz/TF
-      Enabled: true
+      Enabled: false
       Frame Timeout: 15
       Frames:
         All Enabled: false
-        tianbot_1/base_link:
-          Value: true
-        tianbot_1/caster_wheel_link:
-          Value: false
-        tianbot_1/casterball_link:
-          Value: false
-        tianbot_1/chassis:
-          Value: false
-        tianbot_1/chassis_inertia:
-          Value: false
-        tianbot_1/laser:
-          Value: false
-        tianbot_1/left_wheel_link:
-          Value: false
-        tianbot_1/odom:
-          Value: false
-        tianbot_1/right_wheel_link:
-          Value: false
-        tianbot_2/base_link:
-          Value: true
-        tianbot_2/caster_wheel_link:
-          Value: false
-        tianbot_2/casterball_link:
-          Value: false
-        tianbot_2/chassis:
-          Value: false
-        tianbot_2/chassis_inertia:
-          Value: false
-        tianbot_2/laser:
-          Value: false
-        tianbot_2/left_wheel_link:
-          Value: false
-        tianbot_2/odom:
-          Value: false
-        tianbot_2/right_wheel_link:
-          Value: false
-        tianbot_2/target:
-          Value: true
-        tianbot_3/base_link:
-          Value: true
-        tianbot_3/caster_wheel_link:
-          Value: false
-        tianbot_3/casterball_link:
-          Value: false
-        tianbot_3/chassis:
-          Value: false
-        tianbot_3/chassis_inertia:
-          Value: false
-        tianbot_3/laser:
-          Value: false
-        tianbot_3/left_wheel_link:
-          Value: false
-        tianbot_3/odom:
-          Value: false
-        tianbot_3/right_wheel_link:
-          Value: false
-        tianbot_3/target:
-          Value: true
-        world:
-          Value: true
+      Marker Alpha: 1
       Marker Scale: 1
       Name: TF
       Show Arrows: true
       Show Axes: true
       Show Names: true
       Tree:
-        world:
-          tianbot_1/odom:
-            tianbot_1/base_link:
-              tianbot_1/chassis:
-                tianbot_1/caster_wheel_link:
-                  tianbot_1/casterball_link:
-                    {}
-                tianbot_1/chassis_inertia:
-                  {}
-              tianbot_1/laser:
-                {}
-              tianbot_1/left_wheel_link:
-                {}
-              tianbot_1/right_wheel_link:
-                {}
-              tianbot_2/target:
-                {}
-              tianbot_3/target:
-                {}
-          tianbot_2/odom:
-            tianbot_2/base_link:
-              tianbot_2/chassis:
-                tianbot_2/caster_wheel_link:
-                  tianbot_2/casterball_link:
-                    {}
-                tianbot_2/chassis_inertia:
-                  {}
-              tianbot_2/laser:
-                {}
-              tianbot_2/left_wheel_link:
-                {}
-              tianbot_2/right_wheel_link:
-                {}
-          tianbot_3/odom:
-            tianbot_3/base_link:
-              tianbot_3/chassis:
-                tianbot_3/caster_wheel_link:
-                  tianbot_3/casterball_link:
-                    {}
-                tianbot_3/chassis_inertia:
-                  {}
-              tianbot_3/laser:
-                {}
-              tianbot_3/left_wheel_link:
-                {}
-              tianbot_3/right_wheel_link:
-                {}
+        {}
       Update Interval: 0
-      Value: true
+      Value: false
     - Alpha: 1
       Class: rviz/RobotModel
       Collision Enabled: false
@@ -183,46 +81,46 @@ Visualization Manager:
         Expand Link Details: false
         Expand Tree: false
         Link Tree Style: Links in Alphabetic Order
-        tianbot_1/base_link:
+        tbmn_01/base_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-        tianbot_1/caster_wheel_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        tianbot_1/casterball_link:
+        tbmn_01/caster_wheel_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        tianbot_1/chassis:
+        tbmn_01/casterball_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        tianbot_1/chassis_inertia:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        tianbot_1/laser:
+        tbmn_01/chassis:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        tianbot_1/left_wheel_link:
+        tbmn_01/chassis_inertia:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        tbmn_01/laser:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        tianbot_1/right_wheel_link:
+        tbmn_01/left_wheel_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        tbmn_01/right_wheel_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
       Name: RobotModel
-      Robot Description: tianbot_1/robot_description
+      Robot Description: tbmn_01/robot_description
       TF Prefix: ""
       Update Interval: 0
       Value: true
@@ -237,46 +135,46 @@ Visualization Manager:
         Expand Link Details: false
         Expand Tree: false
         Link Tree Style: Links in Alphabetic Order
-        tianbot_2/base_link:
+        tbmn_02/base_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-        tianbot_2/caster_wheel_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        tianbot_2/casterball_link:
+        tbmn_02/caster_wheel_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        tianbot_2/chassis:
+        tbmn_02/casterball_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        tianbot_2/chassis_inertia:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        tianbot_2/laser:
+        tbmn_02/chassis:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        tianbot_2/left_wheel_link:
+        tbmn_02/chassis_inertia:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        tbmn_02/laser:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        tianbot_2/right_wheel_link:
+        tbmn_02/left_wheel_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        tbmn_02/right_wheel_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
       Name: RobotModel
-      Robot Description: tianbot_2/robot_description
+      Robot Description: tbmn_02/robot_description
       TF Prefix: ""
       Update Interval: 0
       Value: true
@@ -291,46 +189,46 @@ Visualization Manager:
         Expand Link Details: false
         Expand Tree: false
         Link Tree Style: Links in Alphabetic Order
-        tianbot_3/base_link:
+        tbmn_03/base_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-        tianbot_3/caster_wheel_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        tianbot_3/casterball_link:
+        tbmn_03/caster_wheel_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        tianbot_3/chassis:
+        tbmn_03/casterball_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        tianbot_3/chassis_inertia:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        tianbot_3/laser:
+        tbmn_03/chassis:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        tianbot_3/left_wheel_link:
+        tbmn_03/chassis_inertia:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        tbmn_03/laser:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        tianbot_3/right_wheel_link:
+        tbmn_03/left_wheel_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        tbmn_03/right_wheel_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
       Name: RobotModel
-      Robot Description: tianbot_3/robot_description
+      Robot Description: tbmn_03/robot_description
       TF Prefix: ""
       Update Interval: 0
       Value: true
@@ -363,12 +261,13 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 2.5607423782348633
+      Distance: 2.569519519805908
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
+      Field of View: 0.7853981852531433
       Focal Point:
         X: 0
         Y: 0
@@ -380,7 +279,6 @@ Visualization Manager:
       Near Clip Distance: 0.009999999776482582
       Pitch: 0.7903980016708374
       Target Frame: <Fixed Frame>
-      Value: Orbit (rviz)
       Yaw: 0.785398006439209
     Saved: ~
 Window Geometry:

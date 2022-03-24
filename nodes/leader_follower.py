@@ -14,13 +14,13 @@ import numpy as np
 from simple_pid import PID
 
 
-pid_linear = PID(2, 0.0, 0.0)
+pid_linear = PID(0.5, 0.0, 0.0)
 pid_linear.output_limits = (-0.8, 0.8)
-pid_angular = PID(5, 0.0, 0.0)
+pid_angular = PID(1, 0.0, 0.0)
 pid_angular.output_limits = (-1.5, 1.5)
 
-k_1 = 2
-k_2 = 2
+k_1 = 1
+k_2 = 1
 d = 0.1
 w_L = 0
 v_L = 0
@@ -40,9 +40,9 @@ def odom_cb(msg):
 
 if __name__ == '__main__':
     rospy.init_node('tianbot_mini_tf_listener')
-    target_frame = rospy.get_param('~target_frame',"tianbot_1/base_link")
     leader_robot_name = rospy.get_param('~leader_robot_name')
     follower_robot_name = rospy.get_param('~follower_robot_name')
+    target_frame = rospy.get_param('~target_frame',leader_robot_name+"/base_link")
     theta0 = rospy.get_param('~expected_theta', np.pi)
     L0 = rospy.get_param('~expected_distance', 1)
 

@@ -1,21 +1,24 @@
 <launch>
-  <arg name="robot_name_1" default="tianbot_1" />
-  <arg name="robot_name_2" default="tianbot_2" /> 
-  <arg name="robot_name_3" default="tianbot_3" /> 
+  <arg name="robot_name_1" default="tbmn_01" />
+  <arg name="robot_name_2" default="tbmn_02" /> 
+  <arg name="robot_name_3" default="tbmn_03" /> 
   <param name="use_sim_time" value="true"/>
 
   <include file="$(find tianbot_mini)/launch/simulation.launch" >
     <arg name="robot_name" value="$(arg robot_name_1)" />
+    <arg name="world_name" value="$(find gazebo_ros)/launch/empty_world.launch" />
   </include>
   <include file="$(find abc_swarm)/launch/spawn_robot.launch">
     <arg name="robot_name" value="$(arg robot_name_2)" />
     <!--the position is controlled by the static transform-->
-    <arg name="initial_pose_x" value="-1"/>
+    <arg name="initial_pose_x" value="-0.732"/>
+    <arg name="initial_pose_y" value="0.5"/>
   </include>
   <include file="$(find abc_swarm)/launch/spawn_robot.launch">
     <arg name="robot_name" value="$(arg robot_name_3)" />
     <!--the position is controlled by the static transform-->
-    <arg name="initial_pose_x" value="-2"/>
+    <arg name="initial_pose_x" value="-0.732"/>
+    <arg name="initial_pose_y" value="-0.5"/>
   </include>
   
   <node pkg="tf" type="static_transform_publisher" name="world_to_global_1" args="0 0 0 0 0 0 world $(arg robot_name_1)/odom 20" />

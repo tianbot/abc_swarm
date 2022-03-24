@@ -19,5 +19,3 @@
   <node pkg="tf" type="static_transform_publisher" name="world_to_global_2" args="0 0 0 0 0 0 world $(arg robot_name_2)/map 20" />
 
 </launch>
-
-<!-- http://wiki.ros.org/multirobot_map_merge -->

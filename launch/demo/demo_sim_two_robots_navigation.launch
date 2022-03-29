@@ -30,4 +30,5 @@
   <node pkg="tf" type="static_transform_publisher" name="world_to_global_1" args="0 0 0 0 0 0 world $(arg robot_name_1)/map 20" />
   <node pkg="tf" type="static_transform_publisher" name="world_to_global_2" args="0 0 0 0 0 0 world $(arg robot_name_2)/map 20" />
 
+  <!-- <node pkg="abc_swarm" type="two_robots_nav_goals.py" name="two_robots_nav" /> -->
 </launch>

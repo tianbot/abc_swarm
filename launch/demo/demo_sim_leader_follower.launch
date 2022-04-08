@@ -2,6 +2,7 @@
   <arg name="robot_name_1" default="tbmn_01" />
   <arg name="robot_name_2" default="tbmn_02" /> 
   <arg name="robot_name_3" default="tbmn_03" /> 
+  <arg name="front_distance" default = "0.1" />
   <param name="use_sim_time" value="true"/>
 
   <include file="$(find tianbot_mini)/launch/simulation.launch" >
@@ -24,8 +25,8 @@
   <node pkg="tf" type="static_transform_publisher" name="world_to_global_1" args="0 0 0 0 0 0 world $(arg robot_name_1)/odom 20" />
   <node pkg="tf" type="static_transform_publisher" name="world_to_global_2" args="0 0 0 0 0 0 world $(arg robot_name_2)/odom 20" />
   <node pkg="tf" type="static_transform_publisher" name="world_to_global_3" args="0 0 0 0 0 0 world $(arg robot_name_3)/odom 20" />
-  <node pkg="tf" type="static_transform_publisher" name="robot_2_front" args="0.1 0 0 0 0 0 $(arg robot_name_2)/base_link $(arg robot_name_2)/front 20" />
-  <node pkg="tf" type="static_transform_publisher" name="robot_3_front" args="0.1 0 0 0 0 0 $(arg robot_name_3)/base_link $(arg robot_name_3)/front 20" />
+  <node pkg="tf" type="static_transform_publisher" name="robot_2_front" args="$(arg front_distance) 0 0 0 0 0 $(arg robot_name_2)/base_link $(arg robot_name_2)/front 20" />
+  <node pkg="tf" type="static_transform_publisher" name="robot_3_front" args="$(arg front_distance) 0 0 0 0 0 $(arg robot_name_3)/base_link $(arg robot_name_3)/front 20" />
 
 
   <node pkg="abc_swarm" type="leader_follower.py" name="robot_2_follower" output="screen">
@@ -33,6 +34,7 @@
     <param name="follower_robot_name" value="$(arg robot_name_2)" />
     <param name="expected_distance" value="0.5" />
     <param name="expected_theta" value="$(eval 3.14159 * 2 /3)" />
+    <param name="front_distance" value="$(arg front_distance)" />
   </node>
 
   <node pkg="abc_swarm" type="leader_follower.py" name="robot_3_follower" output="screen">
@@ -40,7 +42,9 @@
     <param name="follower_robot_name" value="$(arg robot_name_3)" />
     <param name="expected_distance" value="0.5" />
     <param name="expected_theta" value="$(eval -3.14159 * 2 /3)" />
+    <param name="front_distance" value="$(arg front_distance)" />
   </node>
+
   <!-- RVIZ可视化调试工具 -->
   <node name="rviz" pkg="rviz" type="rviz" args="-d $(find abc_swarm)/rviz/demo_formation.rviz" />
 </launch>

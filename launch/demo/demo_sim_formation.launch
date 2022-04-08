@@ -22,22 +22,23 @@
     <arg name="initial_pose_y" value="-0.5"/>
   </include>
   
+  <!-- the target frame pos x = - 0.866(spawn) + 0.2(set_distance) -->
   <node pkg="tf" type="static_transform_publisher" name="world_to_odom_1" args="0 0 0 0 0 0 world $(arg robot_name_1)/odom 20" />
   <node pkg="tf" type="static_transform_publisher" name="world_to_odom_2" args="0 0 0 0 0 0 world $(arg robot_name_2)/odom 20" />
   <node pkg="tf" type="static_transform_publisher" name="world_to_odom_3" args="0 0 0 0 0 0 world $(arg robot_name_3)/odom 20" />
-  <node pkg="tf" type="static_transform_publisher" name="robot_2_target" args="-0.866 0.5 0 0 0 0 $(arg robot_name_1)/base_link $(arg robot_name_2)/target 20" />
-  <node pkg="tf" type="static_transform_publisher" name="robot_3_target" args="-0.866 -0.5 0 0 0 0 $(arg robot_name_1)/base_link $(arg robot_name_3)/target 20" />
+  <node pkg="tf" type="static_transform_publisher" name="robot_2_target" args="-0.666 0.5 0 0 0 0 $(arg robot_name_1)/base_link $(arg robot_name_2)/target 20" />
+  <node pkg="tf" type="static_transform_publisher" name="robot_3_target" args="-0.666 -0.5 0 0 0 0 $(arg robot_name_1)/base_link $(arg robot_name_3)/target 20" />
 
   <node pkg="abc_swarm" type="tianbot_mini_tf.py" name="tianbot_2_follower" >
     <param name="target_frame" value="$(arg robot_name_2)/target" />
     <param name="follower_robot_name" value="$(arg robot_name_2)" />
-    <param name="set_distance" value="0.05" />
+    <param name="set_distance" value="0.2" />
   </node>
 
   <node pkg="abc_swarm" type="tianbot_mini_tf.py" name="tianbot_3_follower" >
     <param name="target_frame" value="$(arg robot_name_3)/target" />
     <param name="follower_robot_name" value="$(arg robot_name_3)" />
-    <param name="set_distance" value="0.05" />
+    <param name="set_distance" value="0.2" />
   </node>
 
 

@@ -1,0 +1,49 @@
+<launch>
+  <arg name="robot_name_1" default="tbmn_01" />
+  <arg name="robot_name_2" default="tbmn_02" /> 
+
+  <include file="$(find abc_swarm)/launch/includes/two_robots.launch.xml" >
+    <arg name="robot_name_1" value="$(arg robot_name_1)" />
+    <arg name="robot_name_2" value="$(arg robot_name_2)" /> 
+  </include>
+  
+  <include file="$(find tianbot_mini)/launch/amcl.launch" >
+    <arg name="robot_name" value="$(arg robot_name_1)" />
+    <arg name="map" value="$(find tianbot_mini)/maps/office.yaml" />
+    <arg name="initial_pose_x"  default="-0.3"/>
+    <arg name="initial_pose_y"  default="0.3"/>
+    <arg name="use_rviz" value="false" />
+  </include>
+
+  <include file="$(find tianbot_mini)/launch/amcl.launch" >
+    <arg name="robot_name" value="$(arg robot_name_2)" />
+    <arg name="map" value="$(find tianbot_mini)/maps/office.yaml" />
+    <arg name="initial_pose_x"  default="-0.3"/>
+    <arg name="initial_pose_y"  default="-0.3"/>
+    <arg name="use_rviz" value="false" />
+  </include>
+
+  <node pkg="tf" type="static_transform_publisher" name="world_to_global_1" args="0 0 0 0 0 0 world $(arg robot_name_1)/map 20" />
+  <node pkg="tf" type="static_transform_publisher" name="world_to_global_2" args="0 0 0 0 0 0 world $(arg robot_name_2)/map 20" />
+
+  <node pkg="tf" type="static_transform_publisher" name="robot_1_target" args="-0.2 0.3 0 0 0 0 virtual_leader $(arg robot_name_1)/target 20" />
+  <node pkg="tf" type="static_transform_publisher" name="robot_2_target" args="-0.2 -0.3 0 0 0 0 virtual_leader $(arg robot_name_2)/target 20" />
+
+  <!-- <node pkg="abc_swarm" type="virtual_leader.py" name="virtual_leader" /> -->
+
+  <node pkg="abc_swarm" type="tianbot_mini_tf.py" name="tianbot_1_follower" >
+    <param name="target_frame" value="$(arg robot_name_1)/target" />
+    <param name="follower_robot_name" value="$(arg robot_name_1)" />
+    <param name="set_distance" value="0.1" />
+  </node>
+
+  <node pkg="abc_swarm" type="tianbot_mini_tf.py" name="tianbot_2_follower" >
+    <param name="target_frame" value="$(arg robot_name_2)/target" />
+    <param name="follower_robot_name" value="$(arg robot_name_2)" />
+    <param name="set_distance" value="0.1" />
+  </node>
+
+
+  <!-- RVIZ可视化调试工具 -->
+  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find abc_swarm)/rviz/demo_formation.rviz" />
+</launch>

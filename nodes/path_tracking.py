@@ -85,20 +85,18 @@ class PathTracking():
         self.Lf = 0.3
         # param
         self.robot_name = rospy.get_param('~robot_name', 'tianbot_mini')
-        #self.plan_topic_name = rospy.get_param('~plan_topic', '/move_base/TrajectoryPlannerROS/global_plan')
-        self.plan_topic_name = rospy.get_param('~plan_topic', '/path')
-        # self.plan_topic_name = rospy.get_param('~plan_topic', '/path')                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            ')
+        self.plan_topic_name = rospy.get_param('~plan_topic', 'global_plan')
 
         # subs and pubs
-        self.path_sub = rospy.Subscriber(self.robot_name + self.plan_topic_name, Path, self.path_cb)
-        self.cmd_vel_pub = rospy.Publisher(self.robot_name + '/cmd_vel', Twist, queue_size=1)
+        self.path_sub = rospy.Subscriber(self.plan_topic_name, Path, self.path_cb)
+        self.cmd_vel_pub = rospy.Publisher('cmd_vel', Twist, queue_size=1)
         self.listener = tf.TransformListener()
 
 if __name__ == '__main__':  
 
     try:  
-        task = PathTracking() 
-        task.pure_pursuit()
+        tracker = PathTracking() 
+        tracker.pure_pursuit()
 
     except rospy.ROSInterruptException:  
 

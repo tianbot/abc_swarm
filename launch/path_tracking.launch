@@ -1,0 +1,15 @@
+<launch>
+  <arg name="robot_name" default="tianbot_mini" />
+  <arg name="plan_topic" default="global_plan" />
+  <group ns="$(arg robot_name)">
+    <node pkg="abc_swarm" type="path_planning.py" name="path_planner" output="screen">
+      <param name="robot_name" value="$(arg robot_name)" />
+      <param name="plan_topic" value="$(arg plan_topic)" />
+    </node>
+
+    <node pkg="abc_swarm" type="path_tracking.py" name="path_tracker" output="screen">
+      <param name="robot_name" value="$(arg robot_name)" />
+      <param name="plan_topic" value="$(arg plan_topic)" />
+    </node>
+  </group>
+</launch>

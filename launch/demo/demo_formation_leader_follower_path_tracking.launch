@@ -1,0 +1,83 @@
+<launch>
+  <arg name="robot_name_1" default="tbmn_01" />
+  <arg name="robot_name_2" default="tbmn_02" /> 
+  <arg name="robot_name_3" default="tbmn_03" /> 
+  <arg name="front_distance" default = "0.1" />
+
+  <include file="$(find tianbot_mini)/launch/bringup.launch" >
+    <arg name="robot_name" value="$(arg robot_name_1)" />
+  </include>
+  <include file="$(find tianbot_mini)/launch/lidar.launch" >
+    <arg name="robot_name" value="$(arg robot_name_1)" />
+    <arg name="port" value="/dev/ttyUSB0" />
+  </include>
+
+  <include file="$(find abc_swarm)/launch/add_robot.launch">
+    <arg name="robot_name" value="$(arg robot_name_2)" />
+  </include>
+  <include file="$(find tianbot_mini)/launch/lidar.launch" >
+    <arg name="robot_name" value="$(arg robot_name_2)" />
+    <arg name="port" value="/dev/ttyUSB1" />
+  </include>
+  
+  <include file="$(find abc_swarm)/launch/add_robot.launch">
+    <arg name="robot_name" value="$(arg robot_name_3)" />
+  </include>
+  <include file="$(find tianbot_mini)/launch/lidar.launch" >
+    <arg name="robot_name" value="$(arg robot_name_3)" />
+    <arg name="port" value="/dev/ttyUSB2" />
+  </include>
+
+  <include file="$(find tianbot_mini)/launch/includes/amcl.launch.xml" >
+    <arg name="robot_name" value="$(arg robot_name_1)" />
+    <arg name="map" value="$(find tianbot_mini)/maps/office.yaml" />
+    <arg name="initial_pose_x"  default="0"/>
+    <arg name="initial_pose_y"  default="0"/>
+  </include>
+
+  <include file="$(find tianbot_mini)/launch/includes/amcl.launch.xml" >
+    <arg name="robot_name" value="$(arg robot_name_2)" />
+    <arg name="map" value="$(find tianbot_mini)/maps/office.yaml" />
+    <arg name="initial_pose_x"  default="-0.6"/>
+    <arg name="initial_pose_y"  default="0.3"/>
+  </include>
+
+  <include file="$(find tianbot_mini)/launch/includes/amcl.launch.xml" >
+    <arg name="robot_name" value="$(arg robot_name_3)" />
+    <arg name="map" value="$(find tianbot_mini)/maps/office.yaml" />
+    <arg name="initial_pose_x"  default="-0.6"/>
+    <arg name="initial_pose_y"  default="-0.3"/>
+  </include>
+
+  <node pkg="tf" type="static_transform_publisher" name="world_to_global_1" args="0 0 0 0 0 0 world $(arg robot_name_1)/map 20" />
+  <node pkg="tf" type="static_transform_publisher" name="world_to_global_2" args="0 0 0 0 0 0 world $(arg robot_name_2)/map 20" />
+  <node pkg="tf" type="static_transform_publisher" name="world_to_global_3" args="0 0 0 0 0 0 world $(arg robot_name_3)/map 20" />
+
+  <node pkg="tf" type="static_transform_publisher" name="robot_2_front" args="$(arg front_distance) 0 0 0 0 0 $(arg robot_name_2)/base_link $(arg robot_name_2)/front 20" />
+  <node pkg="tf" type="static_transform_publisher" name="robot_3_front" args="$(arg front_distance) 0 0 0 0 0 $(arg robot_name_3)/base_link $(arg robot_name_3)/front 20" />
+
+
+  <node pkg="abc_swarm" type="leader_follower.py" name="robot_2_follower" output="screen">
+    <param name="leader_robot_name" value="$(arg robot_name_1)" />
+    <param name="follower_robot_name" value="$(arg robot_name_2)" />
+    <param name="expected_distance" value="0.3" />
+    <param name="expected_theta" value="$(eval 3.14159 * 5/6)" />
+    <param name="front_distance" value="$(arg front_distance)" />
+  </node>
+
+  <node pkg="abc_swarm" type="leader_follower.py" name="robot_3_follower" output="screen">
+    <param name="leader_robot_name" value="$(arg robot_name_1)" />
+    <param name="follower_robot_name" value="$(arg robot_name_3)" />
+    <param name="expected_distance" value="0.3" />
+    <param name="expected_theta" value="$(eval -3.14159 * 5/6)" />
+    <param name="front_distance" value="$(arg front_distance)" />
+  </node>
+
+  <!-- RViz -->
+  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find abc_swarm)/rviz/demo_formation.rviz" />
+
+  <!-- Path planning and tracking -->
+  <include file="$(find abc_swarm)/launch/path_tracking.launch">
+    <arg name="robot_name" value="$(arg robot_name_1)" />
+  </include>
+</launch>

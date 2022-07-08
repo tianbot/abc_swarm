@@ -31,7 +31,10 @@ The formation of the leader and the follower requires the leader and the followe
 
 According to the geometric relationship in the figure, we can get the following equation:
 
-
+.. math::
+ \begin{cases}l_{x}=\left(x_{L}-x_{F}-d\cos\left(\theta_{F}\right)\right)\cos\left(\theta_{L}\right)+\left(y_{L}-y_{F}-d\sin\left(\theta_{F}\right)\right)\sin\left(\theta_{L}\right)
+ \\l_{y}=-\left(x_{L}-x_{F}-d\cos\left(\theta_{F}\right)\right)\sin\left(\theta_{L}\right)+\left(y_{L}-y_{F}-d\sin\left(\theta_{F}\right)\right)\cos\left(\theta_{L}\right)
+ \end{cases}
 
 References
 ==========

@@ -36,6 +36,10 @@ According to the geometric relationship in the figure, we can get the following 
  \\l_{y}=-\left(x_{L}-x_{F}-d\cos\left(\theta_{F}\right)\right)\sin\left(\theta_{L}\right)+\left(y_{L}-y_{F}-d\sin\left(\theta_{F}\right)\right)\cos\left(\theta_{L}\right)
  \end{cases}
 
+We need to know how the error changes, after derivation of the above formula, we can get the following equation:
+
+Here, we use a control law that linearizes the input and output.
+
 References
 ==========
 

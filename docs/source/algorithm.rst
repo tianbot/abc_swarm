@@ -17,6 +17,10 @@ The kinematic equation of the mobile robot can be expressed as:
  \\\dot{\theta}=\omega
  \end{cases}
 
+Paths and trajectories
+==========
+The path of the mobile robot is only related to the position, and the trajectory is not only related to the position, but also constrained by time.
+
 Multiple mobile robots
 ==========
 

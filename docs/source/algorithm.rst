@@ -43,6 +43,9 @@ According to the geometric relationship in the figure, we can get the following 
 We need to know how the error changes, after derivation of the above formula, we can get the following equation:
 Here, we use a control law that linearizes the input and output.
 
+.. math::
+\textbf{e}=-\textbf{k}\dot{\textbf{e}}
+
 Formation change
 ----------
 When multiple mobile robots move in a certain formation, they will switch formations according to the needs of the task. The following are common formations.

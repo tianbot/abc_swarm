@@ -1,0 +1,23 @@
+<launch>
+  <arg name="robot_name_1" default="tbmn_1" />
+  <arg name="drone_name_1" default="rmtt_0" /> 
+
+  <!-- There is no need to launch tianbot mini -->
+
+  <!-- There is no need to publish static tf from world to map, odom, etc. -->
+
+  <!-- There is no odom published from tianbot mini  -->
+
+  <!-- publish static transform to link vrpn link to robot base_link -->
+  <node pkg="tf" type="static_transform_publisher" name="robot_1_link" args="0 0 0 0 0 0 $(arg robot_name_1) $(arg robot_name_1)/base_link 20" />
+  <node pkg="tf" type="static_transform_publisher" name="drone_1_link" args="0 0 0 0 0 0 $(arg drone_name_1) $(arg drone_name_1)/base_link 20" />
+
+  <node pkg="abc_swarm" type="tianbot_mini_tf.py" name="tianbot_mini_tf" output="screen">
+    <param name="target_frame" value="$(arg robot_name_1)" />
+    <param name="follower_robot_name" value="$(arg drone_name_1)" />
+    <param name="set_distance" value="0.3" />
+  </node>
+
+  <!-- RVIZ可视化调试工具 -->
+  <!-- <node name="rviz" pkg="rviz" type="rviz" args="-d $(find abc_swarm)/rviz/demo_formation.rviz" /> -->
+</launch>

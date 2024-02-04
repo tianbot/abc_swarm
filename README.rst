@@ -1,4 +1,4 @@
 ABC Swarm
 =======================================
 
-ABC Swarm is the developer manual for ROS2GO, Tianbot Mini and RoboMaster TT ROS Swarm Kit.
+ABC Swarm, ROS2GO, Tianbot Mini ve RoboMaster TT ROS Swarm Kit için geliştirici kılavuzudur.

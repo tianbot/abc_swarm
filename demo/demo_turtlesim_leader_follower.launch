@@ -1,0 +1,10 @@
+<launch>
+    <!-- start the turtlesim node -->
+    <node pkg="turtlesim" type="turtlesim_node" name="turtlesim" output="screen" />
+
+    <!-- launch turtle follower script -->
+    <node pkg="abc_swarm" type="turtle_follow.py" name="turtle_follower" output="screen" />
+
+    <!-- (optional) start the keyboard control node for manual control of turtle1 -->
+    <node pkg="turtlesim" type="turtle_teleop_key" name="teleop_key" output="screen" />
+</launch>

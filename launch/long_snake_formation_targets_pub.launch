@@ -1,0 +1,14 @@
+<launch>
+    <arg name="target_frame" default="leader/base_link" />
+    <arg name="target_num" default="10" />
+    <arg name="follower_frame" default="follower" />
+    <arg name="window_size" default="50" />
+    <arg name="hz" default="100" />
+    <node pkg="abc_swarm" type="long_snake_formation_target_pub_with_tf.py" name="long_snake_targets_pub" output="screen" >
+        <param name="target_frame" value="$(arg target_frame)" />
+        <param name="target_num" value="$(arg target_num)" />
+        <param name="follower_frame" value="$(arg follower_frame)" />
+        <param name="window_size" value="$(arg window_size)" />
+        <param name="hz" value="$(arg hz)" />
+    </node>
+</launch>

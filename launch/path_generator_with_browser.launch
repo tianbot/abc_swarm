@@ -1,0 +1,14 @@
+<launch>
+    <arg name="robot_name" default="$(optenv ROBOT_NAME /)" doc="robot name [robot_No1, robot_No2, robot_No3, ...]"/>
+    <arg name="fixed_frame" default="world" doc="fixed frame [world, map, odom, ...]" />
+    <arg name="use_rviz" default="false" />
+
+    <!-- launch path generator with mouse in browser -->
+    <group ns="$(arg robot_name)">
+        <include file="$(find path_generator)/launch/path_generator_with_draw.launch">
+            <arg name="robot_name" value="$(arg robot_name)" />
+            <arg name="fixed_frame" value="$(arg fixed_frame)" />
+            <arg name="use_rviz" value="$(arg use_rviz)" />
+        </include>
+    </group>
+</launch>

@@ -1,6 +1,6 @@
 <launch>
     <arg name="robot_name" default="$(optenv ROBOT_NAME /)" doc="robot name [robot_No1, robot_No2, robot_No3, ...]"/>
-    <arg name="fixed_frame" default="$(arg robot_name)/map"/>
+    <arg name="fixed_frame" default="world" doc="fixed frame [world, map, odom, ...]"/>
     <arg name="use_rviz" default="false" />
 
     <!-- launch path generator with clickpoints in rviz viewport -->

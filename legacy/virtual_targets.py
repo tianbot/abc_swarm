@@ -7,18 +7,11 @@ from tf import broadcaster
 import numpy as np
 
 def broadcaster():
-    rospy.init_node('virtual_target', anonymous=True)
-    
-    # read params
-    center_frame = rospy.get_param('~center_frame', 'tbmn_1')
-    radius = rospy.get_param('~radius', 0.5)
-    target_frame = rospy.get_param('~target_frame', 'virtual_leader')
-    linear_speed = rospy.get_param('~speed', 0.1)
 
     listener = tf.TransformListener()
-    listener.waitForTransform(center_frame, "world", rospy.Time(0), rospy.Duration(3.0));
+    listener.waitForTransform(center_frame_id, global_frame_id, rospy.Time(0), rospy.Duration(3.0));
     try:
-        (trans, rot) = listener.lookupTransform("world", center_frame, rospy.Time())
+        (trans, rot) = listener.lookupTransform(global_frame_id, center_frame_id, rospy.Time())
     except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
         pass
 
@@ -31,22 +24,36 @@ def broadcaster():
     v = linear_speed
     a = v / r
 
-    aligned_center_frame = center_frame + '_aligned'
+    aligned_center_frame_id = center_frame_id + '_aligned'
 
     br.sendTransform((x, y, 0),
               tf.transformations.quaternion_from_euler(0, 0, 0),
               rospy.Time.now(),
-              aligned_center_frame,
-              "world")
-    rospy.sleep(5)
+              aligned_center_frame_id,
+              global_frame_id)
+    rospy.sleep(2)
     
     start = rospy.Time.now()
     rate = rospy.Rate(20) 
     while not rospy.is_shutdown():
         try:
-            (trans, rot) = listener.lookupTransform("world", center_frame, rospy.Time())
+            (trans, rot) = listener.lookupTransform(global_frame_id, center_frame_id, rospy.Time())
         except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
             continue
+
+        """ 
+        \   |
+         \  |
+          \ |
+           \| 
+            o-center_frame_id
+            |\ 
+            | \
+            |  \
+            |   \
+            |    \
+            |theta \
+        """
 
         x = trans[0]
         y = trans[1]
@@ -54,8 +61,8 @@ def broadcaster():
         br.sendTransform((x, y, 0),
                 tf.transformations.quaternion_from_euler(0, 0, 0),
                 rospy.Time.now(),
-                aligned_center_frame,
-                "world")        
+                aligned_center_frame_id,
+                global_frame_id)        
         
         t = (rospy.Time.now() - start).to_sec()
         theta = a * t
@@ -64,22 +71,28 @@ def broadcaster():
         br.sendTransform((x, y, 0),
                      tf.transformations.quaternion_from_euler(0, 0, theta),
                      rospy.Time.now(),
-                     "rmtt_0_target",
-                     aligned_center_frame)
-        
+                     f"{target_frame_id_prefix}_0_target",
+                     aligned_center_frame_id)
         theta = a * t + np.pi
         x = r * math.sin(theta)
         y = - r * math.cos(theta)
         br.sendTransform((x, y, 0),
                 tf.transformations.quaternion_from_euler(0, 0, theta),
                 rospy.Time.now(),
-                "rmtt_2_target",
-                aligned_center_frame)
+                f"{target_frame_id_prefix}_2_target",
+                aligned_center_frame_id)
 
         rate.sleep()
 
-
 if __name__ == '__main__':
+    rospy.init_node('virtual_target', anonymous=True)
+    
+    # read params
+    center_frame_id = rospy.get_param('~center_frame_id', 'leader')
+    target_frame_id_prefix = rospy.get_param('~target_frame_id_prefix', 'rmtt')
+    radius = rospy.get_param('~radius', 0.5)
+    global_frame_id = rospy.get_param('~global_frame_id', 'world')
+    linear_speed = rospy.get_param('~speed', 0.1)
     try:
         broadcaster()
     except rospy.ROSInterruptException:

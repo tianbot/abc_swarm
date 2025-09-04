@@ -1,12 +1,13 @@
 <launch>
     <arg name="robot_name" default="$(optenv ROBOT_NAME follower)" doc="robot name [robot_No1, robot_No2, robot_No3, ...]"/>
+    <arg name="set_distance" default="0.5" doc="distance to setpoint"/>
     <group ns="$(arg robot_name)">
         <node pkg="abc_swarm" type="pid_tracker.py" name="path_tracker" output="screen">
             <param name="target_frame" value="$(arg robot_name)/target" />
             <param name="tracker_frame" value="$(arg robot_name)/base_link" />
             <!-- cmd_vel Twist -->
-            <param name="tracker_motion_topic" value="$(arg robot_name)/cmd_vel" />
-            <param name="set_distance" value="0.5" />
+            <param name="tracker_motion_topic" value="cmd_vel" />
+            <param name="set_distance" value="$(arg set_distance)" />
         </node>
     </group>
 </launch>

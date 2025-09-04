@@ -44,6 +44,7 @@ if __name__ == '__main__':
         try:
             (trans, rot) = listener.lookupTransform(tracker_frame, target_frame, rospy.Time())
         except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+            rospy.logwarn('tf from {} to {} lookup failed'.format(tracker_frame, target_frame))
             continue
         
         dis = math.sqrt(trans[0] ** 2 + trans[1] ** 2)

@@ -2,6 +2,7 @@
 
 import rospy
 import tf
+import numpy as np
 from tf import transformations
 from tf import broadcaster
 
@@ -19,18 +20,23 @@ def long_snake_target_tf(target_num, window_size, target_frame='world', follower
     
     # queue of target poses
     target_poses = []
+    last_target_pose = [0, 0, 0]
     
     def update_leader_trajectory():
         try:
             # get the current tf of the leader
             (trans, rot) = listener.lookupTransform('world', target_frame, rospy.Time(0))
-            
-            # update the sliding window
-            leader_trajectory.append((trans, rot))
+            nonlocal last_target_pose
+            # update the sliding window if the leader pose is updated, not equal to the last one, 
+            # 1e-01 is the tolerance of the distance between two poses
+            if not np.allclose(last_target_pose, trans, atol=1e-01):
+                # rospy.loginfo("Leader pose updated: {}".format(trans))
+                leader_trajectory.append((trans, rot))
+                last_target_pose = trans
             if len(leader_trajectory) > window_size:
                 leader_trajectory.pop(0)  # remove the oldest track point
-            
-            rospy.loginfo("Leader trajectory len: {}".format(len(leader_trajectory)))
+            else:
+                rospy.loginfo("Leader trajectory len: {}".format(len(leader_trajectory)))
 
             # calc the target points queue
             target_poses.clear()
@@ -78,9 +84,9 @@ if __name__ == '__main__':
     
     # publish the long snake formation tf
     long_snake_target_tf(
-        target_num=3,
-        window_size=300,
+        target_num=target_num,
+        window_size=window_size,
         target_frame=target_frame,
         follower_frame_prefix=follower_frame,
-        hz=50
+        hz=hz
     )

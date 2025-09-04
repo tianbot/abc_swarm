@@ -1,0 +1,47 @@
+<launch>
+  <arg name="robot_name_1" default="tbmn_01" />
+  <arg name="robot_name_2" default="tbmn_02" /> 
+  <arg name="robot_name_3" default="tbmn_03" /> 
+
+  <include file="$(find tianbot_mini)/launch/simulation.launch" >
+    <arg name="robot_name" value="$(arg robot_name_1)" />
+    <arg name="world_name" value="$(find gazebo_ros)/launch/empty_world.launch" />
+  </include>
+
+  <include file="$(find abc_swarm)/demo/tbmn_with_rmtt/spawn_robot.launch">
+    <arg name="robot_name" value="$(arg robot_name_2)" />
+    <!--the position is controlled by the static transform-->
+    <arg name="initial_pose_x" value="-0.866"/>
+    <arg name="initial_pose_y" value="0.5"/>
+  </include>
+
+  <include file="$(find abc_swarm)/demo/tbmn_with_rmtt/spawn_robot.launch">
+    <arg name="robot_name" value="$(arg robot_name_3)" />
+    <!--the position is controlled by the static transform-->
+    <arg name="initial_pose_x" value="-0.866"/>
+    <arg name="initial_pose_y" value="-0.5"/>
+  </include>
+  
+  <!-- the target frame pos x = - 0.866(spawn) + 0.2(set_distance) -->
+  <node pkg="tf" type="static_transform_publisher" name="world_to_odom_1" args="0 0 0 0 0 0 world $(arg robot_name_1)/odom 20" />
+  <node pkg="tf" type="static_transform_publisher" name="world_to_odom_2" args="0 0 0 0 0 0 world $(arg robot_name_2)/odom 20" />
+  <node pkg="tf" type="static_transform_publisher" name="world_to_odom_3" args="0 0 0 0 0 0 world $(arg robot_name_3)/odom 20" />
+  <node pkg="tf" type="static_transform_publisher" name="robot_2_target" args="-0.666 0.5 0 0 0 0 $(arg robot_name_1)/base_link $(arg robot_name_2)/target 20" />
+  <node pkg="tf" type="static_transform_publisher" name="robot_3_target" args="-0.666 -0.5 0 0 0 0 $(arg robot_name_1)/base_link $(arg robot_name_3)/target 20" />
+
+  <node pkg="abc_swarm" type="pid_tracker.py" name="tianbot_2_follower" >
+    <param name="target_frame" value="$(arg robot_name_2)/target" />
+    <param name="tracker_frame" value="$(arg robot_name_2)/base_link" />
+    <param name="tracker_motion_topic" value="$(arg robot_name_2)/cmd_vel" />
+    <param name="set_distance" value="0.2" />
+  </node>
+
+  <node pkg="abc_swarm" type="pid_tracker.py" name="tianbot_3_follower" >
+    <param name="target_frame" value="$(arg robot_name_3)/target" />
+    <param name="tracker_frame" value="$(arg robot_name_3)/base_link" />
+    <param name="tracker_motion_topic" value="$(arg robot_name_3)/cmd_vel" />
+    <param name="set_distance" value="0.2" />
+  </node>
+
+  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find abc_swarm)/rviz/demo_sim_tbmn_formation.rviz -f world" />
+</launch>

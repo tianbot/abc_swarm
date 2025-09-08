@@ -1,14 +1,19 @@
 <launch>
     <arg name="robot_name" />
     <arg name="set_distance" default="0.5" doc="distance to setpoint"/>
-    <arg name="cmd_topic" default="cmd_vel" />
+    <arg name="cmd_topic" default="cmd_vel_global" />
     <group ns="$(arg robot_name)">
-        <node pkg="abc_swarm" type="pid_tracker.py" name="path_tracker" output="screen">
+        <node pkg="abc_swarm" type="pid_tracker.py" name="target_tracker" output="screen">
             <param name="target_frame" value="$(arg robot_name)/target" />
             <param name="tracker_frame" value="$(arg robot_name)/base_link" />
             <!-- cmd_vel Twist -->
             <param name="tracker_motion_topic" value="$(arg cmd_topic)" />
             <param name="set_distance" value="$(arg set_distance)" />
+        </node>
+        <node pkg="abc_swarm" type="vel_trans.py" name="vel_trans" output="screen">
+            <param name="target_frame" value="$(arg robot_name)/target" />
+            <param name="tracker_frame" value="$(arg robot_name)/base_link" />
+            <remap from="cmd_vel_body" to="cmd_vel"/>
         </node>
     </group>
 </launch>

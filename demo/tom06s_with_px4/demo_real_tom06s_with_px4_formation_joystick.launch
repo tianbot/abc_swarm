@@ -1,0 +1,43 @@
+<launch>
+  <arg name="robot_name_1" default="leader" />
+  <arg name="robot_name_2" default="follower_1" /> 
+  <arg name="robot_name_3" default="follower_2" /> 
+  <arg name="set_distance" default="0.2" />
+  <arg name="vrpn_server_ip" default="192.168.0.39" />
+  <arg name="fixed_frame" default="world" doc="fixed frame [world, map, odom, ...]" />
+  <arg name="use_rviz" default="false" />
+
+  <!-- 启动vrpn_client节点，连接vrpn服务器 -->
+  <include file="$(find vrpn_client_ros)/launch/sample.launch">
+    <arg name="server" value="$(arg vrpn_server_ip)" />
+  </include>
+
+  <!-- 启动vrpn tf appender节点，将补全的tf信息发布到tf中 -->
+  <include file="$(find abc_swarm)/launch/vrpn_tf_append.launch" />
+  
+  <!-- 启动跟随者的阵型目标点生成节点 -->
+  <node pkg="abc_swarm" type="long_snake_formation_target_pub_with_tf.py" name="formation_target_pub" >
+    <param name="target_frame" value="$(arg robot_name_1)/base_link" />
+    <param name="follower_frame" value="follower" />
+    <param name="window_size" value="15" />
+    <param name="target_num" value="4" />
+    <param name="hz" value="100" />
+  </node>
+
+  <!-- 启动跟随者的阵型跟随节点 -->
+
+  <!-- 启动follower_1跟随节点 -->
+  <include file="$(find abc_swarm)/launch/follower_pid_tracker.launch" >
+    <arg name="robot_name" value="$(arg robot_name_2)" />
+    <arg name="set_distance" value="0.5" />
+  </include>
+
+  <!-- 启动follower_2跟随节点 -->
+  <include file="$(find abc_swarm)/launch/follower_pid_tracker_px4.launch" >
+    <arg name="robot_name" value="$(arg robot_name_3)" />
+    <arg name="set_distance" value="0.5" />
+  </include>
+
+  <!-- launch rviz -->
+  <node pkg="rviz" type="rviz" name="rviz" args="-d $(find abc_swarm)/rviz/path_generator.rviz -f $(arg fixed_frame)" if="$(arg use_rviz)" />
+</launch>

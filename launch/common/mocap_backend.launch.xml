@@ -1,0 +1,16 @@
+<launch>
+  <arg name="site_config" default="$(find abc_swarm)/config/mocap.yaml"/>
+  <arg name="vrpn_server_ip" default="$(optenv ABC_SWARM_VRPN_SERVER)"/>
+  <arg name="vrpn_port" default=""/>
+  <arg name="start_driver" default="true"/>
+  <arg name="start_vrpn" default="true"/>
+  <param name="/use_sim_time" value="false" type="bool"/>
+  <node if="$(arg start_driver)" pkg="rosserial_server" type="socket_node"
+        name="tianbot_manager" output="screen" required="true"/>
+  <node if="$(arg start_vrpn)" pkg="vrpn_client_ros" type="vrpn_client_node"
+        name="vrpn_client_node" output="screen" required="true" clear_params="true">
+    <rosparam command="load" file="$(arg site_config)"/>
+    <param if="$(eval arg('vrpn_server_ip') != '')" name="server" value="$(arg vrpn_server_ip)" type="str"/>
+    <param if="$(eval arg('vrpn_port') != '')" name="port" value="$(arg vrpn_port)" type="int"/>
+  </node>
+</launch>

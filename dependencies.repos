@@ -1,0 +1,13 @@
+repositories:
+  tianbot_mini:
+    type: git
+    url: https://github.com/tianbot/tianbot_mini.git
+    version: 61fc77e0f3d440893f5cc9cd60ee3d5bbbfeda1b
+  rosserial:
+    type: git
+    url: https://github.com/ros-drivers/rosserial.git
+    version: c169ae2173dcfda7cee567d64beae45198459400
+  teleop_twist_keyboard:
+    type: git
+    url: https://github.com/ros-teleop/teleop_twist_keyboard.git
+    version: 7b0a27fe14818b171a46247d2efe08cb4847f7e6

@@ -1,0 +1,67 @@
+<?xml version="1.0" ?>
+<launch>
+  <arg name="use_rviz" default="false"/>
+  <arg name="teleop_terminal" default="xterm -e"/>
+  <arg name="start_teleop" default="true"/>
+  <arg name="vrpn_port" default=""/>
+  <arg name="site_config" default="$(find abc_swarm)/config/mocap.yaml"/>
+  <arg name="vrpn_server_ip" default="$(optenv ABC_SWARM_VRPN_SERVER)"/>
+  <arg name="start_vrpn" default="true"/>
+  <arg name="start_driver" default="true"/>
+  <arg name="enabled" default="false"/>
+  <arg name="spacing" default="0.5"/>
+  <arg name="max_linear" default="0.10"/>
+  <arg name="max_angular" default="0.6"/>
+  <arg name="tf_timeout" default="0.5"/>
+  <arg name="robot_name_1" default="tianbot_mini_01"/>
+  <arg name="rigid_body_1" default="tianbot_mini_01"/>
+  <arg name="robot_name_2" default="tianbot_mini_02"/>
+  <arg name="rigid_body_2" default="tianbot_mini_02"/>
+  <arg name="robot_name_3" default="tianbot_mini_03"/>
+  <arg name="rigid_body_3" default="tianbot_mini_03"/>
+  <param name="/abc_swarm_demo/enabled" value="$(arg enabled)" type="bool"/>
+  <node pkg="tf2_ros" type="static_transform_publisher" name="swarm_target_2" args="$(eval '%s %s 0 0 0 0 %s abc_swarm_demo/target_2' % (-1 * float(arg('spacing')), 1 * float(arg('spacing')), arg('rigid_body_1')))"/>
+  <node pkg="abc_swarm" type="pid_tracker.py" name="mini_2_tracker" output="screen" required="true">
+    <param name="target_frame" value="abc_swarm_demo/target_2"/>
+    <param name="tracker_frame" value="$(arg rigid_body_2)"/>
+    <param name="tracker_motion_topic" value="/$(arg robot_name_2)/cmd_vel"/>
+    <param name="set_distance" value="0.0"/>
+    <param name="max_linear" value="$(arg max_linear)"/>
+    <param name="max_angular" value="$(arg max_angular)"/>
+    <param name="tf_timeout" value="$(arg tf_timeout)"/>
+    <param name="enable_param" value="/abc_swarm_demo/enabled"/>
+  </node>
+  <node pkg="tf2_ros" type="static_transform_publisher" name="swarm_target_3" args="$(eval '%s %s 0 0 0 0 %s abc_swarm_demo/target_3' % (-1 * float(arg('spacing')), -1 * float(arg('spacing')), arg('rigid_body_1')))"/>
+  <node pkg="abc_swarm" type="pid_tracker.py" name="mini_3_tracker" output="screen" required="true">
+    <param name="target_frame" value="abc_swarm_demo/target_3"/>
+    <param name="tracker_frame" value="$(arg rigid_body_3)"/>
+    <param name="tracker_motion_topic" value="/$(arg robot_name_3)/cmd_vel"/>
+    <param name="set_distance" value="0.0"/>
+    <param name="max_linear" value="$(arg max_linear)"/>
+    <param name="max_angular" value="$(arg max_angular)"/>
+    <param name="tf_timeout" value="$(arg tf_timeout)"/>
+    <param name="enable_param" value="/abc_swarm_demo/enabled"/>
+  </node>
+  <include file="$(find abc_swarm)/launch/common/mocap_backend.launch.xml">
+    <arg name="site_config" value="$(arg site_config)"/>
+    <arg name="vrpn_server_ip" value="$(arg vrpn_server_ip)"/>
+    <arg name="vrpn_port" value="$(arg vrpn_port)"/>
+    <arg name="start_driver" value="$(arg start_driver)"/>
+    <arg name="start_vrpn" value="$(arg start_vrpn)"/>
+  </include>
+  <node pkg="abc_swarm" type="demo_runtime.py" name="abc_swarm_demo" output="screen" required="true" clear_params="false">
+    <param name="mode" value="manual"/>
+    <param name="fixed_frame" value="world"/>
+    <rosparam param="robot_frames" subst_value="true">[&quot;$(arg rigid_body_1)&quot;, &quot;$(arg rigid_body_2)&quot;, &quot;$(arg rigid_body_3)&quot;]</rosparam>
+    <rosparam param="feedback_topics" subst_value="true">[]</rosparam>
+    <param name="cmd_topic" value="/$(arg robot_name_1)/cmd_vel"/>
+  </node>
+  <node if="$(arg start_teleop)" pkg="teleop_twist_keyboard" type="teleop_twist_keyboard.py" name="leader_teleop" output="screen" launch-prefix="$(arg teleop_terminal)">
+    <remap from="cmd_vel" to="/abc_swarm_demo/teleop_cmd"/>
+    <param name="speed" value="0.05"/>
+    <param name="turn" value="0.15"/>
+    <param name="repeat_rate" value="20.0"/>
+    <param name="key_timeout" value="0.3"/>
+  </node>
+  <node if="$(arg use_rviz)" pkg="rviz" type="rviz" name="demo_rviz" args="-d $(find abc_swarm)/rviz/path_following.rviz"/>
+</launch>

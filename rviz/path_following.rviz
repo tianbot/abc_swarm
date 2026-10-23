@@ -1,0 +1,39 @@
+Panels:
+  - Class: rviz/Displays
+    Name: Displays
+Visualization Manager:
+  Class: ""
+  Global Options:
+    Fixed Frame: world
+    Background Color: 48; 48; 48
+  Displays:
+    - Class: rviz/Grid
+      Name: Grid
+      Enabled: true
+      Cell Size: 0.5
+      Plane Cell Count: 20
+    - Class: rviz/TF
+      Name: TF
+      Enabled: true
+      Show Names: true
+    - Class: rviz/Path
+      Name: Planned path
+      Enabled: true
+      Topic: /abc_swarm_path/path
+      Color: 255; 200; 0
+    - Class: rviz/Path
+      Name: Actual leader path
+      Enabled: true
+      Topic: /abc_swarm_path/actual_path
+      Color: 0; 220; 255
+    - Class: rviz/PointStamped
+      Name: Lookahead target
+      Enabled: true
+      Topic: /abc_swarm_path/target
+  Views:
+    Current:
+      Class: rviz/TopDownOrtho
+      Name: Top view
+      Scale: 150
+      X: 0
+      Y: 1

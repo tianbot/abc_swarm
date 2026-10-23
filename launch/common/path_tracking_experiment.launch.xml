@@ -1,0 +1,104 @@
+<?xml version="1.0" ?>
+<launch>
+  <arg name="vrpn_port" default=""/>
+  <arg name="site_config" default="$(find abc_swarm)/config/mocap.yaml"/>
+  <arg name="formation"/>
+  <arg name="use_sim_time" default="false"/>
+  <param name="/use_sim_time" value="$(arg use_sim_time)" type="bool"/>
+  <arg name="shape" default="circle"/>
+  <arg name="radius" default="0.8"/>
+  <arg name="width" default="2.5"/>
+  <arg name="height" default="2.0"/>
+  <arg name="speed" default="0.05"/>
+  <arg name="laps" default="1"/>
+  <arg name="clockwise" default="false"/>
+  <arg name="start_vrpn" default="false"/>
+  <arg name="start_driver" default="false"/>
+  <arg name="vrpn_server_ip" default="$(optenv ABC_SWARM_VRPN_SERVER)"/>
+  <arg name="spacing" default="0.5"/>
+  <arg name="backward_spacing" default="$(eval -float(arg('spacing')))"/>
+  <arg name="robot_name_1" default="tianbot_mini_01"/>
+  <arg name="rigid_body_1" default="$(arg robot_name_1)"/>
+  <arg name="robot_name_2" default="tianbot_mini_02"/>
+  <arg name="rigid_body_2" default="$(arg robot_name_2)"/>
+  <arg name="robot_name_3" default="tianbot_mini_03"/>
+  <arg name="rigid_body_3" default="$(arg robot_name_3)"/>
+  <param name="/abc_swarm_demo/enabled" value="false" type="bool"/>
+  <include if="$(eval arg('formation') == 'triangle')" file="$(find abc_swarm)/launch/common/three_mini_leader_follower.launch.xml">
+    <arg name="spacing" value="$(arg spacing)"/>
+    <arg name="robot_name_1" value="$(arg robot_name_1)"/>
+    <arg name="rigid_body_1" value="$(arg rigid_body_1)"/>
+    <arg name="robot_name_2" value="$(arg robot_name_2)"/>
+    <arg name="rigid_body_2" value="$(arg rigid_body_2)"/>
+    <arg name="robot_name_3" value="$(arg robot_name_3)"/>
+    <arg name="rigid_body_3" value="$(arg rigid_body_3)"/>
+    <arg name="formation" value="triangle"/>
+  </include>
+  <include if="$(eval arg('formation') == 'snake')" file="$(find abc_swarm)/launch/common/three_mini_leader_follower.launch.xml">
+    <arg name="spacing" value="$(arg spacing)"/>
+    <arg name="robot_name_1" value="$(arg robot_name_1)"/>
+    <arg name="rigid_body_1" value="$(arg rigid_body_1)"/>
+    <arg name="robot_name_2" value="$(arg robot_name_2)"/>
+    <arg name="rigid_body_2" value="$(arg rigid_body_2)"/>
+    <arg name="robot_name_3" value="$(arg robot_name_3)"/>
+    <arg name="rigid_body_3" value="$(arg rigid_body_3)"/>
+    <arg name="formation" value="snake"/>
+  </include>
+  <node pkg="abc_swarm" type="preset_path_tracker.py" name="abc_swarm_path" output="screen" required="true">
+    <rosparam command="load" file="$(find abc_swarm)/config/path_tracking.yaml"/>
+    <param name="shape" value="$(arg shape)"/>
+    <param name="radius" value="$(arg radius)"/>
+    <param name="width" value="$(arg width)"/>
+    <param name="height" value="$(arg height)"/>
+    <param name="speed" value="$(arg speed)"/>
+    <param name="laps" value="$(arg laps)"/>
+    <param name="clockwise" value="$(arg clockwise)"/>
+    <rosparam param="edges">[]</rosparam>
+    <rosparam param="follower_status_topics">[]</rosparam>
+    <param name="robot_frame" value="$(arg rigid_body_1)"/>
+    <param name="cmd_topic" value="/$(arg robot_name_1)/cmd_vel"/>
+  </node>
+  <group if="$(eval arg('formation') == 'triangle')">
+    <rosparam param="/abc_swarm_path/follower_status_topics" subst_value="true">[&quot;/$(arg robot_name_2)_leader_follower/status&quot;, &quot;/$(arg robot_name_3)_leader_follower/status&quot;]</rosparam>
+    <rosparam param="/abc_swarm_path/edges" subst_value="true">- {leader: &quot;$(arg rigid_body_1)&quot;, follower: &quot;$(arg rigid_body_2)&quot;, x: $(arg backward_spacing), y: $(arg spacing)}
+- {leader: &quot;$(arg rigid_body_1)&quot;, follower: &quot;$(arg rigid_body_3)&quot;, x: $(arg backward_spacing), y: $(arg backward_spacing)}
+</rosparam>
+  </group>
+  <group if="$(eval arg('formation') == 'snake')">
+    <rosparam param="/abc_swarm_path/follower_status_topics" subst_value="true">[&quot;/$(arg robot_name_2)_leader_follower/status&quot;, &quot;/$(arg robot_name_3)_leader_follower/status&quot;]</rosparam>
+    <rosparam param="/abc_swarm_path/edges" subst_value="true">- {leader: &quot;$(arg rigid_body_1)&quot;, follower: &quot;$(arg rigid_body_2)&quot;, x: $(arg backward_spacing), y: 0.0}
+- {leader: &quot;$(arg rigid_body_2)&quot;, follower: &quot;$(arg rigid_body_3)&quot;, x: $(arg backward_spacing), y: 0.0}
+</rosparam>
+  </group>
+  <include if="$(eval arg('start_driver') or arg('start_vrpn'))" file="$(find abc_swarm)/launch/common/mocap_backend.launch.xml">
+    <arg name="site_config" value="$(arg site_config)"/>
+    <arg name="vrpn_server_ip" value="$(arg vrpn_server_ip)"/>
+    <arg name="vrpn_port" value="$(arg vrpn_port)"/>
+    <arg name="start_driver" value="$(arg start_driver)"/>
+    <arg name="start_vrpn" value="$(arg start_vrpn)"/>
+  </include>
+  <group if="$(eval arg('formation') == 'single')">
+    <node pkg="abc_swarm" type="demo_runtime.py" name="abc_swarm_demo" output="screen" required="true" clear_params="false">
+      <param name="mode" value="path"/>
+      <param name="fixed_frame" value="world"/>
+      <rosparam param="robot_frames" subst_value="true">[&quot;$(arg rigid_body_1)&quot;]</rosparam>
+      <rosparam param="feedback_topics" subst_value="true">[]</rosparam>
+    </node>
+  </group>
+  <group if="$(eval arg('formation') == 'triangle')">
+    <node pkg="abc_swarm" type="demo_runtime.py" name="abc_swarm_demo" output="screen" required="true" clear_params="false">
+      <param name="mode" value="path"/>
+      <param name="fixed_frame" value="world"/>
+      <rosparam param="robot_frames" subst_value="true">[&quot;$(arg rigid_body_1)&quot;, &quot;$(arg rigid_body_2)&quot;, &quot;$(arg rigid_body_3)&quot;]</rosparam>
+      <rosparam param="feedback_topics" subst_value="true">[&quot;/$(arg robot_name_1)/odom&quot;]</rosparam>
+    </node>
+  </group>
+  <group if="$(eval arg('formation') == 'snake')">
+    <node pkg="abc_swarm" type="demo_runtime.py" name="abc_swarm_demo" output="screen" required="true" clear_params="false">
+      <param name="mode" value="path"/>
+      <param name="fixed_frame" value="world"/>
+      <rosparam param="robot_frames" subst_value="true">[&quot;$(arg rigid_body_1)&quot;, &quot;$(arg rigid_body_2)&quot;, &quot;$(arg rigid_body_3)&quot;]</rosparam>
+      <rosparam param="feedback_topics" subst_value="true">[&quot;/$(arg robot_name_1)/odom&quot;, &quot;/$(arg robot_name_2)/odom&quot;]</rosparam>
+    </node>
+  </group>
+</launch>

@@ -1,0 +1,37 @@
+<launch>
+  <arg name="leader_name" />
+  <arg name="follower_name" />
+  <arg name="leader_frame" default="$(arg leader_name)" />
+  <arg name="follower_frame" default="$(arg follower_name)" />
+  <arg name="offset_x" default="-0.5" />
+  <arg name="offset_y" default="0.0" />
+  <arg name="front_distance" default="0.1" />
+  <arg name="k_x" default="0.5" />
+  <arg name="k_y" default="0.5" />
+  <arg name="max_linear" default="0.10" />
+  <arg name="max_angular" default="0.6" />
+  <arg name="tf_timeout" default="0.5" />
+  <arg name="odom_timeout" default="0.5" />
+
+  <node pkg="tf2_ros" type="static_transform_publisher"
+        name="$(arg follower_name)_lf_target"
+        args="$(arg offset_x) $(arg offset_y) 0 0 0 0 $(arg leader_frame) abc_swarm_lf/$(arg follower_name)/target" />
+
+  <node pkg="abc_swarm" type="leader_follower_tracker.py"
+        name="$(arg follower_name)_leader_follower" output="screen" required="true">
+    <param name="leader_frame" value="$(arg leader_frame)" />
+    <param name="follower_frame" value="$(arg follower_frame)" />
+    <param name="leader_odom_topic" value="/$(arg leader_name)/odom" />
+    <param name="cmd_topic" value="/$(arg follower_name)/cmd_vel" />
+    <param name="offset_x" value="$(arg offset_x)" />
+    <param name="offset_y" value="$(arg offset_y)" />
+    <param name="front_distance" value="$(arg front_distance)" />
+    <param name="k_x" value="$(arg k_x)" />
+    <param name="k_y" value="$(arg k_y)" />
+    <param name="max_linear" value="$(arg max_linear)" />
+    <param name="max_angular" value="$(arg max_angular)" />
+    <param name="tf_timeout" value="$(arg tf_timeout)" />
+    <param name="odom_timeout" value="$(arg odom_timeout)" />
+    <param name="enabled_param" value="/abc_swarm_demo/enabled" />
+  </node>
+</launch>

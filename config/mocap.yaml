@@ -1,0 +1,9 @@
+# Edit this site profile once, or pass site_config:=/absolute/path/site.yaml.
+# CLI vrpn_server_ip / vrpn_port override these client parameters.
+server: 192.168.2.101
+port: 3883
+frame_id: world
+update_frequency: 100.0
+use_server_time: false
+broadcast_tf: true
+refresh_tracker_frequency: 1.0

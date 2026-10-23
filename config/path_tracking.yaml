@@ -1,0 +1,17 @@
+# Shared algorithm parameters; independent of localization and robot names.
+shape: circle
+radius: 0.8
+width: 2.5
+height: 2.0
+clockwise: false
+laps: 1
+speed: 0.05
+lookahead: 0.25
+max_angular: 0.5
+goal_tolerance: 0.05
+max_error: 0.5
+start_tolerance: 0.15
+settle_tolerance: 0.1
+settle_timeout: 30.0
+fixed_frame: world
+tf_timeout: 0.5

@@ -1,0 +1,5 @@
+repositories:
+  rmtt_ros:
+    type: git
+    url: https://github.com/tianbot/rmtt_ros.git
+    version: 2f5afd56efff8e93aec7557d46fbc9e8d4a25504

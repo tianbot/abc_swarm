@@ -2,6 +2,8 @@
 
 `docs/source/*.rst`、原图片和旧 Read the Docs 配置均保留原位、原内容，作为原课程和历史网站依据。根目录继续使用原 `README.rst`，不增加第二个 README 入口。
 
+开发原则记录在根 [AGENTS.md](../AGENTS.md)：节点统一在 nodes，Python 算法可复用，设备和场景通过参数与 launch 组合。
+
 当前用户指南：
 
 - [动捕实验、摆位与启动](mocap-demos.md)

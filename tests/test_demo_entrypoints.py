@@ -80,3 +80,27 @@ class DemoEntrypointTests(unittest.TestCase):
         self.assertFalse(any(n.type in ('demo_runtime.py', 'socket_node', 'vrpn_client_node')
                              for n in config.nodes))
         self.assertNotIn('/abc_swarm_demo/enabled', config.params)
+
+    def test_path_and_followers_share_configured_front_distance(self):
+        for path in DEMOS:
+            if 'path_tracking' not in path.name:
+                continue
+            config = load(path, ['front_distance:=0.23', 'start_driver:=false',
+                                 'start_vrpn:=false', 'use_rviz:=false'])
+            self.assertEqual(config.params['/abc_swarm_path/front_distance'].value, 0.23)
+            followers = [p.value for name, p in config.params.items()
+                         if name.endswith('_leader_follower/front_distance')]
+            self.assertEqual(followers, [] if path.name == 'demo_mocap_path_tracking.launch'
+                             else [0.23, 0.23])
+
+    def test_algorithm_config_is_not_shadowed_by_demo_defaults(self):
+        defaults = yaml.safe_load((ROOT / 'config/path_tracking.yaml').read_text())
+        for path in DEMOS:
+            if 'path_tracking' not in path.name:
+                continue
+            config = load(path, ['radius:=0.95', 'speed:=0.04', 'laps:=2',
+                                 'start_driver:=false', 'start_vrpn:=false', 'use_rviz:=false'])
+            for key, value in defaults.items():
+                self.assertEqual(config.params['/abc_swarm_path/' + key].value, value)
+            for key, value in [('radius', 0.95), ('speed', 0.04), ('laps', 2)]:
+                self.assertEqual(config.params['/abc_swarm_path/' + key].value, value)

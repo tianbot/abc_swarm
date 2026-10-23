@@ -16,6 +16,7 @@
   <arg name="start_driver" default="false"/>
   <arg name="vrpn_server_ip" default="$(optenv ABC_SWARM_VRPN_SERVER)"/>
   <arg name="spacing" default="0.5"/>
+  <arg name="front_distance" default="0.1"/>
   <arg name="backward_spacing" default="$(eval -float(arg('spacing')))"/>
   <arg name="robot_name_1" default="tianbot_mini_01"/>
   <arg name="rigid_body_1" default="$(arg robot_name_1)"/>
@@ -26,6 +27,7 @@
   <param name="/abc_swarm_demo/enabled" value="false" type="bool"/>
   <include if="$(eval arg('formation') == 'triangle')" file="$(find abc_swarm)/launch/common/three_mini_leader_follower.launch.xml">
     <arg name="spacing" value="$(arg spacing)"/>
+    <arg name="front_distance" value="$(arg front_distance)"/>
     <arg name="robot_name_1" value="$(arg robot_name_1)"/>
     <arg name="rigid_body_1" value="$(arg rigid_body_1)"/>
     <arg name="robot_name_2" value="$(arg robot_name_2)"/>
@@ -36,6 +38,7 @@
   </include>
   <include if="$(eval arg('formation') == 'snake')" file="$(find abc_swarm)/launch/common/three_mini_leader_follower.launch.xml">
     <arg name="spacing" value="$(arg spacing)"/>
+    <arg name="front_distance" value="$(arg front_distance)"/>
     <arg name="robot_name_1" value="$(arg robot_name_1)"/>
     <arg name="rigid_body_1" value="$(arg rigid_body_1)"/>
     <arg name="robot_name_2" value="$(arg robot_name_2)"/>
@@ -46,6 +49,7 @@
   </include>
   <node pkg="abc_swarm" type="preset_path_tracker.py" name="abc_swarm_path" output="screen" required="true">
     <rosparam command="load" file="$(find abc_swarm)/config/path_tracking.yaml"/>
+    <param name="front_distance" value="$(arg front_distance)"/>
     <param name="shape" value="$(arg shape)"/>
     <param name="radius" value="$(arg radius)"/>
     <param name="width" value="$(arg width)"/>

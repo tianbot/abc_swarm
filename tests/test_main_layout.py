@@ -23,23 +23,24 @@ class MainLayoutTests(unittest.TestCase):
                 if original in BASELINE['renames']:
                     self.assertFalse((ROOT / original).exists())
 
-    def test_nodes_and_includes_have_no_additional_files(self):
+    def test_original_nodes_and_includes_keep_their_paths(self):
         for directory in ('nodes', 'launch/includes'):
             expected = {p for p in BASELINE['originals'] if p.startswith(directory + '/')}
             actual = {str(p.relative_to(ROOT)) for p in (ROOT / directory).rglob('*')
                       if p.is_file() and '__pycache__' not in p.parts
                       and not any(part.startswith('.') for part in p.relative_to(ROOT).parts)}
+            if directory == 'nodes':
+                expected |= {'nodes/' + name for name in ('demo_runtime.py', 'preset_path_tracker.py',
+                             'leader_follower_tracker.py', 'pid_tracker.py')}
             self.assertEqual(actual, expected)
 
     def test_new_layout_is_flat_and_does_not_carry_refactor_directories(self):
         self.assertFalse(any(p.is_dir() for p in (ROOT / 'config').iterdir()))
-        self.assertEqual({p.name for p in (ROOT / 'scripts').glob('*.py')},
-                         {'demo_runtime.py', 'preset_path_tracker.py',
-                          'leader_follower_tracker.py', 'pid_tracker.py'})
-        for p in (ROOT / 'scripts').glob('*.py'):
+        self.assertEqual(len(list((ROOT / 'nodes').glob('*.py'))), 13)
+        for p in (ROOT / 'nodes').glob('*.py'):
             self.assertTrue(os.access(str(p), os.X_OK), p)
             ast.parse(p.read_text(), filename=str(p))
-        for directory in ('demo', 'legacy', 'examples', 'launch/simulation',
+        for directory in ('scripts', 'demo', 'legacy', 'examples', 'launch/simulation',
                           'launch/sim_demo', 'launch/experiments', 'src/target_tracker'):
             self.assertFalse((ROOT / directory).exists(), directory)
         self.assertEqual(len(list((ROOT / 'launch/mocap').rglob('*.launch'))), 9)

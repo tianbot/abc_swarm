@@ -201,10 +201,10 @@
     }
   },
   "selected_files": {
-    "nodes/pid_tracker.py": "scripts/pid_tracker.py",
-    "src/target_tracker/leader_follower_tracker.py": "scripts/leader_follower_tracker.py",
-    "src/abc_swarm/ros/preset_path.py": "scripts/preset_path_tracker.py",
-    "src/abc_swarm/ros/demo_runtime.py": "scripts/demo_runtime.py",
+    "nodes/pid_tracker.py": "nodes/pid_tracker.py",
+    "src/target_tracker/leader_follower_tracker.py": "nodes/leader_follower_tracker.py",
+    "src/abc_swarm/ros/preset_path.py": "nodes/preset_path_tracker.py",
+    "src/abc_swarm/ros/demo_runtime.py": "nodes/demo_runtime.py",
     "src/abc_swarm/controllers/leader_follower.py": "src/abc_swarm/leader_follower_control.py",
     "src/abc_swarm/algorithms/paths.py": "src/abc_swarm/preset_paths.py",
     "src/abc_swarm/algorithms/pure_pursuit.py": "src/abc_swarm/pure_pursuit.py",

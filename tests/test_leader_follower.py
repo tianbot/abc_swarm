@@ -9,7 +9,7 @@ from nav_msgs.msg import Odometry
 from abc_swarm.leader_follower_control import tracking_velocity
 
 ROOT = Path(__file__).resolve().parents[1]
-spec = importlib.util.spec_from_file_location('lf_tracker', ROOT / 'scripts/leader_follower_tracker.py')
+spec = importlib.util.spec_from_file_location('lf_tracker', ROOT / 'nodes/leader_follower_tracker.py')
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
 

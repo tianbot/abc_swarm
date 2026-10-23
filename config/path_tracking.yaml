@@ -1,11 +1,4 @@
-# Shared algorithm parameters; independent of localization and robot names.
-shape: circle
-radius: 0.8
-width: 2.5
-height: 2.0
-clockwise: false
-laps: 1
-speed: 0.05
+# Shared tracking parameters. Path geometry, speed and laps belong to demo launch args.
 lookahead: 0.25
 max_angular: 0.5
 goal_tolerance: 0.05

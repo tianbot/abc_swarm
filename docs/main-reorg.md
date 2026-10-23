@@ -1,5 +1,7 @@
 # 从 origin/main 重组：范围、取舍与验证
 
+后续指导方针：Python 实现可复用核心算法，关键参数可配置，launch 负责设备适配和实验组合。用户确认四个新节点可并入 nodes；当前结构以下文及根 AGENTS.md 为准。
+
 ## 基线与分支
 
 新分支 `teaching/main-reorg` 直接从已同步的 `origin/main` 创建，基线 `1708f332ae900384b9e84889b7ab3979aaae9f5f`（2023-02-15）。不合并 refactor 分支，也不把旧分支整批内容导入。代码提交 `d79ae73` 的直接父提交就是该 main 基线。
@@ -10,7 +12,7 @@
 
 ## 原版保持
 
-- 原 `nodes/` 九个脚本逐字节、原路径保留，没有新增文件。
+- 原 `nodes/` 九个脚本逐字节、原路径保留。后续获用户确认，四个新增节点从 scripts 并入 nodes，保持平层，共十三个可执行文件。
 - 原 `launch/includes/` 两个文件逐字节、原路径保留。新公共组合放在 `launch/common/`，没有改旧 include 引用。
 - 原课程其余 launch 原位、原内容保留，原 `demo_sim_*` 名称和无动捕实车实验不改。
 - 两个明确获准的例外：`launch/demo/demo_mc_tf_tt_circle_mini.launch`、`demo_mc_tf_tt_follow_mini.launch` 移到平层 `launch/mocap/`，更名为 `demo_mocap_tf_tt_*`，文件内容不改。它们是旧空地参考，不自动纳入新三车生命周期。
@@ -23,8 +25,7 @@
 ## 新布局
 
 ```text
-nodes/                         原视频九个脚本，不变
-scripts/                       四个新增 ROS 节点，平层
+nodes/                         原九个脚本 + 四个新节点，平层
 src/abc_swarm/                 三份共享计算，平层
 config/                        tf_pid.cfg、mocap.yaml、path_tracking.yaml
 launch/demo/                   原课程与原无动捕实车/Gazebo 入口
@@ -33,7 +34,7 @@ launch/common/                 四个新增公共启动片段，平层
 launch/mocap/                  新动捕与原动捕参考，平层
 ```
 
-新脚本为 `leader_follower_tracker.py`、`pid_tracker.py`、`preset_path_tracker.py`、`demo_runtime.py`，命名不区分仿真和真车。路径、Pure Pursuit 和 leader-follower 计算可共用；本轮没有增加另一套仿真入口或纯 Python 课程。内部理想运动学模型仅放在 tests 中用于控制回归。
+四个新节点均在 nodes，新脚本为 `leader_follower_tracker.py`、`pid_tracker.py`、`preset_path_tracker.py`、`demo_runtime.py`，命名不区分仿真和真车。路径、Pure Pursuit 和 leader-follower 计算可共用；本轮没有增加另一套仿真入口或纯 Python 课程。内部理想运动学模型仅放在 tests 中用于控制回归。
 
 ## 摘取与舍弃
 
@@ -73,3 +74,13 @@ GUI 可独立保持 `mocap_backend.launch`，运行实验时关闭重复后台�
 ## 验收边界
 
 本轮没有启动 Gazebo、真实驱动、VRPN 客户端、键盘窗口、Mini 或飞行器。新分支的实际设备效果和停车仍需现场复验；不能把先前分支的三车反馈直接标成此分支实车验收。新网站页面尚未发布，代码只作本地提交，不推送。
+
+## 后续优化评估
+
+- 已合并节点入口；保留旧脚本正文和可执行名，不增加层级。项目原则写入根 `AGENTS.md`。
+- 已消除路径收敛中的硬编码前置点距离，与跟随器共同使用 `front_distance`。
+- 已分清参数归属：路径几何、速度、圈数由 demo 的 launch 参数配置；算法前视距离、容差等在 YAML 中。删除 YAML 中被 launch 同名默认值遮蔽的重复字段，不改变默认实验参数。
+- 核心算法与设备型号分开；共享 TF/Path/Twist 输入输出不能替代运动模型校核。原 RMTT 控制会输出 linear.y，当前 Mini 控制输出 v/omega，后续应复用适用的控制律或增加必要适配，不靠改话题声称支持新设备。TOM06S 的模型与接口需要查实际驱动后判断。
+- 后续优先整理各算法的输入/输出、关键参数、参考坐标和运动模型说明；无需先建插件系统、更多包或更多层级。preset_path_tracker 暂保留完整实验流程，不为了形式拆成更多节点。
+
+后续合并节点的验证：20 项测试通过，包含原九个脚本内容不变、新前置点参数一致性和参数默认值不被重复遮蔽。六个新动捕入口的隔离 ROS 回归通过（日志 `/tmp/abc_swarm_path_ros_wgpngoku`），安装中可执行名称唯一；实际工作区四个 relay 均已指向 nodes。原 48 个资源的 SHA256 与用户自有文件均未改变，未启动实车或 Gazebo。

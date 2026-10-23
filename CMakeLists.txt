@@ -6,17 +6,13 @@ catkin_python_setup()
 generate_dynamic_reconfigure_options(config/tf_pid.cfg)
 catkin_package(CATKIN_DEPENDS roscpp rospy std_msgs dynamic_reconfigure)
 
-# Original teaching nodes remain at their original paths, with no new files.
-file(GLOB COURSE_NODES nodes/*.py)
-catkin_install_python(PROGRAMS ${COURSE_NODES}
-  scripts/leader_follower_tracker.py
-  scripts/pid_tracker.py
-  scripts/preset_path_tracker.py
-  scripts/demo_runtime.py
+# All ROS executables share the flat teaching directory; keep basenames unique.
+file(GLOB SWARM_NODES nodes/*.py)
+catkin_install_python(PROGRAMS ${SWARM_NODES}
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 install(DIRECTORY launch config rviz docs DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
-install(FILES README.rst LICENSE dependencies.repos dependencies-rmtt.repos requirements.txt
+install(FILES README.rst AGENTS.md LICENSE dependencies.repos dependencies-rmtt.repos requirements.txt
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
 
 if(CATKIN_ENABLE_TESTING)

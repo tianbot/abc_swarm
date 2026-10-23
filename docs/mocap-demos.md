@@ -4,9 +4,9 @@
 
 ## 从哪里找
 
-- 原视频脚本仍在 `nodes/`，没有新增或移动；原课程 launch 仍在原位置。
+- 原视频脚本仍在 `nodes/`，原九个文件不动；四个新可执行节点也在同一目录。原课程 launch 保持原位。
 - 新动捕入口都在 `launch/mocap/` 一层，名称全部为 `demo_mocap_*`。
-- 新节点在 `scripts/` 一层：leader-follower、PID 对照、预设路径跟踪、统一运行节点。
+- 不再单独设置 `scripts/`；leader-follower、PID 对照、预设路径跟踪、统一运行节点都从 `nodes/` 查找。
 - 少量控制计算在 `src/abc_swarm/` 一层，供实车和未来的仿真复用，不带 sim/mocap 后缀。
 - 新公共组合在 `launch/common/`；原 `launch/includes/` 没有改动。
 
@@ -80,7 +80,7 @@ roslaunch abc_swarm demo_mocap_snake_leader_follower_path_tracking.launch shape:
 
 默认启动驱动、VRPN、算法和 RViz，不启动键盘。头车首次有效位姿确定路径起点和切线方向，路径预览后固定在 world，不随头车移动。默认逆时针，圆在车头左侧；`clockwise:=true` 改为右侧。
 
-默认圆半径 0.8 m；圆角矩形外轮廓宽 2.5 m、高 2.0 m、圆角半径 0.8 m；头车 0.05 m/s、一圈。可通过 `radius`、`width`、`height`、`speed`、`laps`、`clockwise`、`spacing` 调整。矩形宽高必须至少为圆角半径两倍。后车和车体尺寸会超出头车路径，先确认整个队形扫过范围；外侧车需要更大速度余量。
+默认圆半径 0.8 m；圆角矩形外轮廓宽 2.5 m、高 2.0 m、圆角半径 0.8 m；头车 0.05 m/s、一圈。可通过 `radius`、`width`、`height`、`speed`、`laps`、`clockwise`、`spacing` 调整。`front_distance` 同时传给跟随器和收敛判断，默认 0.1 m。路径几何、速度和圈数由 launch 参数负责；前视距离、容差等算法参数在 `config/path_tracking.yaml`，不再重复声明同名默认值。矩形宽高必须至少为圆角半径两倍。后车和车体尺寸会超出头车路径，先确认整个队形扫过范围；外侧车需要更大速度余量。
 
 RViz 使用 world，显示 `/abc_swarm_path/path`、`actual_path`、`target` 和 TF。确认预览与现场空间、摆位后，通过相同 set_enabled 服务开始。
 

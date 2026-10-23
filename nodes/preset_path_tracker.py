@@ -24,8 +24,10 @@ class PresetPathNode:
         self.settle_tolerance = float(rospy.get_param('~settle_tolerance', 0.1))
         self.start_tolerance = float(rospy.get_param('~start_tolerance', 0.15))
         self.edges = rospy.get_param('~edges', [])
+        self.front_distance = float(rospy.get_param('~front_distance', 0.1))
         if not all(math.isfinite(v) and v > 0 for v in
-                   (self.timeout, self.settle_timeout, self.settle_tolerance, self.start_tolerance)):
+                   (self.timeout, self.settle_timeout, self.settle_tolerance,
+                    self.start_tolerance, self.front_distance)):
             raise ValueError('Timeouts and tolerances must be positive and finite')
         self.listener = tf.TransformListener()
         self.cmd = rospy.Publisher(rospy.get_param('~cmd_topic'), Twist, queue_size=1)
@@ -179,9 +181,9 @@ class PresetPathNode:
             if self.controller.completed:
                 if self.settle_started is None:
                     self.settle_started = time.monotonic()
-                # Match the existing follower controller's 0.1 m front point.
-                settled = all(math.hypot(p[0] + 0.1 * math.cos(p[2]) - float(e['x']) - 0.1,
-                                         p[1] + 0.1 * math.sin(p[2]) - float(e['y']))
+                # Match the same configurable front point used by both followers.
+                settled = all(math.hypot(p[0] + self.front_distance * math.cos(p[2]) - float(e['x']) - self.front_distance,
+                                         p[1] + self.front_distance * math.sin(p[2]) - float(e['y']))
                               <= self.settle_tolerance
                               for e in self.edges
                               for p in [self.pose(e['leader'], e['follower'])])

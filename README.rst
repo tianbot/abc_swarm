@@ -7,8 +7,8 @@ ABC Swarm is the developer manual for ROS2GO, Tianbot Mini and RoboMaster TT ROS
 --------------------
 
 本分支从 ``origin/main`` 重新整理，保留原课程的文件布局和命令。
-``nodes/`` 仍是原来的九个教学脚本；新增节点放在平层 ``scripts/``，
-原 ``launch/includes/`` 不变。配置文件统一放在 ``config/`` 一层。
+``nodes/`` 保留原九个教学脚本，并集中放置四个新增可执行节点，
+不另设 scripts 入口目录。原 ``launch/includes/`` 不变，配置文件保持一层。
 
 * 原课程：继续按视频操作，原有无动捕实车和 Gazebo demo 不新增、不搬迁。
 * 新增动捕实验：进入 ``launch/mocap/``，文件统一使用 ``demo_mocap_*`` 命名。
@@ -53,3 +53,11 @@ ABC Swarm is the developer manual for ROS2GO, Tianbot Mini and RoboMaster TT ROS
 
 本轮不启动 Gazebo 或真实设备。新分支的运行效果需要现场复验，
 检查通过不等于已完成实车验收。
+
+开发指导方针
+------------
+
+Python 实现可复用核心算法，关键参数可配置；launch 负责驱动、定位、
+设备话题/frame 映射、角色、参数和实验组合。相同算法不按 Mini、RMTT、
+TOM06S 分别复制。运动模型或控制输出不同的设备，使用必要的适配或对应控制律。
+项目开发约定记录在 `AGENTS.md <AGENTS.md>`_。

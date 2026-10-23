@@ -17,6 +17,7 @@ install(FILES README.rst AGENTS.md LICENSE dependencies.repos dependencies-rmtt.
 
 if(CATKIN_ENABLE_TESTING)
   catkin_add_nosetests(tests/test_main_layout.py)
+  catkin_add_nosetests(tests/test_course_guard.py)
   catkin_add_nosetests(tests/test_leader_follower.py)
   catkin_add_nosetests(tests/test_preset_path.py)
   catkin_add_nosetests(tests/test_demo_entrypoints.py)

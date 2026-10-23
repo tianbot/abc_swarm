@@ -1,0 +1,96 @@
+name: ABC Swarm checks
+
+"on": [push, pull_request, workflow_dispatch]
+
+permissions:
+  contents: read
+
+jobs:
+  course_compatibility:
+    name: Course compatibility
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Compare with frozen pre-refactor main
+        run: python3 tests/check_course_compatibility.py
+      - name: Verify the guard rejects broken compatibility
+        run: python3 -m unittest discover -s tests -p test_course_guard.py -v
+      - name: Check change whitespace
+        run: git diff --check 1708f332ae900384b9e84889b7ab3979aaae9f5f...HEAD
+      - name: Check Python syntax
+        run: python3 -m compileall -q nodes src
+      - name: Run hardware-independent control regressions
+        env:
+          PYTHONPATH: src
+        run: python3 -m unittest discover -s tests -p test_preset_path.py -v
+
+  noetic_build_tests:
+    name: Noetic build and tests
+    needs: course_compatibility
+    runs-on: ubuntu-24.04
+    container: ros:noetic-ros-base-focal
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+    env:
+      DEBIAN_FRONTEND: noninteractive
+      SETUPTOOLS_USE_DISTUTILS: stdlib
+    steps:
+      # Git must exist before checkout so full history is actually available.
+      - name: Install build and test dependencies
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends git python3-pip python3-nose python3-numpy python3-yaml ros-noetic-tf ros-noetic-nav-msgs ros-noetic-std-srvs ros-noetic-dynamic-reconfigure
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install pinned Python dependency
+        run: python3 -m pip install --disable-pip-version-check -r requirements.txt
+      - name: Build test and install in Noetic
+        run: |
+          source /opt/ros/noetic/setup.bash
+          test_ws="$RUNNER_TEMP/abc_swarm_ws"
+          mkdir -p "$test_ws/src"
+          ln -s "$GITHUB_WORKSPACE" "$test_ws/src/abc_swarm"
+          catkin_make -C "$test_ws" --only-pkg-with-deps abc_swarm -DPYTHON_EXECUTABLE=/usr/bin/python3
+          catkin_make -C "$test_ws" run_tests_abc_swarm
+          catkin_test_results "$test_ws/build/test_results/abc_swarm"
+          catkin_make -C "$test_ws" install
+      - name: Check installed executable discovery
+        run: |
+          source "$RUNNER_TEMP/abc_swarm_ws/install/setup.bash"
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib
+          import json
+          import rospkg
+          import roslib.packages
+          root = Path(rospkg.RosPack().get_path('abc_swarm'))
+          assert root.name == 'abc_swarm' and root.parent.name == 'share', root
+          for script in Path('nodes').glob('*.py'):
+              matches = roslib.packages.find_node('abc_swarm', script.name)
+              assert len(matches) == 1, script.name
+              assert Path(matches[0]).read_text().splitlines()[1:] == script.read_text().splitlines()[1:], script.name
+          from roslaunch.rlutil import resolve_launch_arguments
+          manifest = json.loads(Path('tests/main_baseline.json').read_text())
+          for original, entry in manifest['originals'].items():
+              if original.startswith(('launch/', 'config/', 'rviz/')):
+                  path = root / entry['current_path']
+                  assert path.is_file(), original
+                  assert hashlib.sha256(path.read_bytes()).hexdigest() == entry['sha256'], original
+                  if path.suffix == '.launch':
+                      assert Path(resolve_launch_arguments(['abc_swarm', path.name])[0]) == path, original
+          assert (root / 'config/mocap.yaml').is_file()
+          print('Installed nodes and configuration verified')
+          PY
+      - name: Run isolated synthetic ROS integration
+        run: |
+          source "$RUNNER_TEMP/abc_swarm_ws/install/setup.bash"
+          # The harness forces loopback master and synthetic names; hardware/UI disabled.
+          python3 tests/ros/preset_path_smoke.py

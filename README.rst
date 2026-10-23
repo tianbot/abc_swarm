@@ -61,3 +61,17 @@ Python 实现可复用核心算法，关键参数可配置；launch 负责驱动
 设备话题/frame 映射、角色、参数和实验组合。相同算法不按 Mini、RMTT、
 TOM06S 分别复制。运动模型或控制输出不同的设备，使用必要的适配或对应控制律。
 项目开发约定记录在 `AGENTS.md <AGENTS.md>`_。
+
+旧课程兼容检查
+--------------
+
+冻结对比原 main 的 ``1708f33``，不会随未来 main 自动重设基线。
+在源码仓库根目录即可检查，不需要启动 ROS 或设备：
+
+.. code-block:: bash
+
+   python3 tests/check_course_compatibility.py
+
+GitHub 工作流会运行兼容检查、算法回归以及 Noetic 构建和合成 ROS 测试。
+推送后还需要在 main 设置必过检查，才会阻止未通过检查的合并。
+操作步骤见 `兼容保障与 CI <docs/course-compatibility.md>`_。

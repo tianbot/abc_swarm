@@ -6,6 +6,8 @@
 
 当前用户指南：
 
+- [旧 main 兼容检查、CI 和你需要做的事](course-compatibility.md)
+
 - [动捕实验、摆位与启动](mocap-demos.md)
 - [统一启动及 GUI 接口](demo-runtime.md)
 - [从 main 重组的取舍与验证](main-reorg.md)

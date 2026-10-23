@@ -6,6 +6,8 @@
 
 当前用户指南：
 
+- **[三车现场测试清单：明天直接从这里开始](field-test.md)**
+
 - [旧 main 兼容检查、CI 和你需要做的事](course-compatibility.md)
 
 - [动捕实验、摆位与启动](mocap-demos.md)

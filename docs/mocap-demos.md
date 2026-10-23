@@ -1,5 +1,7 @@
 # 三车动捕实验
 
+首次现场复验直接按 [现场测试清单](field-test.md) 操作；下文保留完整实验说明。
+
 本轮从原 main 摘取有用的新功能，不转换原有无动捕实车 demo，也不增加 Gazebo 实验。Mini 三车仍为 `tianbot_mini_01/02/03`，动捕刚体默认同名，服务器和端口统一在 `config/mocap.yaml`。NOKOV 是动捕合作伙伴，当前通过 VRPN 接入。
 
 ## 从哪里找

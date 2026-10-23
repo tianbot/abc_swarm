@@ -46,6 +46,7 @@ ABC Swarm is the developer manual for ROS2GO, Tianbot Mini and RoboMaster TT ROS
 地址和端口只需在 ``config/mocap.yaml`` 配置，也可通过启动参数覆盖。
 准备好后使用统一服务开始、停止，具体摆位和路径范围先看文档。
 
+* `现场测试清单 <docs/field-test.md>`_
 * `动捕实验说明 <docs/mocap-demos.md>`_
 * `统一启动和 GUI 接口 <docs/demo-runtime.md>`_
 * `本轮取舍和验证 <docs/main-reorg.md>`_

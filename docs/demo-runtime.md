@@ -66,7 +66,7 @@ rosservice call /abc_swarm_demo/reset
 
 JSON schema_version=2，保留 state、reason、enabled、ready、mode、vrpn_server、vrpn_port。enabled 表示自动反馈门是否打开，不再表示操作员启用状态。GUI 用实验进程的启动/退出控制运行，不把 ROS service 调用作为开车前的必经步骤。
 
-键盘和 GUI 都通过 teleop_cmd 进入头车统一输出；GUI 使用 start_teleop:=false。输入超时 0.3 秒停止头车请求，默认限制 0.1 m/s、0.6 rad/s。路径实验的头车最终输出仍只由路径跟踪器发布。
+键盘和 GUI 都通过 teleop_cmd 进入头车统一输出；GUI 使用 start_teleop:=false。输入超时 0.3 秒停止头车请求，默认限制 0.15 m/s、0.6 rad/s。路径实验的头车最终输出仍只由路径跟踪器发布。
 
 ## 后续功能边界
 

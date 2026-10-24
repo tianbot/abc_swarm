@@ -97,7 +97,7 @@ def validate(spec):
         require(path['shape'] in ('circle', 'rounded_rectangle'), 'path.shape: circle or rounded_rectangle')
         for key in ('radius', 'width', 'height', 'speed'):
             number(path[key], 'path.' + key, positive=True)
-        require(path['speed'] <= 0.1, 'path.speed: maximum supported demo request is 0.1 m/s')
+        require(path['speed'] <= 0.15, 'path.speed: maximum supported demo request is 0.15 m/s')
         require(type(path['laps']) is int and path['laps'] >= 1, 'path.laps: positive integer; continuous motion excluded')
         require(type(path['clockwise']) is bool, 'path.clockwise: boolean required')
         if path['shape'] == 'rounded_rectangle':

@@ -63,7 +63,7 @@ python3 ai/generate_launch.py /tmp/customer-demo/experiment.json --output /tmp/c
 - `name` 是交付名称；每台 `name` 是 ROS 名称，`rigid_body` 是 VRPN 刚体/frame；采用字母开头的扁平字母数字下划线名称，名称和刚体分别不能重复。不接收任意 topic/frame 表达式。
 - `initial_pose` 是客户记录的摆位，不是控制目标；可以为 `null`。表中建议摆位按头车起点及 spacing 计算，实际位置偏离时先人工摆好。工具没有验证现场实测位姿或碰撞。
 - `spacing` 为正的米数：三角形的纵/横偏移各为 spacing；逐车跟随为每车在前车后方 spacing。不是三角形三边长。
-- 自动实验的 `path` 必须完整；shape 为 `circle` 或 `rounded_rectangle`，radius/width/height 均正，圆角矩形长宽至少两倍半径；speed 在 (0,0.1] m/s；laps 为正整数。circle 仍要求填写 width/height，它们对圆形无效。手动实验 `path: null`。
+- 自动实验的 `path` 必须完整；shape 为 `circle` 或 `rounded_rectangle`，radius/width/height 均正，圆角矩形长宽至少两倍半径；speed 在 (0,0.15] m/s；laps 为正整数。circle 仍要求填写 width/height，它们对圆形无效。手动实验 `path: null`。
 - clockwise 明确方向。路径在启动/重置时根据实测头车位置生成；圆形逆时针在头车朝向左侧，顺时针在右侧。需要核对整个编队的扫掠区域，且逐车跟随可能切角。
 - `startup` 的四个字段均为真正的布尔值。start_driver/start_vrpn 为 true 表示本实验启动，为 false 表示复用现场已有后台。两者不表示运动开关；没有反馈不能 ready。use_rviz 控制界面，start_teleop 仅手动实验可为 true。自动实验禁止键盘并发控制。
 - 不提供手动 enabled 启动选项、无限圈数、任意文件/节点/命令扩展。业务需要新能力时走下述维护流程。
@@ -122,3 +122,6 @@ python3 tests/check_course_compatibility.py
 targets 包含 reference（world 或 initial_leader）与 poses（三个 [x_m,y_m,yaw_rad]）。poses 是显式控制目标，不使用 robots[].initial_pose 作为目标；initial_leader 在所有定位有效时按首台车实际位姿冻结目标。设备数组顺序用于一对一分配，不是头车/跟随者拓扑。
 
 生成器把目标作为固定 rosparam 写入生成的 launch，覆盖包内目标默认值，不接收任意配置文件路径或节点。可继续使用相同生成/只读 --check 流程。该点镇定只支持独立到位、最终航向和停车；还没有自动目标分配、避障或无碰撞入队，不能答应任意交叉起点的安全集结。
+
+
+当前新增动捕实验默认直线速度/上限已调整为 0.15 m/s，路径输入 speed 上限同为 0.15；生成文件在运行前须向客户说明。点镇定 AI 输入继续显式提供 targets：三角形 offsets 为 [[0,0,0],[-s,s,0],[-s,-s,0]]，蛇形为 [[0,0,0],[-s,0,0],[-2*s,0,0]]，reference=initial_leader。不要把“排成蛇形后停车”生成成持续蛇形跟随。用 world 目标可让三台车各自移动，包括首台。CLI 的 formation 预设不改变已有 AI 输入契约；生成器始终使用显式 targets，避免目标歧义。

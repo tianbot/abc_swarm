@@ -47,7 +47,7 @@ def run(controller, formation='single', spacing=0.5, dt=0.05, max_seconds=None):
         for leader, follower, offset in edges:
             relative = relative_pose(poses[leader], poses[follower])
             v, w = tracking_velocity(relative, velocities[leader], offset, 0.1, 0.5, 0.5)
-            commands.append((max(-0.1, min(0.1, v)), max(-0.6, min(0.6, w))))
+            commands.append((max(-0.15, min(0.15, v)), max(-0.6, min(0.6, w))))
             errors.append(math.hypot(relative[0] - offset[0], relative[1] - offset[1]))
             front_errors.append(math.hypot(relative[0] + 0.1 * math.cos(relative[2]) - offset[0] - 0.1,
                                            relative[1] + 0.1 * math.sin(relative[2]) - offset[1]))

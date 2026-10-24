@@ -31,7 +31,7 @@ class DemoRuntime:
         self.timeout = float(rospy.get_param('~feedback_timeout', 0.5))
         self.future_tolerance = float(rospy.get_param('~odom_future_tolerance', 0.1))
         self.command_timeout = float(rospy.get_param('~command_timeout', 0.3))
-        self.max_linear = float(rospy.get_param('~max_linear', 0.1))
+        self.max_linear = float(rospy.get_param('~max_linear', 0.15))
         self.max_angular = float(rospy.get_param('~max_angular', 0.6))
         if not self.frames or any(not math.isfinite(v) or v <= 0 for v in
                 (self.timeout, self.future_tolerance, self.command_timeout, self.max_linear, self.max_angular)):

@@ -34,7 +34,17 @@ def world_goals(poses, reference, anchor):
     return result
 
 
-def point_velocity(pose, goal, max_linear=0.08, max_angular=0.5,
+def formation_targets(formation, spacing):
+    if formation not in ('triangle', 'snake'):
+        raise ValueError('formation must be triangle or snake')
+    if type(spacing) not in (int, float) or not math.isfinite(spacing) or spacing <= 0:
+        raise ValueError('spacing must be positive and finite')
+    if formation == 'triangle':
+        return [(0.0, 0.0, 0.0), (-spacing, spacing, 0.0), (-spacing, -spacing, 0.0)]
+    return [(0.0, 0.0, 0.0), (-spacing, 0.0, 0.0), (-2*spacing, 0.0, 0.0)]
+
+
+def point_velocity(pose, goal, max_linear=0.15, max_angular=0.5,
                    position_tolerance=0.04, yaw_tolerance=0.08,
                    k_distance=0.6, k_heading=1.5):
     validate_pose(pose)

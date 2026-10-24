@@ -68,7 +68,7 @@ class PresetPathTests(unittest.TestCase):
         for shape in ('circle', 'rounded_rectangle'):
             for formation in ('single', 'triangle', 'snake'):
                 with self.subTest(shape=shape, formation=formation):
-                    tracker = PurePursuit(preset_path(shape, radius=0.8))
+                    tracker = PurePursuit(preset_path(shape, radius=0.8), speed=0.05)
                     rows = run(tracker, formation)
                     self.assertTrue(tracker.completed)
                     self.assertLess(max(r[3] for r in rows), 0.02)
@@ -76,6 +76,19 @@ class PresetPathTests(unittest.TestCase):
                                         for pose in row[1] for v in pose))
                     if formation != 'single':
                         self.assertLess(max(rows[-1][6]), 0.01)
+
+    def test_faster_default_finishes_with_runtime_formation_tolerance(self):
+        for shape in ('circle', 'rounded_rectangle'):
+            for formation in ('single', 'triangle', 'snake'):
+                with self.subTest(shape=shape,formation=formation):
+                    tracker=PurePursuit(preset_path(shape,radius=0.8))
+                    self.assertEqual(tracker.speed,0.15)
+                    rows=run(tracker,formation)
+                    self.assertTrue(tracker.completed)
+                    self.assertLess(max(r[3] for r in rows),0.02)
+                    self.assertTrue(all(abs(v)<=0.15+1e-9 for row in rows for v,w in row[2]))
+                    if formation!='single':
+                        self.assertLess(max(rows[-1][6]),0.1)  # Production settle_tolerance.
 
     def test_invalid_dimensions_and_lost_path_are_rejected(self):
         for kwargs in ({'radius': 0}, {'width': 1, 'shape': 'rounded_rectangle'},

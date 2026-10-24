@@ -72,7 +72,7 @@ rostopic echo /abc_swarm_demo/status
 
 正常时 state 为 running、ready 为 true。若 waiting，看 reason 指出的 frame 或 odom。头车未动时，后车也可能开始向编队位置收敛。
 
-键盘 i 前进、u/o 缓弯、k 停止头车请求。初始请求 0.05 m/s、0.15 rad/s；输入超时 0.3 秒停止头车请求。不要另开直接向头车 cmd_vel 发速度的遥控节点。停止整套实验时在 roslaunch 终端按 Ctrl+C。
+键盘 i 前进、u/o 缓弯、k 停止头车请求。初始请求 0.15 m/s、0.15 rad/s；输入超时 0.3 秒停止头车请求。不要另开直接向头车 cmd_vel 发速度的遥控节点。停止整套实验时在 roslaunch 终端按 Ctrl+C。
 
 退出旧 demo 并确认三车实际静止。再摆成同向纵列、相邻间距 0.5 m，启动逐车跟随：
 
@@ -90,7 +90,7 @@ roslaunch abc_swarm demo_mocap_three_mini_leader_follower_snake.launch
 roslaunch abc_swarm demo_mocap_path_tracking.launch shape:=circle
 ```
 
-首次有效位姿确定起点和起始切线，路径固定在 world。默认逆时针、圆在初始车头左侧，半径 0.8 m、速度 0.05 m/s、一圈。启动前确认整条轨迹及编队范围足够空旷；反馈就绪后自动跟踪，RViz 用于观察运行路径。
+首次有效位姿确定起点和起始切线，路径固定在 world。默认逆时针、圆在初始车头左侧，半径 0.8 m、速度 0.15 m/s、一圈。启动前确认整条轨迹及编队范围足够空旷；反馈就绪后自动跟踪，RViz 用于观察运行路径。
 
 完成应显示 completed 并停止输出。再次测试可重启 launch，或在 completed/fault 后重置：
 

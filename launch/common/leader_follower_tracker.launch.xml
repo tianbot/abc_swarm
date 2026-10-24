@@ -8,7 +8,7 @@
   <arg name="front_distance" default="0.1" />
   <arg name="k_x" default="0.5" />
   <arg name="k_y" default="0.5" />
-  <arg name="max_linear" default="0.10" />
+  <arg name="max_linear" default="0.15" />
   <arg name="max_angular" default="0.6" />
   <arg name="tf_timeout" default="0.5" />
   <arg name="odom_timeout" default="0.5" />

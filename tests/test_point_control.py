@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import math
 import unittest
-from abc_swarm.point_control import angle, point_velocity, world_goals
+from abc_swarm.point_control import angle, formation_targets, point_velocity, world_goals
 
 
 class PointControlTests(unittest.TestCase):
@@ -15,7 +15,7 @@ class PointControlTests(unittest.TestCase):
             with self.subTest(start=start):
                 for _ in range(6000):
                     v, w, phase = point_velocity(pose, goal)
-                    self.assertTrue(0 <= v <= 0.08)
+                    self.assertTrue(0 <= v <= 0.15)
                     self.assertLessEqual(abs(w), 0.5)
                     if phase == 'arrived':
                         break
@@ -37,6 +37,12 @@ class PointControlTests(unittest.TestCase):
         for actual, expected in zip(goals,[(1,2,math.pi/2),(0.5,1.5,math.pi/2),(1.5,1.5,math.pi/2)]):
             for a,b in zip(actual,expected):self.assertAlmostEqual(a,b)
         self.assertEqual(world_goals(local,'world',(10,20,0)),[tuple(p) for p in local])
+
+    def test_triangle_and_snake_presets_hold_the_first_robot(self):
+        self.assertEqual(formation_targets('triangle',0.5),[(0,0,0),(-0.5,0.5,0),(-0.5,-0.5,0)])
+        self.assertEqual(formation_targets('snake',0.6),[(0,0,0),(-0.6,0,0),(-1.2,0,0)])
+        for formation,spacing in [('unknown',0.5),('triangle',0),('snake',-1),('snake',True),('snake',math.nan)]:
+            with self.assertRaises(ValueError):formation_targets(formation,spacing)
 
     def test_invalid_inputs_fail_before_motion(self):
         for key in ['max_linear','max_angular','position_tolerance','yaw_tolerance','k_distance','k_heading']:

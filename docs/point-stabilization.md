@@ -35,6 +35,32 @@ roslaunch abc_swarm demo_mocap_three_mini_point_stabilization.launch start_drive
 
 启动前的客户起点记录不用于改写 TF；默认参考点来自实际动捕。刚体 x 向车头、y 向左，原点对应底盘控制参考点。
 
+## 用参数选择任务
+
+点镇定的“任务”就是每台车的目标位置和最终朝向。可以直接选择预设：
+
+```bash
+roslaunch abc_swarm demo_mocap_three_mini_point_stabilization.launch formation:=triangle
+```
+
+```bash
+roslaunch abc_swarm demo_mocap_three_mini_point_stabilization.launch formation:=snake
+```
+
+两种预设都在全部定位有效时冻结 01 的位姿；01 保持该位置，02/03 到位后停车，各车最终朝向与冻结的 01 朝向相同。
+
+| formation | 01 目标 | 02 相对目标 | 03 相对目标 |
+| --- | --- | --- | --- |
+| triangle | 原位置/朝向 | 后 spacing、左 spacing | 后 spacing、右 spacing |
+| snake | 原位置/朝向 | 后 spacing | 后 2×spacing |
+| config（默认） | 由目标文件决定 | 由目标文件决定 | 由目标文件决定 |
+
+`spacing:=0.5` 设置预设间距。预设显式覆盖文件中的 target_reference/target_poses，固定使用 initial_leader；用自定义 world 目标时选择 `formation:=config goal_config:=...`。默认不写 formation 就读取默认目标文件，效果是三角形；自定义文件仍按原来的方式生效，不会被默认预设覆盖。
+
+点镇定蛇形是“排成一列并停住”，不等于 01→02→03 的持续跟随。它完成后不会自动切换到跟随实验。自定义 world 文件可以给 01 也指定新位置，使三台车都移动。
+
+直线速度默认上限为 0.15 m/s，可通过 `max_linear:=0.15` 覆盖；不传时使用目标配置文件的 max_linear。它不是全程恒速：接近目标会按距离减速，转向/最终对齐航向时直线速度为零。没有改角速度限制。
+
 ## 看目标、误差和结束
 
 ```bash
@@ -43,7 +69,7 @@ rostopic echo /abc_swarm_demo/status
 
 状态是 JSON：mode=point_stabilization；waiting 表示某台定位缺失/过期；running 表示自动执行；completed 表示所有位置和航向都进入容差。robots 字段包含每车 goal、phase、position_error 和 yaw_error。
 
-phase 分为 aligning、approaching、orienting、arrived。默认最大前进速度 0.08 m/s、角速度 0.5 rad/s，位置容差 0.04 m、航向容差 0.08 rad，使用前进与原地转向，不倒车。
+phase 分为 aligning、approaching、orienting、arrived。默认最大前进速度 0.15 m/s、角速度 0.5 rad/s，位置容差 0.04 m、航向容差 0.08 rad，使用前进与原地转向，不倒车。
 
 ```bash
 rostopic echo -n 1 /abc_swarm_demo/goals
@@ -125,3 +151,8 @@ roslaunch --nodes /tmp/customer-point-demo/experiment.launch start_driver:=false
 48 项本地测试通过；Noetic 独立 catkin 工作空间构建、测试和安装检查通过。安装后的新节点可被找到，AI 生成的点镇定 launch 已实际生成、只读检查并完成 ROS 参数解析。私有 ROS 闭环记录位于 `/tmp/abc_swarm_point_ros_6xp4bbiw`，验证冻结目标、三车位置及航向收敛、单车 TF 过期共同停车、恢复、world 目标、完成保持、退出零输出和重复映射拒绝。合成结果不代替实车验收。
 
 本轮显式修改 AI 能力表/生成器，登记已实现点镇定；CMake 增加新测试，CI 增加安装后生成和私有点镇定闭环步骤，供维护者审核。冻结 main 基线、旧课程检查器及例外清单未修改，48 个原资源兼容检查通过。未启动实车/VRPN/Gazebo，未推送代码或发布文档网站，远端 CI 尚未运行。
+
+
+2026-10-24 后续调整：新增 formation=triangle/snake/config 选择；新增动捕 demo 的键盘、头车/后车、路径默认速度与点镇定上限统一为 0.15 m/s。点镇定预设和自定义目标语义见上文；提速结果须重新做实车验收，旧课程资源不变。
+
+本次提速/任务选择验证：52 项本地测试通过，独立 Noetic 构建测试安装通过；点镇定闭环（含 snake 预设）日志 `/tmp/abc_swarm_point_ros_n56y1no9`，路径/手动跟随/PID 回归日志 `/tmp/abc_swarm_path_ros_q6bfxlvk`。新速度下的测试使用对应 0.15 限幅，并保留原 0.05 路径回归；提速圆角矩形的编队收敛按生产 0.1 m 容差验证。未改旧课程检查规则，48 个原资源仍兼容。现场运行进程未重启，实车提速效果未验收。

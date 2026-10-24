@@ -7,6 +7,9 @@
   <arg name="start_vrpn" default="true"/>
   <arg name="use_rviz" default="false"/>
   <arg name="goal_config" default="$(find abc_swarm)/config/point_stabilization.yaml"/>
+  <arg name="formation" default="config"/>
+  <arg name="spacing" default="0.5"/>
+  <arg name="max_linear" default=""/>
   <arg name="robot_name_1" default="tianbot_mini_01"/>
   <arg name="robot_name_2" default="tianbot_mini_02"/>
   <arg name="robot_name_3" default="tianbot_mini_03"/>
@@ -22,6 +25,9 @@
   </include>
   <node pkg="abc_swarm" type="point_stabilization.py" name="abc_swarm_demo" output="screen" required="true" clear_params="true">
     <rosparam command="load" file="$(arg goal_config)"/>
+    <param name="formation" value="$(arg formation)"/>
+    <param name="spacing" value="$(arg spacing)"/>
+    <param if="$(eval arg('max_linear') != '')" name="max_linear" value="$(arg max_linear)" type="double"/>
     <rosparam param="robots" subst_value="true">
       - {name: "$(arg robot_name_1)", frame: "$(arg rigid_body_1)"}
       - {name: "$(arg robot_name_2)", frame: "$(arg rigid_body_2)"}

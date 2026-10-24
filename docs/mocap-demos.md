@@ -47,7 +47,7 @@ rostopic echo /abc_swarm_demo/status
 反馈就绪后自动运行：
 
 
-键盘 i 前进，u/o 缓弯，k 停止。遥控请求初始 0.05 m/s、0.15 rad/s；统一入口超过 0.3 秒没有新指令时停车。旧键盘版本需要持续按键。GUI 接管时关闭默认键盘，并向 `/abc_swarm_demo/teleop_cmd` 发布，不能另开节点直接争用头车 cmd_vel。
+键盘 i 前进，u/o 缓弯，k 停止。遥控请求初始 0.15 m/s、0.15 rad/s；统一入口超过 0.3 秒没有新指令时停车。旧键盘版本需要持续按键。GUI 接管时关闭默认键盘，并向 `/abc_swarm_demo/teleop_cmd` 发布，不能另开节点直接争用头车 cmd_vel。
 
 停止整套实验：在 roslaunch 终端按 Ctrl+C，并确认三车静止。
 
@@ -76,7 +76,7 @@ roslaunch abc_swarm demo_mocap_snake_leader_follower_path_tracking.launch shape:
 
 默认启动驱动、VRPN、算法和 RViz，不启动键盘。头车首次有效位姿确定路径起点和切线方向，路径预览后固定在 world，不随头车移动。默认逆时针，圆在车头左侧；`clockwise:=true` 改为右侧。
 
-默认圆半径 0.8 m；圆角矩形外轮廓宽 2.5 m、高 2.0 m、圆角半径 0.8 m；头车 0.05 m/s、一圈。可通过 `radius`、`width`、`height`、`speed`、`laps`、`clockwise`、`spacing` 调整。`front_distance` 同时传给跟随器和收敛判断，默认 0.1 m。路径几何、速度和圈数由 launch 参数负责；前视距离、容差等算法参数在 `config/path_tracking.yaml`，不再重复声明同名默认值。矩形宽高必须至少为圆角半径两倍。后车和车体尺寸会超出头车路径，先确认整个队形扫过范围；外侧车需要更大速度余量。
+默认圆半径 0.8 m；圆角矩形外轮廓宽 2.5 m、高 2.0 m、圆角半径 0.8 m；头车 0.15 m/s、一圈。可通过 `radius`、`width`、`height`、`speed`、`laps`、`clockwise`、`spacing` 调整。`front_distance` 同时传给跟随器和收敛判断，默认 0.1 m。路径几何、速度和圈数由 launch 参数负责；前视距离、容差等算法参数在 `config/path_tracking.yaml`，不再重复声明同名默认值。矩形宽高必须至少为圆角半径两倍。后车和车体尺寸会超出头车路径，先确认整个队形扫过范围；外侧车需要更大速度余量。
 
 RViz 使用 world，显示 `/abc_swarm_path/path`、`actual_path`、`target` 和 TF。启动前确认完整编队活动空间和摆位；反馈有效后自动运行，RViz 显示运行路径。
 
@@ -93,3 +93,6 @@ rosservice call /abc_swarm_demo/reset
 控制器没有避障。leader-follower 控制车体前方 0.1 m 的点，该点误差与车体参考点误差不同，不单独约束最终朝向。TF 时间检查也不能识别服务器用新时间戳反复发送冻结姿态；底盘急停、模式和断网停车仍须现场确认。
 
 这一分支完成静态与合成反馈验证后，仍需现场复验。过去三车手动领航的测试不能代替新分支和自动路径实验的实际验收。统一参数、服务和 GUI 生命周期见 [运行接口](demo-runtime.md)。
+
+
+当前默认直线速度为 0.15 m/s：手动领航的键盘请求、运行节点及后车限幅共同使用 max_linear；路径 speed 默认为 0.15，后车限幅同为 0.15。点镇定详见[任务选择](point-stabilization.md)。0.15 是请求/上限，转弯与接近目标会减速；跟随算法还会按误差调整速度，不能保证每车每时刻都以同一速度运动。外侧车辆受相同限幅时，提速转弯会增大跟随误差，需现场验收。

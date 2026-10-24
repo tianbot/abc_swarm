@@ -9,7 +9,7 @@
   <arg name="radius" default="0.8"/>
   <arg name="width" default="2.5"/>
   <arg name="height" default="2.0"/>
-  <arg name="speed" default="0.05"/>
+  <arg name="speed" default="0.15"/>
   <arg name="laps" default="1"/>
   <arg name="clockwise" default="false"/>
   <arg name="start_vrpn" default="false"/>

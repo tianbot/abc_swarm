@@ -199,11 +199,11 @@ def main():
             raw = rospy.Publisher('/abc_swarm_demo/teleop_cmd', Twist, queue_size=1)
             pump(0.3)
             msg = Twist()
-            msg.linear.x, msg.angular.z = 0.08, 0.2
+            msg.linear.x, msg.angular.z = 0.2, 0.2
             for i in range(8):
                 raw.publish(msg)
                 pump(0.05, odom_ahead=0.05)
-            assert abs(commands[1][-1][1] - 0.08) < 1e-6, commands[1][-1]
+            assert abs(commands[1][-1][1] - 0.15) < 1e-6, commands[1][-1]
             assert runtime_states[-1]['state'] == 'running', runtime_states[-1]
             pump(0.6)
             zeros()  # Expired input stops the head.
@@ -234,9 +234,9 @@ def main():
         assert process.poll() is None, 'required ROS node exited; inspect logs in ' + str(folder)
         assert runtime_states[-1]['state'] == 'running', runtime_states[-1]
         deadline = time.monotonic() + 8
-        while not (0 < commands[2][-1][1] <= 0.1) and time.monotonic() < deadline:
+        while not (0 < commands[2][-1][1] <= 0.15) and time.monotonic() < deadline:
             pump(0.1)
-        assert 0 < commands[2][-1][1] <= 0.1, commands[2][-1]
+        assert 0 < commands[2][-1][1] <= 0.15, commands[2][-1]
         pump(0.8, missing=1)
         for i in commands:
             zeros(i)

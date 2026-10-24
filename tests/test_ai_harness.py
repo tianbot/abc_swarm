@@ -81,7 +81,7 @@ class AIHarnessTests(unittest.TestCase):
             lambda s: s['startup'].update(start_driver='false'),
             lambda s: s['startup'].update(start_teleop=True),
             lambda s: s.update(spacing=0),
-            lambda s: s['path'].update(speed=0.11),
+            lambda s: s['path'].update(speed=0.16),
             lambda s: s['path'].update(laps=0),
             lambda s: s['path'].update(laps=True),
             lambda s: s['path'].update(radius=float('inf')),

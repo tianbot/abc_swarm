@@ -10,18 +10,23 @@ import tf
 from geometry_msgs.msg import Pose, PoseArray, Twist
 from std_msgs.msg import String
 
-from abc_swarm.point_control import point_velocity, validate_pose, world_goals
+from abc_swarm.point_control import formation_targets, point_velocity, validate_pose, world_goals
 
 
 class PointStabilization:
     def __init__(self):
         self.fixed = rospy.get_param('~fixed_frame', 'world')
         self.robots = rospy.get_param('~robots')
-        self.targets = rospy.get_param('~target_poses')
-        self.reference = rospy.get_param('~target_reference', 'initial_leader')
+        self.formation = rospy.get_param('~formation', 'config')
+        if self.formation == 'config':
+            self.targets = rospy.get_param('~target_poses')
+            self.reference = rospy.get_param('~target_reference', 'initial_leader')
+        else:
+            self.targets = formation_targets(self.formation, rospy.get_param('~spacing', 0.5))
+            self.reference = 'initial_leader'
         self.timeout = rospy.get_param('~tf_timeout', 0.5)
         self.control = {key: rospy.get_param('~' + key, default) for key, default in
-                        [('max_linear', 0.08), ('max_angular', 0.5),
+                        [('max_linear', 0.15), ('max_angular', 0.5),
                          ('position_tolerance', 0.04), ('yaw_tolerance', 0.08),
                          ('k_distance', 0.6), ('k_heading', 1.5)]}
         if type(self.timeout) not in (int, float) or not math.isfinite(self.timeout) or self.timeout <= 0:
@@ -39,7 +44,7 @@ class PointStabilization:
         for key in ('name', 'frame'):
             if len({robot[key] for robot in self.robots}) != len(self.robots):
                 raise ValueError('Duplicate robot ' + key)
-        if not isinstance(self.targets, list) or len(self.targets) != len(self.robots):
+        if not isinstance(self.targets, (list, tuple)) or len(self.targets) != len(self.robots):
             raise ValueError('One explicit target pose is required for every robot')
         world_goals(self.targets, self.reference, (0, 0, 0))
         point_velocity((0, 0, 0), (0, 0, 0), **self.control)
@@ -90,7 +95,7 @@ class PointStabilization:
         value = json.dumps({'schema_version': 2, 'mode': 'point_stabilization',
                             'state': state, 'ready': state in ('running', 'completed'),
                             'enabled': state == 'running', 'reason': reason,
-                            'robots': details or [], 'target_reference': self.reference,
+                            'robots': details or [], 'target_reference': self.reference, 'formation': self.formation,
                             'vrpn_server': rospy.get_param('/vrpn_client_node/server', ''),
                             'vrpn_port': rospy.get_param('/vrpn_client_node/port', 0)}, sort_keys=True)
         # Numeric errors change continuously; cap status updates at 5 Hz.

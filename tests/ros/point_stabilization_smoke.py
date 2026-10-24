@@ -108,9 +108,20 @@ def main():
             assert math.hypot(poses[i][0]-goal[0],poses[i][1]-goal[1])<=0.045,(i,poses[i],goal)
             assert abs(angle(poses[i][2]-goal[2]))<=0.085,(i,poses[i],goal)
         pump(0.4);zeros()
-        assert all(0<=v<=0.08 and abs(w)<=0.5 for rr in rows.values() for _,v,w in rr)
+        assert all(0<=v<=0.15 and abs(w)<=0.5 for rr in rows.values() for _,v,w in rr)
         poses[0]=(anchor[0]+0.2,anchor[1],anchor[2])
         pump(0.4);zeros()  # Completion is held, no automatic second experiment.
+        stop(p)
+
+        # The explicit snake task freezes a line behind the current first robot.
+        snake_expected=world_goals([[0,0,0],[-0.4,0,0],[-0.8,0,0]],'initial_leader',poses[0])
+        states.clear();goals.clear()
+        p=start(args+['formation:=snake','spacing:=0.4'],'snake_preset')
+        pump(3,move=False)
+        assert p.poll() is None,'snake node exited; see '+str(folder)
+        assert states[-1]['formation']=='snake' and states[-1]['state']=='running',states[-1]
+        for pose,goal in zip(goals[-1].poses,snake_expected):
+            assert abs(pose.position.x-goal[0])<1e-6 and abs(pose.position.y-goal[1])<1e-6
         stop(p)
 
         data=yaml.safe_load((package/'config/point_stabilization.yaml').read_text())
@@ -134,7 +145,7 @@ def main():
         while p.poll() is None and time.monotonic()<deadline:pump(0.1,move=False)
         assert p.poll() is not None,'invalid duplicate mapping was accepted'
         assert not any(v!=0 or w!=0 for rr in rows.values() for t,v,w in rr if t>before)
-        print('PASS: point goals frozen, automatic closed-loop pose convergence, all-stop on stale TF, recovery, world targets, completion hold, shutdown zeros and invalid mapping rejection')
+        print('PASS: point goals frozen, automatic closed-loop pose convergence, all-stop on stale TF, recovery, world targets, completion hold, shutdown zeros, snake task selection and invalid mapping rejection')
         print('Logs: '+str(folder))
     finally:
         for p in reversed(processes):stop(p)

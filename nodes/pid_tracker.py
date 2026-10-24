@@ -13,7 +13,7 @@ import numpy as np
 from simple_pid import PID
 
 pid_linear = PID(2, 0.5, 0.0)
-pid_linear.output_limits = (-0.25, 0.25)
+pid_linear.output_limits = (-0.15, 0.15)
 pid_angular = PID(2, 1.0, 0.0)
 pid_angular.output_limits = (-1.57, 1.57)
 
@@ -30,7 +30,7 @@ if __name__ == '__main__':
     tracker_frame = rospy.get_param('~tracker_frame')
     tracker_motion_topic = rospy.get_param('~tracker_motion_topic')
     set_distance = rospy.get_param('~set_distance')
-    max_linear = float(rospy.get_param('~max_linear', 0.25))
+    max_linear = float(rospy.get_param('~max_linear', 0.15))
     max_angular = float(rospy.get_param('~max_angular', 1.57))
     tf_timeout = float(rospy.get_param('~tf_timeout', 0.5))
     enable_param = rospy.get_param('~enable_param', '~enabled')

@@ -115,6 +115,24 @@ class DemoEntrypointTests(unittest.TestCase):
                                  for n in config.nodes))
             self.assertEqual(sum(n.type == 'demo_runtime.py' for n in config.nodes), 1)
 
+    def test_default_linear_speed_is_consistent_through_the_command_chain(self):
+        for path in DEMOS:
+            if path.name=='mocap_backend.launch':continue
+            config=load(path)
+            if 'path_tracking' in path.name:
+                self.assertEqual(config.params['/abc_swarm_path/speed'].value,0.15)
+            else:
+                self.assertEqual(config.params['/leader_teleop/speed'].value,0.15)
+                self.assertEqual(config.params['/abc_swarm_demo/max_linear'].value,0.15)
+            followers=[p.value for name,p in config.params.items()
+                       if name.endswith(('_leader_follower/max_linear','_tracker/max_linear'))]
+            self.assertTrue(all(value==0.15 for value in followers))
+        config=load(ROOT/'launch/mocap/demo_mocap_three_mini_leader_follower_triangle.launch',
+                    ['max_linear:=0.12'])
+        self.assertEqual(config.params['/leader_teleop/speed'].value,0.12)
+        self.assertEqual(config.params['/abc_swarm_demo/max_linear'].value,0.12)
+        self.assertEqual(config.params['/tianbot_mini_02_leader_follower/max_linear'].value,0.12)
+
     def test_controller_fragment_has_no_backend_or_lifecycle(self):
         config = load(ROOT / 'launch/common/three_mini_leader_follower.launch.xml',
                       ['formation:=snake'])

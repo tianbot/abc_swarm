@@ -11,6 +11,6 @@
   ],
   "experiment": "path_triangle",
   "spacing": 0.5,
-  "path": {"shape": "circle", "radius": 0.8, "width": 2.5, "height": 2.0, "speed": 0.05, "laps": 1, "clockwise": false},
+  "path": {"shape": "circle", "radius": 0.8, "width": 2.5, "height": 2.0, "speed": 0.15, "laps": 1, "clockwise": false},
   "startup": {"start_driver": true, "start_vrpn": true, "use_rviz": true, "start_teleop": false}
 }

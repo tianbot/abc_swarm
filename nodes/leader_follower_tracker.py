@@ -28,7 +28,7 @@ class LeaderFollower:
         self.d = float(rospy.get_param('~front_distance', 0.1))
         self.k_x = float(rospy.get_param('~k_x', 0.5))
         self.k_y = float(rospy.get_param('~k_y', 0.5))
-        self.max_linear = float(rospy.get_param('~max_linear', 0.1))
+        self.max_linear = float(rospy.get_param('~max_linear', 0.15))
         self.max_angular = float(rospy.get_param('~max_angular', 0.6))
         self.tf_timeout = float(rospy.get_param('~tf_timeout', 0.5))
         self.odom_timeout = float(rospy.get_param('~odom_timeout', 0.5))

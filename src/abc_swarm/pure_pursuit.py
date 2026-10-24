@@ -9,7 +9,7 @@ import math
 
 
 class PurePursuit:
-    def __init__(self, points, laps=1, speed=0.05, lookahead=0.25,
+    def __init__(self, points, laps=1, speed=0.15, lookahead=0.25,
                  max_angular=0.5, goal_tolerance=0.05, max_error=0.5):
         if isinstance(laps, bool) or not isinstance(laps, int) or laps < 0:
             raise ValueError('laps must be a nonnegative integer (0 means continuous)')

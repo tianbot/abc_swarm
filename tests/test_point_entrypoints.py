@@ -60,7 +60,9 @@ class PointEntrypointTests(unittest.TestCase):
         module=runpy.run_path(str(ROOT/'nodes/point_stabilization.py'))
         base={'~robots':[{'name':'a','frame':'body_a'},{'name':'b','frame':'body_b'},{'name':'c','frame':'body_c'}],
               '~target_poses':[[0,0,0],[-0.5,0.5,0],[-0.5,-0.5,0]]}
-        cases=[lambda p:p.update({'~max_linear':True}),
+        cases=[lambda p:p.update({'~formation':'unknown'}),
+               lambda p:p.update({'~formation':'snake','~spacing':-1}),
+               lambda p:p.update({'~max_linear':True}),
                lambda p:p.update({'~max_linear':-0.1}),
                lambda p:p.update({'~tf_timeout':float('nan')}),
                lambda p:p.update({'~target_reference':'map'}),
@@ -74,6 +76,23 @@ class PointEntrypointTests(unittest.TestCase):
                  patch('tf.TransformListener') as listener, patch('rospy.Publisher') as publisher:
                 with self.assertRaises(ValueError):module['PointStabilization']()
                 listener.assert_not_called();publisher.assert_not_called()
+
+    def test_preset_and_speed_arguments_reach_the_controller(self):
+        module=runpy.run_path(str(ROOT/'nodes/point_stabilization.py'))
+        for formation in ('triangle','snake'):
+            config=load(DEMO,['formation:='+formation,'spacing:=0.6','max_linear:=0.12',
+                              'start_driver:=false','start_vrpn:=false'])
+            params={'~'+key.split('/abc_swarm_demo/')[1]:p.value for key,p in config.params.items()
+                    if key.startswith('/abc_swarm_demo/')}
+            # Presets explicitly override target/reference entries in a goal file.
+            params['~target_reference']='world'
+            with patch('rospy.get_param',side_effect=lambda key,default=None:params.get(key,default)), \
+                 patch('tf.TransformListener'), patch('rospy.Publisher'),patch('rospy.on_shutdown'):
+                node=module['PointStabilization']()
+            self.assertEqual(node.reference,'initial_leader')
+            self.assertEqual(node.targets[0],(0,0,0))
+            self.assertEqual(node.targets[2],(-1.2,0,0) if formation=='snake' else (-0.6,-0.6,0))
+            self.assertEqual(node.control['max_linear'],0.12)
 
     def test_site_override_and_config_priority_are_shared(self):
         config=load(DEMO,['vrpn_server_ip:=192.0.2.31','vrpn_port:=3999'])

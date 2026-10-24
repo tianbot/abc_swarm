@@ -54,7 +54,7 @@ roslaunch abc_swarm demo_mocap_formation_leader_follower_path_tracking.launch sh
 roslaunch abc_swarm demo_mocap_snake_leader_follower_path_tracking.launch shape:=rounded_rectangle
 ```
 
-路径根据头车准备时的位姿生成，预览后固定。默认圆半径 0.8 m，圆角矩形外轮廓宽 2.5 m、高 2.0 m、圆角半径 0.8 m，头车速度 0.05 m/s、一圈。后车轨迹和车体会超出头车参考线，须按整个编队的范围准备场地；参数可以通过 launch 覆盖。
+路径根据头车准备时的位姿生成，预览后固定。默认圆半径 0.8 m，圆角矩形外轮廓宽 2.5 m、高 2.0 m、圆角半径 0.8 m，头车速度 0.15 m/s、一圈。后车轨迹和车体会超出头车参考线，须按整个编队的范围准备场地；参数可以通过 launch 覆盖。
 
 反馈有效后自动运行，不调用启用 service；退出 launch 停止。新一轮可重启 launch，或在 completed/fault 后重置（接受后自动运行）：
 

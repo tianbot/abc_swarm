@@ -89,7 +89,7 @@ class PresetPathNode:
             clockwise=rospy.get_param('~clockwise', False))
         self.controller = PurePursuit(
             points, laps=rospy.get_param('~laps', 1),
-            speed=float(rospy.get_param('~speed', 0.05)),
+            speed=float(rospy.get_param('~speed', 0.15)),
             lookahead=float(rospy.get_param('~lookahead', 0.25)),
             max_angular=float(rospy.get_param('~max_angular', 0.5)),
             goal_tolerance=float(rospy.get_param('~goal_tolerance', 0.05)),

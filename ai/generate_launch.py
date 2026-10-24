@@ -40,7 +40,9 @@ def identifier(value, where):
 
 
 def validate(spec):
-    fields(spec, 'contract_version name localization fixed_frame vrpn robots experiment spacing path startup', 'experiment')
+    point = isinstance(spec, dict) and spec.get('experiment') == 'point_stabilization'
+    fields(spec, 'contract_version name localization fixed_frame vrpn robots experiment path startup'
+           + (' targets' if point else ' spacing'), 'experiment')
     require(type(spec['contract_version']) is int and spec['contract_version'] == 2, 'contract_version: expected 2 (automatic startup; review v1 input before migrating)')
     identifier(spec['name'], 'name')
     for key in ('localization', 'fixed_frame'):
@@ -73,10 +75,21 @@ def validate(spec):
         raise ValueError('vrpn.server: explicit IPv4 address required, no substitutions')
     require(isinstance(spec['vrpn']['server'], str), 'vrpn.server: string required')
     require(type(spec['vrpn']['port']) is int and 1 <= spec['vrpn']['port'] <= 65535, 'vrpn.port: 1..65535')
-    number(spec['spacing'], 'spacing', positive=True)
+    if not point:
+        number(spec['spacing'], 'spacing', positive=True)
     fields(spec['startup'], 'start_driver start_vrpn use_rviz start_teleop', 'startup')
     for key, value in spec['startup'].items():
         require(type(value) is bool, 'startup.' + key + ': boolean required')
+    if point:
+        require(not spec['startup']['start_teleop'], 'point stabilization cannot start teleop')
+        fields(spec['targets'], 'reference poses', 'targets')
+        require(spec['targets']['reference'] in ('world', 'initial_leader'), 'targets.reference: world or initial_leader')
+        poses = spec['targets']['poses']
+        require(isinstance(poses, list) and len(poses) == len(spec['robots']), 'targets: one pose per robot required')
+        for pose in poses:
+            require(isinstance(pose, list) and len(pose) == 3, 'targets.poses: [x_m, y_m, yaw_rad] required')
+            for value in pose:
+                number(value, 'targets.poses')
     if capability['path']:
         require(not spec['startup']['start_teleop'], 'automatic path cannot start teleop')
         path = spec['path']
@@ -105,9 +118,11 @@ def render(spec):
     for key, value in spec['startup'].items():
         ET.SubElement(root, 'arg', name=key, default=text_value(value))
     include = ET.SubElement(root, 'include', file='$(find abc_swarm)/launch/mocap/' + capability['launch'])
-    args = {'vrpn_server_ip': spec['vrpn']['server'], 'vrpn_port': spec['vrpn']['port'], 'spacing': spec['spacing']}
+    args = {'vrpn_server_ip': spec['vrpn']['server'], 'vrpn_port': spec['vrpn']['port']}
+    if not capability.get('point'):
+        args['spacing'] = spec['spacing']
     for key in spec['startup']:
-        if key != 'start_teleop' or not capability['path']:
+        if key != 'start_teleop' or not (capability['path'] or capability.get('point')):
             args[key] = '$(arg ' + key + ')'
     for i, robot in enumerate(spec['robots'], 1):
         args['robot_name_' + str(i)] = robot['name']
@@ -119,12 +134,18 @@ def render(spec):
     template = HERE.parent / 'launch/mocap' / capability['launch']
     declared = {arg.get('name') for arg in ET.parse(str(template)).getroot().findall('arg')}
     require(set(args) <= declared, 'launch interface changed: undeclared arguments ' + str(sorted(set(args) - declared)))
+    if capability.get('point'):
+        for key, value in [('target_reference', spec['targets']['reference']),
+                           ('target_poses', spec['targets']['poses'])]:
+            ET.SubElement(root, 'rosparam', param='/abc_swarm_demo/' + key).text = json.dumps(value)
     # Python 3.8 (Noetic) has no ET.indent.
     return minidom.parseString(ET.tostring(root, encoding='utf-8')).toprettyxml(indent='  ')
 
 
 def report(spec):
     capability = validate(spec)
+    if capability.get('point'):
+        return point_report(spec)
     lines = ['# 客户实验运行单', '', '实验：`{}`；入口：`{}`。'.format(spec['experiment'], capability['launch']),
              '设备顺序即角色：01 项为头车；triangle 的 02/03 跟头车，snake 为逐车跟前车。',
              '坐标单位 m/rad，均为 world 下轴心参考点；以下是人工摆位记录，不设置 TF、不移动到起点。', '',
@@ -162,6 +183,27 @@ def report(spec):
     return '\n'.join(lines)
 
 
+def point_report(spec):
+    lines = ['# 三车点镇定运行单', '',
+             '目标参考系：`' + spec['targets']['reference'] + '`。world 为绝对目标；initial_leader 在全部定位有效时按首车实测位姿冻结目标。',
+             '初始位姿仅供记录，控制目标来自 targets；没有头车领航和后车跟随角色，按设备数组顺序一对一分配。',
+             '启动后自动运行，各车先到目标位置再调整最终航向；没有 ORCA、路径避障或自动切入编队。', '',
+             '| 设备 | 刚体 | 初始位姿记录 | 控制目标 [m,m,rad] |', '| --- | --- | --- | --- |']
+    for robot, goal in zip(spec['robots'], spec['targets']['poses']):
+        lines.append('| {} | {} | {} | {} |'.format(robot['name'], robot['rigid_body'], robot['initial_pose'], goal))
+    lines += ['', '启动前确认每台车通道互不冲突；禁止把本实验用于任意交叉/密集起点的无碰撞集结。',
+              '加载 Noetic 和对应版本 abc_swarm 工作空间后，在本目录只解析检查：', '',
+              '```bash', 'roslaunch --nodes ./experiment.launch start_driver:=false start_vrpn:=false use_rviz:=false', '```', '',
+              '客户准备好现场后启动（AI 不代执行）：', '',
+              '```bash', 'roslaunch ./experiment.launch', '```', '',
+              '```bash', 'rostopic echo /abc_swarm_demo/status', '```', '',
+              'state=completed 表示三车位置和航向均到达，之后持续停车；退出用 Ctrl+C 并确认实际静止。',
+              '任意所需位姿缺失/过期时全组停车；恢复定位后继续原冻结目标，不重建起点。',
+              '无启用 service。新一轮需重启 launch；不要同时运行跟随/路径节点或其他 cmd_vel 发布者。',
+              '', '离线生成检查通过；ROS 解析、驱动/动捕及实车到位/停车仍须现场记录，不代表已验收。', '']
+    return '\n'.join(lines)
+
+
 def unique_pairs(pairs):
     result = {}
     for key, value in pairs:
@@ -176,6 +218,8 @@ def bundle(spec):
              HERE.parent / 'launch/mocap' / validate(spec)['launch']]
     paths += sorted((HERE.parent / 'launch/common').glob('*.launch.xml'))
     paths += [HERE.parent / 'config/mocap.yaml', HERE.parent / 'config/path_tracking.yaml']
+    if validate(spec).get('point'):
+        paths.append(HERE.parent / 'config/point_stabilization.yaml')
     hashes = {str(p.relative_to(HERE.parent)): hashlib.sha256(p.read_bytes()).hexdigest() for p in paths}
     return {'composition.sha256.json': json.dumps(hashes, indent=2, sort_keys=True) + '\n', ** {'experiment.json': json.dumps(spec, ensure_ascii=False, indent=2, allow_nan=False) + '\n',
             'experiment.launch': render(spec), 'README.md': report(spec)}}

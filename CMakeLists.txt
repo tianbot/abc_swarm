@@ -18,6 +18,8 @@ install(FILES README.rst AGENTS.md LICENSE dependencies.repos dependencies-rmtt.
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
 
 if(CATKIN_ENABLE_TESTING)
+  catkin_add_nosetests(tests/test_point_control.py)
+  catkin_add_nosetests(tests/test_point_entrypoints.py)
   catkin_add_nosetests(tests/test_feedback.py)
   catkin_add_nosetests(tests/test_ai_harness.py)
   catkin_add_nosetests(tests/test_main_layout.py)

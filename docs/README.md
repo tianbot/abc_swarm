@@ -6,6 +6,8 @@
 
 当前用户指南：
 
+- [新实验：三车点镇定到位与最终朝向](point-stabilization.md)
+
 - [AI 配置客户实验：设备清单生成 launch](../ai/README.md)
 
 - **[三车现场测试清单：明天直接从这里开始](field-test.md)**

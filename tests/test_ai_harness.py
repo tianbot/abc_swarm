@@ -22,7 +22,9 @@ def scenario(experiment):
     cap = harness.CATALOG['experiments'][experiment]
     spec['experiment'] = experiment
     spec['robots'] = spec['robots'][:cap['robots']]
-    if not cap['path']:
+    if cap.get('point'):
+        spec = json.loads((ROOT / 'ai/point-stabilization.example.json').read_text())
+    elif not cap['path']:
         spec['path'] = None
         spec['startup']['start_teleop'] = True
     return spec
@@ -125,6 +127,21 @@ class AIHarnessTests(unittest.TestCase):
                 path.write_bytes(before[name])
             (out / 'experiment.launch').unlink()
             self.assertEqual(run(cmd + ['--check']).returncode, 2)
+
+    def test_point_targets_are_explicit_and_checked(self):
+        spec = scenario('point_stabilization')
+        text = harness.render(spec)
+        self.assertIn('/abc_swarm_demo/target_poses', text)
+        self.assertIn('控制目标', harness.report(spec))
+        self.assertNotIn('人工摆位记录，不设置 TF、不移动到起点', harness.report(spec))
+        for change in [lambda s: s.pop('targets'),
+                       lambda s: s['targets'].update(reference='map'),
+                       lambda s: s['targets'].update(poses=[[0,0,0]]),
+                       lambda s: s['targets']['poses'][0].__setitem__(0,'$(eval 1)'),
+                       lambda s: s['startup'].update(start_teleop=True)]:
+            invalid = copy.deepcopy(spec)
+            change(invalid)
+            with self.assertRaises(ValueError):harness.bundle(invalid)
 
     def test_duplicate_json_keys_rejected_without_creating_output(self):
         with tempfile.TemporaryDirectory() as directory:

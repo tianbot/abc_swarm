@@ -1,0 +1,16 @@
+# Targets are [x_m, y_m, yaw_rad], mapped in launch robot order, never initial poses.
+# initial_leader: freeze these offsets in world using the first robot's initial pose.
+# world: use the three absolute target poses directly.
+target_reference: initial_leader
+target_poses:
+  - [0.0, 0.0, 0.0]
+  - [-0.5, 0.5, 0.0]
+  - [-0.5, -0.5, 0.0]
+fixed_frame: world
+tf_timeout: 0.5
+max_linear: 0.08
+max_angular: 0.5
+position_tolerance: 0.04
+yaw_tolerance: 0.08
+k_distance: 0.6
+k_heading: 1.5

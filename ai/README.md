@@ -38,7 +38,7 @@ python3 ai/generate_launch.py /tmp/customer-demo/experiment.json --output /tmp/c
 ## AI 必须执行的工作流
 
 1. 读取能力表，核对设备运动模型、数量和实验类型。超出能力时输出具体缺项及待实现内容，停止生成；不减少设备、不自动换实验，不自动移植 ROS2/Gazebo/RMTT。
-2. 核实机器人名称与刚体的一对一映射、VRPN 地址、后台由谁启动。设备数组顺序就是角色顺序，首项为头车；triangle 后两台都跟头车，snake 为逐车跟前车。客户必须确认角色。
+2. 核实机器人名称与刚体的一对一映射、VRPN 地址、后台由谁启动。跟随实验中设备数组顺序就是角色顺序，首项为头车；triangle 后两台都跟头车，snake 为逐车跟前车。点镇定则逐台映射目标，首台只在 initial_leader 模式作为坐标参考。客户必须确认映射。
 3. 初始位置可以用 `null` 表示未知，并在交付中保留“现场核对”。其他必填信息缺失时询问客户。坐标 m/rad，world、x 朝前、y 朝左、底盘轴心；不把动捕起点写成 static TF，不自动导航到摆位点。
 4. 生成 JSON，运行工具，运行 `--check`，运行旧课程兼容检查。生成器不得通过修改旧课程、能力表或测试来接受不支持的需求。
 5. 有完整 Noetic 环境时执行运行单中的 `roslaunch --nodes` 解析；这只解析、不启动。没有环境就标记未检查，不能用 XML 语法通过代替 ROS 参数展开通过。
@@ -57,6 +57,7 @@ python3 ai/generate_launch.py /tmp/customer-demo/experiment.json --output /tmp/c
 | path_single | 1 | 预设路径 | 单车 |
 | path_triangle | 3 | 预设路径 | 三角形 |
 | path_snake | 3 | 预设路径 | 逐车跟随 |
+| point_stabilization | 3 | 各自位置与最终航向 | 独立目标，无跟随拓扑 |
 
 - 当前 model 仅 `tianbot_mini`，localization 仅 `mocap_vrpn`，fixed_frame 仅 `world`。型号、定位来源和数量不匹配就拒绝。比如“5 台 Mini”“Mini 混 RMTT”“Gazebo 下同一份新实验”当前均报告不支持，原视频 Gazebo 用法不受影响。
 - `name` 是交付名称；每台 `name` 是 ROS 名称，`rigid_body` 是 VRPN 刚体/frame；采用字母开头的扁平字母数字下划线名称，名称和刚体分别不能重复。不接收任意 topic/frame 表达式。
@@ -111,4 +112,13 @@ python3 tests/check_course_compatibility.py
 
 本次启动流程修正验证：38 项本地测试通过；独立 master、合成名称、关闭真实驱动/VRPN/UI 的六入口回归通过，覆盖自动运行、反馈中断停车、手动恢复不重放旧输入、时间戳小幅超前容差及路径结束停车。实车进程未重启，现场效果待重新验收。
 
-后续计划的点镇定入队和 ORCA 避障尚未实现。现有 LF 启动后的相对目标收敛不等于无碰撞集结规划；客户要求自动集结规划或 ORCA 时，必须明确报告待实现，不以现有 manual_triangle 等入口冒充。
+后续计划的入队规划和 ORCA 避障尚未实现（点镇定独立实验见下文）。现有 LF 启动后的相对目标收敛不等于无碰撞集结规划；客户要求无碰撞自动集结规划或 ORCA 时，必须明确报告待实现，不以现有 manual_triangle 等入口冒充。
+
+
+## 新能力：三车点镇定
+
+`point_stabilization` 已提供独立入口，见 [完整实验说明](../docs/point-stabilization.md)及 `point-stabilization.example.json`。保持 contract_version=2；既有实验的输入和行为不变。这个实验的顶层字段用 `targets` 取代 `spacing`，path 必须为 null、start_teleop 必须为 false。
+
+targets 包含 reference（world 或 initial_leader）与 poses（三个 [x_m,y_m,yaw_rad]）。poses 是显式控制目标，不使用 robots[].initial_pose 作为目标；initial_leader 在所有定位有效时按首台车实际位姿冻结目标。设备数组顺序用于一对一分配，不是头车/跟随者拓扑。
+
+生成器把目标作为固定 rosparam 写入生成的 launch，覆盖包内目标默认值，不接收任意配置文件路径或节点。可继续使用相同生成/只读 --check 流程。该点镇定只支持独立到位、最终航向和停车；还没有自动目标分配、避障或无碰撞入队，不能答应任意交叉起点的安全集结。

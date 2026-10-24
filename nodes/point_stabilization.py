@@ -1,0 +1,139 @@
+#!/usr/bin/env python3
+"""Multi-robot mocap pose stabilization. No operator arming or obstacle avoidance."""
+import json
+import math
+import re
+import time
+
+import rospy
+import tf
+from geometry_msgs.msg import Pose, PoseArray, Twist
+from std_msgs.msg import String
+
+from abc_swarm.point_control import point_velocity, validate_pose, world_goals
+
+
+class PointStabilization:
+    def __init__(self):
+        self.fixed = rospy.get_param('~fixed_frame', 'world')
+        self.robots = rospy.get_param('~robots')
+        self.targets = rospy.get_param('~target_poses')
+        self.reference = rospy.get_param('~target_reference', 'initial_leader')
+        self.timeout = rospy.get_param('~tf_timeout', 0.5)
+        self.control = {key: rospy.get_param('~' + key, default) for key, default in
+                        [('max_linear', 0.08), ('max_angular', 0.5),
+                         ('position_tolerance', 0.04), ('yaw_tolerance', 0.08),
+                         ('k_distance', 0.6), ('k_heading', 1.5)]}
+        if type(self.timeout) not in (int, float) or not math.isfinite(self.timeout) or self.timeout <= 0:
+            raise ValueError('tf_timeout must be positive and finite')
+        if not isinstance(self.robots, list) or not self.robots:
+            raise ValueError('robots must be a nonempty list')
+        for robot in self.robots:
+            if not isinstance(robot, dict) or set(robot) != {'name', 'frame'}:
+                raise ValueError('Each robot requires exactly name and frame')
+            for value in robot.values():
+                if not isinstance(value, str) or not re.fullmatch(r'[A-Za-z][A-Za-z0-9_]*', value):
+                    raise ValueError('Robot name/frame must be flat ROS identifiers')
+            if robot['frame'] == self.fixed:
+                raise ValueError('Robot frame cannot equal fixed frame')
+        for key in ('name', 'frame'):
+            if len({robot[key] for robot in self.robots}) != len(self.robots):
+                raise ValueError('Duplicate robot ' + key)
+        if not isinstance(self.targets, list) or len(self.targets) != len(self.robots):
+            raise ValueError('One explicit target pose is required for every robot')
+        world_goals(self.targets, self.reference, (0, 0, 0))
+        point_velocity((0, 0, 0), (0, 0, 0), **self.control)
+        self.listener = tf.TransformListener()
+        self.outputs = [rospy.Publisher('/' + r['name'] + '/cmd_vel', Twist, queue_size=1)
+                        for r in self.robots]
+        self.status_pub = rospy.Publisher('~status', String, queue_size=1, latch=True)
+        self.goals_pub = rospy.Publisher('~goals', PoseArray, queue_size=1, latch=True)
+        self.goals = None
+        self.completed = False
+        self.final_details = []
+        self.last_status = None
+        self.last_publish = 0
+        rospy.on_shutdown(self.stop)
+
+    def stop(self):
+        for output in self.outputs:
+            output.publish(Twist())
+
+    def poses(self):
+        poses = []
+        for robot in self.robots:
+            frame = robot['frame']
+            stamp = self.listener.getLatestCommonTime(self.fixed, frame)
+            age = (rospy.Time.now() - stamp).to_sec()
+            if stamp == rospy.Time(0) or not 0 <= age <= self.timeout:
+                raise ValueError('stale pose: ' + frame)
+            xyz, q = self.listener.lookupTransform(self.fixed, frame, stamp)
+            if not all(math.isfinite(v) for v in (*xyz, *q)):
+                raise ValueError('invalid pose: ' + frame)
+            pose = (xyz[0], xyz[1], tf.transformations.euler_from_quaternion(q)[2])
+            validate_pose(pose)
+            poses.append(pose)
+        return poses
+
+    def publish_goals(self):
+        msg = PoseArray()
+        msg.header.frame_id, msg.header.stamp = self.fixed, rospy.Time.now()
+        for x, y, yaw in self.goals:
+            pose = Pose()
+            pose.position.x, pose.position.y = x, y
+            q = tf.transformations.quaternion_from_euler(0, 0, yaw)
+            (pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w) = q
+            msg.poses.append(pose)
+        self.goals_pub.publish(msg)
+
+    def status(self, state, reason, details=None):
+        value = json.dumps({'schema_version': 2, 'mode': 'point_stabilization',
+                            'state': state, 'ready': state in ('running', 'completed'),
+                            'enabled': state == 'running', 'reason': reason,
+                            'robots': details or [], 'target_reference': self.reference,
+                            'vrpn_server': rospy.get_param('/vrpn_client_node/server', ''),
+                            'vrpn_port': rospy.get_param('/vrpn_client_node/port', 0)}, sort_keys=True)
+        # Numeric errors change continuously; cap status updates at 5 Hz.
+        if value != self.last_status and time.monotonic() - self.last_publish >= 0.2:
+            self.status_pub.publish(String(data=value))
+            self.last_status, self.last_publish = value, time.monotonic()
+
+    def step(self):
+        try:
+            poses = self.poses()  # Validate the entire group before publishing any motion.
+            if self.goals is None:
+                self.goals = world_goals(self.targets, self.reference, poses[0])
+                self.publish_goals()
+            if self.completed:
+                self.stop()
+                self.status('completed', 'all target poses reached; restart launch for another run', self.final_details)
+                return
+            results = [point_velocity(pose, goal, **self.control)
+                       for pose, goal in zip(poses, self.goals)]
+            self.completed = all(phase == 'arrived' for _, _, phase in results)
+            details = []
+            for robot, pose, goal, (v, w, phase), output in zip(
+                    self.robots, poses, self.goals, results, self.outputs):
+                cmd = Twist()
+                cmd.linear.x, cmd.angular.z = v, w
+                output.publish(cmd)
+                details.append({'name': robot['name'], 'frame': robot['frame'], 'goal': goal,
+                                'phase': phase, 'position_error': math.hypot(goal[0]-pose[0], goal[1]-pose[1]),
+                                'yaw_error': math.atan2(math.sin(goal[2]-pose[2]), math.cos(goal[2]-pose[2]))})
+            self.final_details = details
+            self.status('completed' if self.completed else 'running',
+                        'all target poses reached' if self.completed else 'tracking frozen target poses', details)
+        except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException, ValueError) as exc:
+            self.stop()
+            self.status('waiting', str(exc))
+
+    def run(self):
+        rate = rospy.Rate(20)
+        while not rospy.is_shutdown():
+            self.step()
+            rate.sleep()
+
+
+if __name__ == '__main__':
+    rospy.init_node('point_stabilization')
+    PointStabilization().run()

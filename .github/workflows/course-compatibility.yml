@@ -97,8 +97,15 @@ jobs:
           ai_dir="$(rospack find abc_swarm)/ai"
           python3 "$ai_dir/generate_launch.py" "$ai_dir/experiment.example.json" --output "$RUNNER_TEMP/customer-demo"
           python3 "$ai_dir/generate_launch.py" "$RUNNER_TEMP/customer-demo/experiment.json" --output "$RUNNER_TEMP/customer-demo" --check
+          python3 "$ai_dir/generate_launch.py" "$ai_dir/point-stabilization.example.json" --output "$RUNNER_TEMP/customer-point-demo"
+          python3 "$ai_dir/generate_launch.py" "$RUNNER_TEMP/customer-point-demo/experiment.json" --output "$RUNNER_TEMP/customer-point-demo" --check
       - name: Run isolated synthetic ROS integration
         run: |
           source "$RUNNER_TEMP/abc_swarm_ws/install/setup.bash"
           # The harness forces loopback master and synthetic names; hardware/UI disabled.
           python3 tests/ros/preset_path_smoke.py
+      - name: Run isolated point stabilization closed loop
+        run: |
+          source "$RUNNER_TEMP/abc_swarm_ws/install/setup.bash"
+          # Private loopback master 11434, synthetic names, hardware/VRPN/UI off.
+          python3 tests/ros/point_stabilization_smoke.py

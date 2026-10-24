@@ -5,10 +5,42 @@
   "localization": "mocap_vrpn",
   "fixed_frame": "world",
   "experiments": {
-    "manual_triangle": {"robots": 3, "formation": "triangle", "path": false, "launch": "demo_mocap_three_mini_leader_follower_triangle.launch"},
-    "manual_snake": {"robots": 3, "formation": "snake", "path": false, "launch": "demo_mocap_three_mini_leader_follower_snake.launch"},
-    "path_single": {"robots": 1, "formation": "single", "path": true, "launch": "demo_mocap_path_tracking.launch"},
-    "path_triangle": {"robots": 3, "formation": "triangle", "path": true, "launch": "demo_mocap_formation_leader_follower_path_tracking.launch"},
-    "path_snake": {"robots": 3, "formation": "snake", "path": true, "launch": "demo_mocap_snake_leader_follower_path_tracking.launch"}
+    "manual_triangle": {
+      "robots": 3,
+      "formation": "triangle",
+      "path": false,
+      "launch": "demo_mocap_three_mini_leader_follower_triangle.launch"
+    },
+    "manual_snake": {
+      "robots": 3,
+      "formation": "snake",
+      "path": false,
+      "launch": "demo_mocap_three_mini_leader_follower_snake.launch"
+    },
+    "path_single": {
+      "robots": 1,
+      "formation": "single",
+      "path": true,
+      "launch": "demo_mocap_path_tracking.launch"
+    },
+    "path_triangle": {
+      "robots": 3,
+      "formation": "triangle",
+      "path": true,
+      "launch": "demo_mocap_formation_leader_follower_path_tracking.launch"
+    },
+    "path_snake": {
+      "robots": 3,
+      "formation": "snake",
+      "path": true,
+      "launch": "demo_mocap_snake_leader_follower_path_tracking.launch"
+    },
+    "point_stabilization": {
+      "robots": 3,
+      "formation": "targets",
+      "path": false,
+      "point": true,
+      "launch": "demo_mocap_three_mini_point_stabilization.launch"
+    }
   }
 }

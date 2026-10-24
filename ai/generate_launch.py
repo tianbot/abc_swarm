@@ -219,7 +219,8 @@ def bundle(spec):
     paths += sorted((HERE.parent / 'launch/common').glob('*.launch.xml'))
     paths += [HERE.parent / 'config/mocap.yaml', HERE.parent / 'config/path_tracking.yaml']
     if validate(spec).get('point'):
-        paths.append(HERE.parent / 'config/point_stabilization.yaml')
+        paths.extend([HERE.parent / 'config/point_stabilization.yaml',
+                      HERE.parent / 'config/point_control.cfg'])
     hashes = {str(p.relative_to(HERE.parent)): hashlib.sha256(p.read_bytes()).hexdigest() for p in paths}
     return {'composition.sha256.json': json.dumps(hashes, indent=2, sort_keys=True) + '\n', ** {'experiment.json': json.dumps(spec, ensure_ascii=False, indent=2, allow_nan=False) + '\n',
             'experiment.launch': render(spec), 'README.md': report(spec)}}

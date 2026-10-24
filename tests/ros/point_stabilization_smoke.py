@@ -20,6 +20,7 @@ def main():
     from geometry_msgs.msg import Twist,PoseArray
     from std_msgs.msg import String
     from abc_swarm.point_control import angle,world_goals
+    from dynamic_reconfigure.client import Client
     processes=[];streams=[]
 
     def start(command,name):
@@ -87,6 +88,13 @@ def main():
         assert p.poll() is None,'required node exited; see '+str(folder)
         assert states[-1]['state']=='running',states[-1]
         assert states[-1]['mode']=='point_stabilization'
+        client=Client('/abc_swarm_demo',timeout=3)
+        config=client.get_configuration(timeout=3)
+        assert config['k_distance']==0.9 and config['k_heading']==2.0,config
+        config=client.update_configuration({'k_distance':0.8,'k_heading':1.9})
+        assert config['k_distance']==0.8 and rospy.get_param('/abc_swarm_demo/k_distance')==0.8
+        client.update_configuration({'k_distance':0.9,'k_heading':2.0})
+
         assert '/abc_swarm_demo/set_enabled' not in dict(rosgraph.Master('/smoke').getSystemState()[2])
         assert goals and len(goals[-1].poses)==3
         for pose,goal in zip(goals[-1].poses,expected):
@@ -110,7 +118,10 @@ def main():
         pump(0.4);zeros()
         assert all(0<=v<=0.15 and abs(w)<=0.5 for rr in rows.values() for _,v,w in rr)
         poses[0]=(anchor[0]+0.2,anchor[1],anchor[2])
-        pump(0.4);zeros()  # Completion is held, no automatic second experiment.
+        client.update_configuration({'k_distance':1.0,'k_heading':2.2})
+        pump(0.4);zeros()  # Dynamic tuning after completion never restarts motion.
+        assert states[-1]['state']=='completed'
+        client.close()
         stop(p)
 
         # The explicit snake task freezes a line behind the current first robot.
@@ -145,7 +156,7 @@ def main():
         while p.poll() is None and time.monotonic()<deadline:pump(0.1,move=False)
         assert p.poll() is not None,'invalid duplicate mapping was accepted'
         assert not any(v!=0 or w!=0 for rr in rows.values() for t,v,w in rr if t>before)
-        print('PASS: point goals frozen, automatic closed-loop pose convergence, all-stop on stale TF, recovery, world targets, completion hold, shutdown zeros, snake task selection and invalid mapping rejection')
+        print('PASS: point goals frozen, automatic closed-loop pose convergence, all-stop on stale TF, recovery, world targets, completion hold, shutdown zeros, snake task selection, dynamic tuning without completion restart and invalid mapping rejection')
         print('Logs: '+str(folder))
     finally:
         for p in reversed(processes):stop(p)

@@ -156,3 +156,6 @@ roslaunch --nodes /tmp/customer-point-demo/experiment.launch start_driver:=false
 2026-10-24 后续调整：新增 formation=triangle/snake/config 选择；新增动捕 demo 的键盘、头车/后车、路径默认速度与点镇定上限统一为 0.15 m/s。点镇定预设和自定义目标语义见上文；提速结果须重新做实车验收，旧课程资源不变。
 
 本次提速/任务选择验证：52 项本地测试通过，独立 Noetic 构建测试安装通过；点镇定闭环（含 snake 预设）日志 `/tmp/abc_swarm_point_ros_n56y1no9`，路径/手动跟随/PID 回归日志 `/tmp/abc_swarm_path_ros_q6bfxlvk`。新速度下的测试使用对应 0.15 限幅，并保留原 0.05 路径回归；提速圆角矩形的编队收敛按生产 0.1 m 容差验证。未改旧课程检查规则，48 个原资源仍兼容。现场运行进程未重启，实车提速效果未验收。
+
+
+点镇定现提供 k_distance/k_heading 动态调参，候选默认调整为 0.9/2.0；方法、离线结果与实车边界见[控制调参说明](control-tuning.md)。调整动态增益不会重新启动已完成任务。

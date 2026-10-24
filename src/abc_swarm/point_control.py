@@ -46,7 +46,7 @@ def formation_targets(formation, spacing):
 
 def point_velocity(pose, goal, max_linear=0.15, max_angular=0.5,
                    position_tolerance=0.04, yaw_tolerance=0.08,
-                   k_distance=0.6, k_heading=1.5):
+                   k_distance=0.9, k_heading=2.0):
     validate_pose(pose)
     validate_pose(goal)
     limits = (max_linear, max_angular, position_tolerance, yaw_tolerance,

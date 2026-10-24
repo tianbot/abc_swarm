@@ -3,7 +3,7 @@ project(abc_swarm)
 
 find_package(catkin REQUIRED COMPONENTS roscpp rospy std_msgs dynamic_reconfigure)
 catkin_python_setup()
-generate_dynamic_reconfigure_options(config/tf_pid.cfg)
+generate_dynamic_reconfigure_options(config/tf_pid.cfg config/point_control.cfg)
 catkin_package(CATKIN_DEPENDS roscpp rospy std_msgs dynamic_reconfigure)
 
 # All ROS executables share the flat teaching directory; keep basenames unique.

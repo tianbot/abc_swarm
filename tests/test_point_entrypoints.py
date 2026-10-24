@@ -87,12 +87,27 @@ class PointEntrypointTests(unittest.TestCase):
             # Presets explicitly override target/reference entries in a goal file.
             params['~target_reference']='world'
             with patch('rospy.get_param',side_effect=lambda key,default=None:params.get(key,default)), \
-                 patch('tf.TransformListener'), patch('rospy.Publisher'),patch('rospy.on_shutdown'):
+                 patch('tf.TransformListener'), patch('rospy.Publisher'),patch('rospy.on_shutdown'), \
+                 patch.dict(module['PointStabilization'].__init__.__globals__,{'Server':lambda *args:None}):
                 node=module['PointStabilization']()
             self.assertEqual(node.reference,'initial_leader')
             self.assertEqual(node.targets[0],(0,0,0))
             self.assertEqual(node.targets[2],(-1.2,0,0) if formation=='snake' else (-0.6,-0.6,0))
             self.assertEqual(node.control['max_linear'],0.12)
+
+    def test_dynamic_gains_replace_the_controller_settings_without_restarting_it(self):
+        module=runpy.run_path(str(ROOT/'nodes/point_stabilization.py'))
+        node=module['PointStabilization'].__new__(module['PointStabilization'])
+        node.control={'k_distance':0.9,'k_heading':2.0,'max_linear':0.15}
+        previous=node.control
+        node.completed=True
+        updated=node.configure({'k_distance':1.0,'k_heading':2.2},0)
+        self.assertEqual(node.control['k_distance'],1.0)
+        self.assertEqual(previous['k_distance'],0.9)  # Snapshot for an in-flight cycle.
+        self.assertEqual(node.control['max_linear'],0.15)
+        self.assertTrue(node.completed)  # A tuning change never starts another run.
+        updated=node.configure({'k_distance':float('nan'),'k_heading':2.0},0)
+        self.assertEqual(updated['k_distance'],1.0)
 
     def test_site_override_and_config_priority_are_shared(self):
         config=load(DEMO,['vrpn_server_ip:=192.0.2.31','vrpn_port:=3999'])

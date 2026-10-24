@@ -9,6 +9,8 @@ import rospy
 import tf
 from geometry_msgs.msg import Pose, PoseArray, Twist
 from std_msgs.msg import String
+from dynamic_reconfigure.server import Server
+from abc_swarm.cfg import point_controlConfig
 
 from abc_swarm.point_control import formation_targets, point_velocity, validate_pose, world_goals
 
@@ -28,7 +30,7 @@ class PointStabilization:
         self.control = {key: rospy.get_param('~' + key, default) for key, default in
                         [('max_linear', 0.15), ('max_angular', 0.5),
                          ('position_tolerance', 0.04), ('yaw_tolerance', 0.08),
-                         ('k_distance', 0.6), ('k_heading', 1.5)]}
+                         ('k_distance', 0.9), ('k_heading', 2.0)]}
         if type(self.timeout) not in (int, float) or not math.isfinite(self.timeout) or self.timeout <= 0:
             raise ValueError('tf_timeout must be positive and finite')
         if not isinstance(self.robots, list) or not self.robots:
@@ -59,6 +61,17 @@ class PointStabilization:
         self.last_status = None
         self.last_publish = 0
         rospy.on_shutdown(self.stop)
+        self.tuning = Server(point_controlConfig, self.configure)
+
+    def configure(self, config, level):
+        gains = (config['k_distance'], config['k_heading'])
+        if not all(type(v) in (int, float) and math.isfinite(v) and v > 0 for v in gains):
+            for key in ('k_distance', 'k_heading'):
+                config[key] = self.control[key]
+            return config
+        # Replace the complete settings snapshot; a control cycle uses one version.
+        self.control = dict(self.control, k_distance=gains[0], k_heading=gains[1])
+        return config
 
     def stop(self):
         for output in self.outputs:
@@ -113,7 +126,8 @@ class PointStabilization:
                 self.stop()
                 self.status('completed', 'all target poses reached; restart launch for another run', self.final_details)
                 return
-            results = [point_velocity(pose, goal, **self.control)
+            control = self.control
+            results = [point_velocity(pose, goal, **control)
                        for pose, goal in zip(poses, self.goals)]
             self.completed = all(phase == 'arrived' for _, _, phase in results)
             details = []

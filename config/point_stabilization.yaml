@@ -12,5 +12,8 @@ max_linear: 0.15
 max_angular: 0.5
 position_tolerance: 0.04
 yaw_tolerance: 0.08
-k_distance: 0.6
-k_heading: 1.5
+k_distance: 0.9
+k_heading: 2.0
+
+# Candidate gains from tests/point_gain_sweep.py; hardware acceptance still required.
+# Runtime gains can be adjusted through /abc_swarm_demo dynamic_reconfigure.

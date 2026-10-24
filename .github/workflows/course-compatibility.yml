@@ -19,10 +19,12 @@ jobs:
         run: python3 tests/check_course_compatibility.py
       - name: Verify the guard rejects broken compatibility
         run: python3 -m unittest discover -s tests -p test_course_guard.py -v
+      - name: Verify AI experiment generation contract
+        run: python3 -m unittest discover -s tests -p test_ai_harness.py -v
       - name: Check change whitespace
         run: git diff --check 1708f332ae900384b9e84889b7ab3979aaae9f5f...HEAD
       - name: Check Python syntax
-        run: python3 -m compileall -q nodes src
+        run: python3 -m compileall -q nodes src ai
       - name: Run hardware-independent control regressions
         env:
           PYTHONPATH: src
@@ -89,6 +91,12 @@ jobs:
           assert (root / 'config/mocap.yaml').is_file()
           print('Installed nodes and configuration verified')
           PY
+      - name: Check installed AI delivery tool
+        run: |
+          source "$RUNNER_TEMP/abc_swarm_ws/install/setup.bash"
+          ai_dir="$(rospack find abc_swarm)/ai"
+          python3 "$ai_dir/generate_launch.py" "$ai_dir/experiment.example.json" --output "$RUNNER_TEMP/customer-demo"
+          python3 "$ai_dir/generate_launch.py" "$RUNNER_TEMP/customer-demo/experiment.json" --output "$RUNNER_TEMP/customer-demo" --check
       - name: Run isolated synthetic ROS integration
         run: |
           source "$RUNNER_TEMP/abc_swarm_ws/install/setup.bash"

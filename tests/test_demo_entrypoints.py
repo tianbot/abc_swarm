@@ -25,6 +25,45 @@ class DemoEntrypointTests(unittest.TestCase):
         env.start()
         self.addCleanup(env.stop)
 
+    def test_ai_generated_customer_launch_resolves_roles_and_disabled_runtime(self):
+        import copy
+        import json
+        import runpy
+        harness = runpy.run_path(str(ROOT / 'ai/generate_launch.py'))
+        example = json.loads((ROOT / 'ai/experiment.example.json').read_text())
+        for experiment, cap in harness['CATALOG']['experiments'].items():
+            with self.subTest(experiment=experiment), tempfile.TemporaryDirectory() as folder:
+                spec = copy.deepcopy(example)
+                spec['experiment'] = experiment
+                spec['robots'] = spec['robots'][:cap['robots']]
+                for i, robot in enumerate(spec['robots']):
+                    robot['name'] = 'customer_car_' + str(i)
+                    robot['rigid_body'] = 'customer_body_' + str(i)
+                if not cap['path']:
+                    spec['path'] = None
+                    spec['startup']['start_teleop'] = True
+                path = Path(folder) / 'experiment.launch'
+                path.write_text(harness['render'](spec))
+                config = load(path)
+                self.assertFalse(config.params['/abc_swarm_demo/enabled'].value)
+                self.assertEqual(config.params['/abc_swarm_demo/robot_frames'].value,
+                                 [r['rigid_body'] for r in spec['robots']])
+                self.assertEqual(config.params['/vrpn_client_node/server'].value, spec['vrpn']['server'])
+                self.assertEqual(sum(n.type == 'leader_follower_tracker.py' for n in config.nodes),
+                                 cap['robots'] - 1)
+                if cap['path']:
+                    self.assertEqual(config.params['/abc_swarm_path/cmd_topic'].value,
+                                     '/customer_car_0/cmd_vel')
+                if cap['robots'] == 3:
+                    # Check actual follower TF mapping, not just generated XML syntax.
+                    expected = 'customer_body_1' if cap['formation'] == 'snake' else 'customer_body_0'
+                    self.assertEqual(config.params['/customer_car_2_leader_follower/leader_frame'].value,
+                                     expected)
+                config = load(path, ['start_driver:=false', 'start_vrpn:=false',
+                                     'use_rviz:=false', 'start_teleop:=false'])
+                self.assertFalse(any(n.package in ('rosserial_server', 'vrpn_client_ros',
+                                                  'rviz', 'teleop_twist_keyboard') for n in config.nodes))
+
     def test_public_demo_starts_one_backend_and_one_runtime(self):
         profile = yaml.safe_load((ROOT / 'config/mocap.yaml').read_text())
         for path in DEMOS:

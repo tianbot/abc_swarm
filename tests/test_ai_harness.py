@@ -1,0 +1,144 @@
+#!/usr/bin/env python3
+"""Customer experiment contract: success, rejection, deterministic delivery, no ROS."""
+import copy
+import importlib.util
+import json
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+import unittest
+import xml.etree.ElementTree as ET
+
+ROOT = Path(__file__).resolve().parents[1]
+MODULE = importlib.util.spec_from_file_location('swarm_delivery', ROOT / 'ai/generate_launch.py')
+harness = importlib.util.module_from_spec(MODULE)
+MODULE.loader.exec_module(harness)
+EXAMPLE = json.loads((ROOT / 'ai/experiment.example.json').read_text())
+
+
+def scenario(experiment):
+    spec = copy.deepcopy(EXAMPLE)
+    cap = harness.CATALOG['experiments'][experiment]
+    spec['experiment'] = experiment
+    spec['robots'] = spec['robots'][:cap['robots']]
+    if not cap['path']:
+        spec['path'] = None
+        spec['startup']['start_teleop'] = True
+    return spec
+
+
+class AIHarnessTests(unittest.TestCase):
+    def test_all_supported_experiments_use_declared_arguments_and_remain_disabled(self):
+        for experiment, cap in harness.CATALOG['experiments'].items():
+            with self.subTest(experiment=experiment):
+                root = ET.fromstring(harness.render(scenario(experiment)))
+                self.assertEqual(len(root.findall('include')), 1)
+                self.assertFalse(root.findall('node'))
+                include = root.find('include')
+                self.assertTrue(include.get('file').endswith('/' + cap['launch']))
+                args = {a.get('name'): a.get('value') for a in include.findall('arg')}
+                self.assertEqual(args['vrpn_server_ip'], EXAMPLE['vrpn']['server'])
+                self.assertEqual(args['rigid_body_1'], 'tianbot_mini_01')
+                self.assertNotIn('initial_pose', args)
+                if not cap['path']:
+                    self.assertEqual(args['enabled'], 'false')
+                else:
+                    self.assertNotIn('enabled', args)
+
+    def test_rounded_rectangle_and_separate_backend_are_supported(self):
+        spec = scenario('path_snake')
+        spec['path'].update(shape='rounded_rectangle', clockwise=True)
+        spec['startup'].update(start_driver=False, start_vrpn=False)
+        root = ET.fromstring(harness.render(spec))
+        args = {a.get('name'): a.get('value') for a in root.find('include').findall('arg')}
+        self.assertEqual(args['shape'], 'rounded_rectangle')
+        self.assertEqual(args['clockwise'], 'true')
+        self.assertEqual(root.find("arg[@name='start_driver']").get('default'), 'false')
+
+    def test_unknown_start_position_is_preserved_and_never_turned_into_tf(self):
+        spec = scenario('path_single')
+        spec['robots'][0]['initial_pose'] = None
+        self.assertIn('现场核对', harness.report(spec))
+        self.assertNotIn('static_transform', harness.render(spec))
+
+    def test_rejects_invalid_customer_inputs(self):
+        changes = [
+            lambda s: s.update(contract_version=True),
+            lambda s: s.update(unknown='ignored?'),
+            lambda s: s.update(experiment='five_mini_snake'),
+            lambda s: s.update(localization='gazebo'),
+            lambda s: s.update(fixed_frame='map'),
+            lambda s: s['robots'].append(copy.deepcopy(s['robots'][0])),
+            lambda s: s['robots'][1].update(model='rmtt'),
+            lambda s: s['robots'][1].update(name=s['robots'][0]['name']),
+            lambda s: s['robots'][1].update(rigid_body=s['robots'][0]['rigid_body']),
+            lambda s: s['robots'][0].update(rigid_body='world'),
+            lambda s: s['robots'][0].update(name='$(eval 1)'),
+            lambda s: s['robots'][0].update(initial_pose=[0, float('nan'), 0]),
+            lambda s: s['vrpn'].update(server='$(optenv VRPN)'),
+            lambda s: s['vrpn'].update(port=True),
+            lambda s: s['startup'].update(start_driver='false'),
+            lambda s: s['startup'].update(start_teleop=True),
+            lambda s: s.update(spacing=0),
+            lambda s: s['path'].update(speed=0.11),
+            lambda s: s['path'].update(laps=0),
+            lambda s: s['path'].update(laps=True),
+            lambda s: s['path'].update(radius=float('inf')),
+            lambda s: s['path'].update(shape='rounded_rectangle', width=1.0),
+            lambda s: s['path'].update(shape='line'),
+            lambda s: s['path'].update(clockwise='false'),
+            lambda s: s['path'].update(enabled=True),
+        ]
+        for change in changes:
+            spec = copy.deepcopy(EXAMPLE)
+            change(spec)
+            with self.subTest(spec=spec), self.assertRaises(ValueError):
+                harness.bundle(spec)
+        spec = scenario('manual_snake')
+        spec['path'] = EXAMPLE['path']
+        with self.assertRaises(ValueError):
+            harness.bundle(spec)
+
+    def test_manual_placement_rotates_offsets_and_chain_uses_each_predecessor(self):
+        spec = scenario('path_snake')
+        spec['robots'][0]['initial_pose'] = [1, 2, 0]
+        self.assertIn('[0.0, 2.0, 0]', harness.report(spec))
+        spec = scenario('path_triangle')
+        spec['robots'][0]['initial_pose'] = [1, 2, 1.5707963267948966]
+        self.assertIn('[0.5, 1.5, 1.5707963267948966]', harness.report(spec))
+
+    def test_cli_refuses_overwrite_and_detects_tampering(self):
+        with tempfile.TemporaryDirectory() as directory:
+            out = Path(directory) / 'delivery'
+            cmd = [sys.executable, str(ROOT / 'ai/generate_launch.py'),
+                   str(ROOT / 'ai/experiment.example.json'), '--output', str(out)]
+            def run(args):
+                return subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            self.assertEqual(run(cmd).returncode, 0)
+            before = {p.name: p.read_bytes() for p in out.iterdir()}
+            self.assertEqual(run(cmd).returncode, 2)
+            self.assertEqual(run(cmd + ['--check']).returncode, 0)
+            self.assertEqual(before, {p.name: p.read_bytes() for p in out.iterdir()})
+            for name in ('experiment.launch', 'README.md', 'composition.sha256.json'):
+                path = out / name
+                path.write_text('tampered')
+                self.assertEqual(run(cmd + ['--check']).returncode, 2)
+                path.write_bytes(before[name])
+            (out / 'experiment.launch').unlink()
+            self.assertEqual(run(cmd + ['--check']).returncode, 2)
+
+    def test_duplicate_json_keys_rejected_without_creating_output(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'bad.json'
+            path.write_text('{"name": "a", "name": "b"}')
+            out = Path(directory) / 'delivery'
+            result = subprocess.run([sys.executable, str(ROOT / 'ai/generate_launch.py'),
+                                     str(path), '--output', str(out)], stderr=subprocess.PIPE)
+            self.assertEqual(result.returncode, 2)
+            self.assertIn(b'duplicate JSON key', result.stderr)
+            self.assertFalse(out.exists())
+
+
+if __name__ == '__main__':
+    unittest.main()

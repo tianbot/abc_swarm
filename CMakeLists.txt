@@ -12,10 +12,13 @@ catkin_install_python(PROGRAMS ${SWARM_NODES}
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 install(DIRECTORY launch config rviz docs DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
+install(DIRECTORY ai DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+  PATTERN "__pycache__" EXCLUDE PATTERN "*.pyc" EXCLUDE)
 install(FILES README.rst AGENTS.md LICENSE dependencies.repos dependencies-rmtt.repos requirements.txt
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
 
 if(CATKIN_ENABLE_TESTING)
+  catkin_add_nosetests(tests/test_ai_harness.py)
   catkin_add_nosetests(tests/test_main_layout.py)
   catkin_add_nosetests(tests/test_course_guard.py)
   catkin_add_nosetests(tests/test_leader_follower.py)

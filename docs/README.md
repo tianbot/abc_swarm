@@ -6,6 +6,8 @@
 
 当前用户指南：
 
+- [AI 配置客户实验：设备清单生成 launch](../ai/README.md)
+
 - **[三车现场测试清单：明天直接从这里开始](field-test.md)**
 
 - [旧 main 兼容检查、CI 和你需要做的事](course-compatibility.md)

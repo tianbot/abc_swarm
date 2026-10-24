@@ -23,7 +23,7 @@ def scenario(experiment):
     spec['experiment'] = experiment
     spec['robots'] = spec['robots'][:cap['robots']]
     if cap.get('point'):
-        spec = json.loads((ROOT / 'ai/point-stabilization.example.json').read_text())
+        spec = json.loads((ROOT / ('ai/orca.example.json' if cap.get('orca') else 'ai/point-stabilization.example.json')).read_text())
     elif not cap['path']:
         spec['path'] = None
         spec['startup']['start_teleop'] = True
@@ -141,6 +141,16 @@ class AIHarnessTests(unittest.TestCase):
                        lambda s: s['startup'].update(start_teleop=True)]:
             invalid = copy.deepcopy(spec)
             change(invalid)
+            with self.assertRaises(ValueError):harness.bundle(invalid)
+
+    def test_orca_delivery_has_explicit_geometry_and_rejects_unsafe_contracts(self):
+        spec=scenario('point_stabilization_orca')
+        self.assertIn('/abc_swarm_demo/orca',harness.render(spec))
+        self.assertIn('ORCA',harness.report(spec))
+        for change in [lambda s:s.pop('orca'),lambda s:s['orca'].update(robot_radius=-1),
+                       lambda s:s['orca'].update(safety_margin=True),lambda s:s['orca'].update(unknown=1),
+                       lambda s:s['targets'].update(poses=[[0,0,0],[0,0,0],[1,1,0]])]:
+            invalid=copy.deepcopy(spec);change(invalid)
             with self.assertRaises(ValueError):harness.bundle(invalid)
 
     def test_duplicate_json_keys_rejected_without_creating_output(self):

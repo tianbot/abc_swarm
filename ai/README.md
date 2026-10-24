@@ -58,6 +58,7 @@ python3 ai/generate_launch.py /tmp/customer-demo/experiment.json --output /tmp/c
 | path_triangle | 3 | 预设路径 | 三角形 |
 | path_snake | 3 | 预设路径 | 逐车跟随 |
 | point_stabilization | 3 | 各自位置与最终航向 | 独立目标，无跟随拓扑 |
+| point_stabilization_orca | 3 | 同上，途中车车避让 | 仅 mocap，需三车实际 odom |
 
 - 当前 model 仅 `tianbot_mini`，localization 仅 `mocap_vrpn`，fixed_frame 仅 `world`。型号、定位来源和数量不匹配就拒绝。比如“5 台 Mini”“Mini 混 RMTT”“Gazebo 下同一份新实验”当前均报告不支持，原视频 Gazebo 用法不受影响。
 - `name` 是交付名称；每台 `name` 是 ROS 名称，`rigid_body` 是 VRPN 刚体/frame；采用字母开头的扁平字母数字下划线名称，名称和刚体分别不能重复。不接收任意 topic/frame 表达式。
@@ -112,7 +113,7 @@ python3 tests/check_course_compatibility.py
 
 本次启动流程修正验证：38 项本地测试通过；独立 master、合成名称、关闭真实驱动/VRPN/UI 的六入口回归通过，覆盖自动运行、反馈中断停车、手动恢复不重放旧输入、时间戳小幅超前容差及路径结束停车。实车进程未重启，现场效果待重新验收。
 
-后续计划的入队规划和 ORCA 避障尚未实现（点镇定独立实验见下文）。现有 LF 启动后的相对目标收敛不等于无碰撞集结规划；客户要求无碰撞自动集结规划或 ORCA 时，必须明确报告待实现，不以现有 manual_triangle 等入口冒充。
+自动目标分配和全局入队规划尚未实现；三车 mocap 点镇定及其 ORCA 车车避让入口见下文。现有 LF 的相对目标收敛没有避障，不能用 manual_triangle 冒充 ORCA；客户要求静态障碍感知或任意拥挤起点的可达保证时应明确报告未支持。
 
 
 ## 新能力：三车点镇定
@@ -125,3 +126,10 @@ targets 包含 reference（world 或 initial_leader）与 poses（三个 [x_m,y_
 
 
 当前新增动捕实验默认直线速度/上限已调整为 0.15 m/s，路径输入 speed 上限同为 0.15；生成文件在运行前须向客户说明。点镇定 AI 输入继续显式提供 targets：三角形 offsets 为 [[0,0,0],[-s,s,0],[-s,-s,0]]，蛇形为 [[0,0,0],[-s,0,0],[-2*s,0,0]]，reference=initial_leader。不要把“排成蛇形后停车”生成成持续蛇形跟随。用 world 目标可让三台车各自移动，包括首台。CLI 的 formation 预设不改变已有 AI 输入契约；生成器始终使用显式 targets，避免目标歧义。
+
+
+## 动捕点镇定 + ORCA
+
+已增加 point_stabilization_orca，见 `orca.example.json` 与 [ORCA 实验说明](../docs/orca.md)。它复用点镇定，额外要求 orca 对象明确声明 robot_radius、safety_margin、front_distance、time_horizon、right_bias、velocity_buffer、odom_timeout、odom_future_tolerance、stall_timeout。生成器只将经过验证的数值写入固定 ROS 参数，不接收代码或任意节点。
+
+AI 必须说明：仅避让本实验三车，三车都需要有效动捕 TF 与实际 odom；启动后自动运动，可能倒车。半径按实际车体/动捕参考点核对；没有静态障碍感知、全局规划或任意目标可达保证。无解、包络冲突及长期无进展会停车报 fault，不能标为成功。目前范围以本节及 ORCA 指南为准，实车尚未验收。

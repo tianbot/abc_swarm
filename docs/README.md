@@ -6,6 +6,8 @@
 
 当前用户指南：
 
+- [动捕点镇定中的 ORCA 车车避让](orca.md)
+
 - [随包第三方代码与许可证](third-party.md)
 
 - [控制参数核对、首轮调参与 ORCA 路线](control-tuning.md)

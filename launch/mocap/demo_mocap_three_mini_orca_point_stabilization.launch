@@ -1,0 +1,40 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="site_config" default="$(find abc_swarm)/config/mocap.yaml"/>
+  <arg name="vrpn_server_ip" default="$(optenv ABC_SWARM_VRPN_SERVER)"/>
+  <arg name="vrpn_port" default=""/>
+  <arg name="start_driver" default="true"/>
+  <arg name="start_vrpn" default="true"/>
+  <arg name="use_rviz" default="false"/>
+  <arg name="goal_config" default="$(find abc_swarm)/config/point_stabilization.yaml"/>
+  <arg name="orca_config" default="$(find abc_swarm)/config/orca.yaml"/>
+  <arg name="formation" default="config"/>
+  <arg name="spacing" default="0.5"/>
+  <arg name="max_linear" default=""/>
+  <arg name="robot_name_1" default="tianbot_mini_01"/>
+  <arg name="robot_name_2" default="tianbot_mini_02"/>
+  <arg name="robot_name_3" default="tianbot_mini_03"/>
+  <arg name="rigid_body_1" default="$(arg robot_name_1)"/>
+  <arg name="rigid_body_2" default="$(arg robot_name_2)"/>
+  <arg name="rigid_body_3" default="$(arg robot_name_3)"/>
+  <include file="$(find abc_swarm)/launch/mocap/demo_mocap_three_mini_point_stabilization.launch">
+    <arg name="avoidance" value="orca"/>
+    <arg name="site_config" value="$(arg site_config)"/>
+    <arg name="vrpn_server_ip" value="$(arg vrpn_server_ip)"/>
+    <arg name="vrpn_port" value="$(arg vrpn_port)"/>
+    <arg name="start_driver" value="$(arg start_driver)"/>
+    <arg name="start_vrpn" value="$(arg start_vrpn)"/>
+    <arg name="use_rviz" value="$(arg use_rviz)"/>
+    <arg name="goal_config" value="$(arg goal_config)"/>
+    <arg name="orca_config" value="$(arg orca_config)"/>
+    <arg name="formation" value="$(arg formation)"/>
+    <arg name="spacing" value="$(arg spacing)"/>
+    <arg name="max_linear" value="$(arg max_linear)"/>
+    <arg name="robot_name_1" value="$(arg robot_name_1)"/>
+    <arg name="robot_name_2" value="$(arg robot_name_2)"/>
+    <arg name="robot_name_3" value="$(arg robot_name_3)"/>
+    <arg name="rigid_body_1" value="$(arg rigid_body_1)"/>
+    <arg name="rigid_body_2" value="$(arg rigid_body_2)"/>
+    <arg name="rigid_body_3" value="$(arg rigid_body_3)"/>
+  </include>
+</launch>

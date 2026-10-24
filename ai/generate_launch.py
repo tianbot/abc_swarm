@@ -40,9 +40,11 @@ def identifier(value, where):
 
 
 def validate(spec):
-    point = isinstance(spec, dict) and spec.get('experiment') == 'point_stabilization'
+    hint = CATALOG['experiments'].get(spec.get('experiment'), {}) if isinstance(spec, dict) and isinstance(spec.get('experiment'), str) else {}
+    point = hint.get('point', False)
+    orca = hint.get('orca', False)
     fields(spec, 'contract_version name localization fixed_frame vrpn robots experiment path startup'
-           + (' targets' if point else ' spacing'), 'experiment')
+           + (' targets' if point else ' spacing') + (' orca' if orca else ''), 'experiment')
     require(type(spec['contract_version']) is int and spec['contract_version'] == 2, 'contract_version: expected 2 (automatic startup; review v1 input before migrating)')
     identifier(spec['name'], 'name')
     for key in ('localization', 'fixed_frame'):
@@ -90,6 +92,16 @@ def validate(spec):
             require(isinstance(pose, list) and len(pose) == 3, 'targets.poses: [x_m, y_m, yaw_rad] required')
             for value in pose:
                 number(value, 'targets.poses')
+    if orca:
+        fields(spec['orca'], 'robot_radius safety_margin front_distance time_horizon right_bias velocity_buffer odom_timeout odom_future_tolerance stall_timeout', 'orca')
+        for key, value in spec['orca'].items():
+            number(value, 'orca.' + key, positive=key not in ('safety_margin','right_bias','velocity_buffer'))
+            require(value >= 0, 'orca.' + key + ': cannot be negative')
+        d = spec['orca']['front_distance']
+        centers = [(x+d*math.cos(yaw),y+d*math.sin(yaw)) for x,y,yaw in spec['targets']['poses']]
+        clearance = 2*(spec['orca']['robot_radius']+spec['orca']['safety_margin']+d) + 2*spec['orca']['velocity_buffer']*spec['orca']['time_horizon']
+        require(all(math.hypot(a[0]-b[0],a[1]-b[1])>clearance for i,a in enumerate(centers) for b in centers[:i]),
+                'orca: target effective envelopes overlap; separate target poses')
     if capability['path']:
         require(not spec['startup']['start_teleop'], 'automatic path cannot start teleop')
         path = spec['path']
@@ -138,6 +150,8 @@ def render(spec):
         for key, value in [('target_reference', spec['targets']['reference']),
                            ('target_poses', spec['targets']['poses'])]:
             ET.SubElement(root, 'rosparam', param='/abc_swarm_demo/' + key).text = json.dumps(value)
+    if capability.get('orca'):
+        ET.SubElement(root, 'rosparam', param='/abc_swarm_demo/orca').text = json.dumps(spec['orca'])
     # Python 3.8 (Noetic) has no ET.indent.
     return minidom.parseString(ET.tostring(root, encoding='utf-8')).toprettyxml(indent='  ')
 
@@ -184,21 +198,22 @@ def report(spec):
 
 
 def point_report(spec):
-    lines = ['# 三车点镇定运行单', '',
+    avoidance = CATALOG['experiments'][spec['experiment']].get('orca', False)
+    lines = ['# 三车点镇定运行单' + ('（ORCA 车车避让）' if avoidance else ''), '',
              '目标参考系：`' + spec['targets']['reference'] + '`。world 为绝对目标；initial_leader 在全部定位有效时按首车实测位姿冻结目标。',
              '初始位姿仅供记录，控制目标来自 targets；没有头车领航和后车跟随角色，按设备数组顺序一对一分配。',
-             '启动后自动运行，各车先到目标位置再调整最终航向；没有 ORCA、路径避障或自动切入编队。', '',
+             ('启动后自动运行，ORCA 仅避让本实验三车；需要三车有效 odom 与 TF，可能短距离倒车。没有静态障碍感知或自动切入编队。' if avoidance else '启动后自动运行，各车先到目标位置再调整最终航向；没有 ORCA、路径避障或自动切入编队。'), '',
              '| 设备 | 刚体 | 初始位姿记录 | 控制目标 [m,m,rad] |', '| --- | --- | --- | --- |']
     for robot, goal in zip(spec['robots'], spec['targets']['poses']):
         lines.append('| {} | {} | {} | {} |'.format(robot['name'], robot['rigid_body'], robot['initial_pose'], goal))
-    lines += ['', '启动前确认每台车通道互不冲突；禁止把本实验用于任意交叉/密集起点的无碰撞集结。',
+    lines += ['', ('启动前核对实际车体半径和安全余量，初始有效包络不能重叠；本地避让不保证任意目标可达，不能代替实车验收。' if avoidance else '启动前确认每台车通道互不冲突；禁止把本实验用于任意交叉/密集起点的无碰撞集结。'),
               '加载 Noetic 和对应版本 abc_swarm 工作空间后，在本目录只解析检查：', '',
               '```bash', 'roslaunch --nodes ./experiment.launch start_driver:=false start_vrpn:=false use_rviz:=false', '```', '',
               '客户准备好现场后启动（AI 不代执行）：', '',
               '```bash', 'roslaunch ./experiment.launch', '```', '',
               '```bash', 'rostopic echo /abc_swarm_demo/status', '```', '',
               'state=completed 表示三车位置和航向均到达，之后持续停车；退出用 Ctrl+C 并确认实际静止。',
-              '任意所需位姿缺失/过期时全组停车；恢复定位后继续原冻结目标，不重建起点。',
+              ('任意 TF/odom 失效时全组停车，恢复后继续冻结目标；包络重叠、无可行速度或进展超时会 fault 停车，需检查并重启。' if avoidance else '任意所需位姿缺失/过期时全组停车；恢复定位后继续原冻结目标，不重建起点。'),
               '无启用 service。新一轮需重启 launch；不要同时运行跟随/路径节点或其他 cmd_vel 发布者。',
               '', '离线生成检查通过；ROS 解析、驱动/动捕及实车到位/停车仍须现场记录，不代表已验收。', '']
     return '\n'.join(lines)
@@ -221,6 +236,8 @@ def bundle(spec):
     if validate(spec).get('point'):
         paths.extend([HERE.parent / 'config/point_stabilization.yaml',
                       HERE.parent / 'config/point_control.cfg'])
+    if validate(spec).get('orca'):
+        paths.extend([HERE.parent / 'config/orca.yaml', HERE.parent / 'licenses/orca/UPSTREAM.json'])
     hashes = {str(p.relative_to(HERE.parent)): hashlib.sha256(p.read_bytes()).hexdigest() for p in paths}
     return {'composition.sha256.json': json.dumps(hashes, indent=2, sort_keys=True) + '\n', ** {'experiment.json': json.dumps(spec, ensure_ascii=False, indent=2, allow_nan=False) + '\n',
             'experiment.launch': render(spec), 'README.md': report(spec)}}

@@ -16,6 +16,8 @@
   <license>BSD</license>
   <!-- Bundled simple-pid; see src/simple_pid/LICENSE.md. -->
   <license>MIT</license>
+  <!-- ORCA pair constraints adapted from RVO2; licenses/orca. -->
+  <license>Apache-2.0</license>
 
 
   <!-- Url tags are optional, but multiple are allowed, one per tag -->

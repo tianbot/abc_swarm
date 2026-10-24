@@ -1,17 +1,21 @@
 #!/usr/bin/env python3
-"""Multi-robot mocap pose stabilization. No operator arming or obstacle avoidance."""
+"""Multi-robot mocap pose stabilization. Optional ORCA participant avoidance, without operator arming."""
 import json
 import math
 import re
 import time
+import threading
 
 import rospy
 import tf
 from geometry_msgs.msg import Pose, PoseArray, Twist
 from std_msgs.msg import String
+from nav_msgs.msg import Odometry
 from dynamic_reconfigure.server import Server
 from abc_swarm.cfg import point_controlConfig
 
+from abc_swarm.orca import OrcaBlocked, orca_velocities
+from abc_swarm.feedback import odometry_error
 from abc_swarm.point_control import formation_targets, point_velocity, validate_pose, world_goals
 
 
@@ -50,6 +54,30 @@ class PointStabilization:
             raise ValueError('One explicit target pose is required for every robot')
         world_goals(self.targets, self.reference, (0, 0, 0))
         point_velocity((0, 0, 0), (0, 0, 0), **self.control)
+        self.avoidance = rospy.get_param('~avoidance', 'none')
+        if self.avoidance not in ('none', 'orca'):
+            raise ValueError('avoidance must be none or orca')
+        self.orca = {}
+        self.feedback = {}
+        self.feedback_lock = threading.Lock()
+        self.avoidance_fault = ''
+        self.progress_time = None
+        self.best_error = None
+        if self.avoidance == 'orca':
+            cfg = rospy.get_param('~orca')
+            defaults = dict(robot_radius=0.13, safety_margin=0.02, front_distance=0.08,
+                            time_horizon=3.0, right_bias=0.01, velocity_buffer=0.002)
+            if not isinstance(cfg, dict) or set(cfg) != set(defaults) | {'odom_timeout','odom_future_tolerance','stall_timeout'}:
+                raise ValueError('ORCA config must contain exactly the fields in config/orca.yaml')
+            for key, value in cfg.items():
+                if type(value) not in (int,float) or not math.isfinite(value) or value < 0:
+                    raise ValueError('Invalid ORCA value: ' + key)
+                if key not in ('safety_margin','right_bias','velocity_buffer') and value <= 0:
+                    raise ValueError('ORCA value must be positive: ' + key)
+            self.orca = {key:cfg[key] for key in defaults}
+            self.odom_timeout = cfg['odom_timeout']
+            self.future_tolerance = cfg['odom_future_tolerance']
+            self.stall_timeout = cfg['stall_timeout']
         self.listener = tf.TransformListener()
         self.outputs = [rospy.Publisher('/' + r['name'] + '/cmd_vel', Twist, queue_size=1)
                         for r in self.robots]
@@ -62,6 +90,32 @@ class PointStabilization:
         self.last_publish = 0
         rospy.on_shutdown(self.stop)
         self.tuning = Server(point_controlConfig, self.configure)
+        self.odom_subscribers = []
+        if self.avoidance == 'orca':
+            self.odom_subscribers = [rospy.Subscriber('/'+robot['name']+'/odom', Odometry,
+                                     self.odom_cb, callback_args=robot['name'], queue_size=1)
+                                     for robot in self.robots]
+
+    def odom_cb(self, msg, name):
+        with self.feedback_lock:
+            self.feedback[name] = (msg.header.stamp.to_sec(), time.monotonic(),
+                                   msg.twist.twist.linear.x, msg.twist.twist.angular.z)
+
+    def measured_velocities(self):
+        with self.feedback_lock:
+            samples = dict(self.feedback)
+        velocities = []
+        for robot in self.robots:
+            sample = samples.get(robot['name'])
+            if sample is None:
+                raise ValueError('waiting for odometry: /'+robot['name']+'/odom')
+            stamp, received, v, w = sample
+            issue = odometry_error(stamp, rospy.Time.now().to_sec(), time.monotonic()-received,
+                                   v,w,self.odom_timeout,self.future_tolerance)
+            if issue:
+                raise ValueError('/'+robot['name']+'/odom: '+issue)
+            velocities.append((v,w))
+        return velocities
 
     def configure(self, config, level):
         gains = (config['k_distance'], config['k_heading'])
@@ -106,7 +160,7 @@ class PointStabilization:
 
     def status(self, state, reason, details=None):
         value = json.dumps({'schema_version': 2, 'mode': 'point_stabilization',
-                            'state': state, 'ready': state in ('running', 'completed'),
+                            'avoidance': self.avoidance, 'state': state, 'ready': state in ('running', 'completed'),
                             'enabled': state == 'running', 'reason': reason,
                             'robots': details or [], 'target_reference': self.reference, 'formation': self.formation,
                             'vrpn_server': rospy.get_param('/vrpn_client_node/server', ''),
@@ -118,7 +172,12 @@ class PointStabilization:
 
     def step(self):
         try:
+            if self.avoidance_fault:
+                self.stop()
+                self.status('fault', self.avoidance_fault)
+                return
             poses = self.poses()  # Validate the entire group before publishing any motion.
+            measured = self.measured_velocities() if self.avoidance == 'orca' else None
             if self.goals is None:
                 self.goals = world_goals(self.targets, self.reference, poses[0])
                 self.publish_goals()
@@ -127,8 +186,18 @@ class PointStabilization:
                 self.status('completed', 'all target poses reached; restart launch for another run', self.final_details)
                 return
             control = self.control
-            results = [point_velocity(pose, goal, **control)
-                       for pose, goal in zip(poses, self.goals)]
+            if self.avoidance == 'orca':
+                results = orca_velocities(poses, self.goals, measured, control, **self.orca)
+                error = sum(math.hypot(g[0]-p[0],g[1]-p[1]) + self.orca['front_distance'] *
+                            abs(math.atan2(math.sin(g[2]-p[2]),math.cos(g[2]-p[2])))
+                            for p,g in zip(poses,self.goals))
+                if self.best_error is None or error < self.best_error-0.005:
+                    self.best_error, self.progress_time = error, time.monotonic()
+                if time.monotonic()-self.progress_time > self.stall_timeout:
+                    raise OrcaBlocked('ORCA progress timeout; inspect geometry and restart')
+            else:
+                results = [point_velocity(pose, goal, **control)
+                           for pose, goal in zip(poses, self.goals)]
             self.completed = all(phase == 'arrived' for _, _, phase in results)
             details = []
             for robot, pose, goal, (v, w, phase), output in zip(
@@ -142,7 +211,13 @@ class PointStabilization:
             self.final_details = details
             self.status('completed' if self.completed else 'running',
                         'all target poses reached' if self.completed else 'tracking frozen target poses', details)
+        except OrcaBlocked as exc:
+            self.avoidance_fault = str(exc)
+            self.stop()
+            self.status('fault', self.avoidance_fault)
         except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException, ValueError) as exc:
+            if self.avoidance == 'orca' and self.progress_time is not None:
+                self.progress_time = time.monotonic()  # Feedback downtime is not planning stall time.
             self.stop()
             self.status('waiting', str(exc))
 

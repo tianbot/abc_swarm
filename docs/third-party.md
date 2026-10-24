@@ -21,3 +21,8 @@ catkin 同时提供多个 Python 包时，其开发环境转发模块可能把 s
 本轮显式更新 setup.py/CMake 安装规则及 CI：移除 pip 安装，增加随包 PID 的独立导入测试、安装来源与许可证检查。冻结课程检查器、基线和例外未改；实际工作空间只重新编译，没有启动或重启设备，也未卸载全局 Python 包。
 
 验证结果：56 项本地测试、Noetic 构建/安装及 48 个旧资源兼容检查通过。禁用 site-packages、仅提供 src、devel 或 install 路径时 PID 均可导入；实际工作空间的四个 PID 使用节点已做非 main 导入检查。远端 CI 未推送运行。
+
+
+## ORCA 两两约束参考
+
+`src/abc_swarm/orca.py` 的两两半平面构造译自固定提交的 RVO2 Agent.cc，其他小规模凸投影、差速限制和停机处理为本地实现。Apache-2.0 许可证及参考文件 SHA-256 位于 licenses/orca，catkin 安装到 share/abc_swarm/licenses/orca；没有额外 pip/native 库依赖。细节见 [ORCA 指南](orca.md)。

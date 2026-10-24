@@ -41,6 +41,14 @@
       "path": false,
       "point": true,
       "launch": "demo_mocap_three_mini_point_stabilization.launch"
+    },
+    "point_stabilization_orca": {
+      "robots": 3,
+      "formation": "targets",
+      "path": false,
+      "point": true,
+      "orca": true,
+      "launch": "demo_mocap_three_mini_orca_point_stabilization.launch"
     }
   }
 }

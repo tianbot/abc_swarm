@@ -32,6 +32,11 @@ jobs:
           PYTHONPATH: src
         run: python3 -m unittest discover -s tests -p test_preset_path.py -v
 
+      - name: Check ORCA geometry without ROS
+        env:
+          PYTHONPATH: src
+        run: python3 -m unittest discover -s tests -p test_orca.py -v
+
   noetic_build_tests:
     name: Noetic build and tests
     needs: course_compatibility
@@ -103,6 +108,8 @@ jobs:
           python3 "$ai_dir/generate_launch.py" "$RUNNER_TEMP/customer-demo/experiment.json" --output "$RUNNER_TEMP/customer-demo" --check
           python3 "$ai_dir/generate_launch.py" "$ai_dir/point-stabilization.example.json" --output "$RUNNER_TEMP/customer-point-demo"
           python3 "$ai_dir/generate_launch.py" "$RUNNER_TEMP/customer-point-demo/experiment.json" --output "$RUNNER_TEMP/customer-point-demo" --check
+          python3 "$ai_dir/generate_launch.py" "$ai_dir/orca.example.json" --output "$RUNNER_TEMP/customer-orca-demo"
+          python3 "$ai_dir/generate_launch.py" "$RUNNER_TEMP/customer-orca-demo/experiment.json" --output "$RUNNER_TEMP/customer-orca-demo" --check
       - name: Run isolated synthetic ROS integration
         run: |
           source "$RUNNER_TEMP/abc_swarm_ws/install/setup.bash"
@@ -113,3 +120,8 @@ jobs:
           source "$RUNNER_TEMP/abc_swarm_ws/install/setup.bash"
           # Private loopback master 11434, synthetic names, hardware/VRPN/UI off.
           python3 tests/ros/point_stabilization_smoke.py
+      - name: Run isolated mocap ORCA point stabilization
+        run: |
+          source "$RUNNER_TEMP/abc_swarm_ws/install/setup.bash"
+          # Private loopback master 11435; synthetic TF/odom; driver/VRPN/UI off.
+          python3 tests/ros/orca_point_smoke.py

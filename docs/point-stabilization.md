@@ -6,7 +6,7 @@
 
 三台 Mini 各有一个目标位姿，依次转向目标、向前接近、最后原地对齐目标朝向。不是头车遥控领航，也不会自动切入跟随实验。节点不需要 odom 速度前馈，只使用有效动捕 TF。
 
-**launch 启动后，全部定位有效即自动运动，不需要调用启用 service。** 当前没有避障、目标自动分配或无碰撞入队规划。首次只做摆位附近的小幅修正，为每台车准备互不冲突的通道，不要用交叉/密集起点测试“自动集结”。
+**launch 启动后，全部定位有效即自动运动，不需要调用启用 service。** 本页默认的普通模式没有避障、目标自动分配或无碰撞入队规划；ORCA 模式见 [独立说明](orca.md)。首次只做摆位附近的小幅修正，为每台车准备互不冲突的通道，不要用交叉/密集起点测试“自动集结”。
 
 ## 先试默认三角形目标
 
@@ -129,7 +129,7 @@ roslaunch --nodes /tmp/customer-point-demo/experiment.launch start_driver:=false
 - launch/mocap/demo_mocap_three_mini_point_stabilization.launch：三台 Mini、VRPN、目标配置的组合。
 - config/point_stabilization.yaml：目标及算法参数，一层文件，保持教学可读。
 
-这里的无 ROS 计算只为共享算法和测试，并不新增纯 Python 教学课程。后续再加入 ORCA/差速运动约束、机器人半径与邻车速度、障碍输入，然后做目标分配及无碰撞入队；ORCA 的参考入口是[官方项目与差速机器人论文](https://gamma-web.iacs.umd.edu/ORCA/)。这些尚未实现，不能把目前到位控制当成避障。
+这里的无 ROS 计算只为共享算法和测试，并不新增纯 Python 教学课程。ORCA 已作为同一节点的可选模式接入，使用车体包络及邻车实测速度；障碍输入、自动目标分配及全局入队规划留待后续。ORCA 的参考入口是[官方项目与差速机器人论文](https://gamma-web.iacs.umd.edu/ORCA/)。普通到位控制本身没有避障，必须明确选择 avoidance=orca 并满足其反馈及几何条件。
 
 ## 现场验收（由用户填写）
 
@@ -159,3 +159,6 @@ roslaunch --nodes /tmp/customer-point-demo/experiment.launch start_driver:=false
 
 
 点镇定现提供 k_distance/k_heading 动态调参，候选默认调整为 0.9/2.0；方法、离线结果与实车边界见[控制调参说明](control-tuning.md)。调整动态增益不会重新启动已完成任务。
+
+
+现在可在同一点镇定节点上选择 `avoidance:=orca`，仍只面向三车 mocap；普通模式默认 none。具体几何/速度反馈、启动和验收见 [ORCA 动捕说明](orca.md)。普通模式没有避障的限制继续成立。

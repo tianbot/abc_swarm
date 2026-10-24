@@ -7,6 +7,8 @@
   <arg name="start_vrpn" default="true"/>
   <arg name="use_rviz" default="false"/>
   <arg name="goal_config" default="$(find abc_swarm)/config/point_stabilization.yaml"/>
+  <arg name="avoidance" default="none"/>
+  <arg name="orca_config" default="$(find abc_swarm)/config/orca.yaml"/>
   <arg name="formation" default="config"/>
   <arg name="spacing" default="0.5"/>
   <arg name="max_linear" default=""/>
@@ -25,6 +27,8 @@
   </include>
   <node pkg="abc_swarm" type="point_stabilization.py" name="abc_swarm_demo" output="screen" required="true" clear_params="true">
     <rosparam command="load" file="$(arg goal_config)"/>
+    <param name="avoidance" value="$(arg avoidance)"/>
+    <rosparam if="$(eval arg('avoidance') == 'orca')" command="load" file="$(arg orca_config)" param="orca"/>
     <param name="formation" value="$(arg formation)"/>
     <param name="spacing" value="$(arg spacing)"/>
     <param if="$(eval arg('max_linear') != '')" name="max_linear" value="$(arg max_linear)" type="double"/>

@@ -20,8 +20,13 @@ install(FILES README.rst AGENTS.md LICENSE dependencies.repos dependencies-rmtt.
 install(FILES src/simple_pid/LICENSE.md src/simple_pid/UPSTREAM.json
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/licenses/simple_pid)
 
+install(FILES licenses/orca/LICENSE licenses/orca/UPSTREAM.json
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/licenses/orca)
+
 if(CATKIN_ENABLE_TESTING)
   catkin_add_nosetests(tests/test_vendored_pid.py)
+  catkin_add_nosetests(tests/test_orca.py)
+  catkin_add_nosetests(tests/test_orca_entrypoints.py)
   catkin_add_nosetests(tests/test_point_control.py)
   catkin_add_nosetests(tests/test_point_entrypoints.py)
   catkin_add_nosetests(tests/test_feedback.py)

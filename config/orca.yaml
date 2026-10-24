@@ -1,0 +1,12 @@
+# ORCA settings for point stabilization; participant-to-participant avoidance only.
+# Mini footprint corners reach ~0.121 m from base_link; 0.13 is a candidate bound.
+# Confirm this bound includes the actual body/markers at the mocap reference point.
+robot_radius: 0.13
+safety_margin: 0.02
+front_distance: 0.08
+time_horizon: 3.0
+right_bias: 0.01
+velocity_buffer: 0.002
+odom_timeout: 0.5
+odom_future_tolerance: 0.1
+stall_timeout: 30.0

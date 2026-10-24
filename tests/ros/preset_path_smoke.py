@@ -236,7 +236,7 @@ def main():
         deadline = time.monotonic() + 8
         while not (0 < commands[2][-1][1] <= 0.15) and time.monotonic() < deadline:
             pump(0.1)
-        assert 0 < commands[2][-1][1] <= 0.15, commands[2][-1]
+        assert abs(commands[2][-1][1]-0.15)<1e-6, commands[2][-1]  # No hidden 0.5 multiplier on straight motion.
         pump(0.8, missing=1)
         for i in commands:
             zeros(i)

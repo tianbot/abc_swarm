@@ -12,9 +12,10 @@ from abc_swarm.cfg import tf_pidConfig
 import numpy as np
 from simple_pid import PID
 
-pid_linear = PID(2, 0.5, 0.0)
+# Match tf_pid.cfg startup defaults; Server loads configured private parameters.
+pid_linear = PID(1.0, 0.0, 0.0)
 pid_linear.output_limits = (-0.15, 0.15)
-pid_angular = PID(2, 1.0, 0.0)
+pid_angular = PID(1.0, 0.0, 0.0)
 pid_angular.output_limits = (-1.57, 1.57)
 
 def callback(config, level):
@@ -90,7 +91,7 @@ if __name__ == '__main__':
             angular = angular_z_gap * 0.5
 
         if abs(angular) * 180 / math.pi <= 3 and abs(dis) != 0:
-            linear = linear * 0.5
+            # Keep the requested linear speed while suppressing tiny yaw corrections.
             angular = 0
 
         msg = geometry_msgs.msg.Twist()

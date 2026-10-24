@@ -14,6 +14,8 @@
   <!-- Commonly used license strings: -->
   <!--   BSD, MIT, Boost Software License, GPLv2, GPLv3, LGPLv2.1, LGPLv3 -->
   <license>BSD</license>
+  <!-- Bundled simple-pid; see src/simple_pid/LICENSE.md. -->
+  <license>MIT</license>
 
 
   <!-- Url tags are optional, but multiple are allowed, one per tag -->

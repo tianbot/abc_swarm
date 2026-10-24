@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 import runpy
 import tempfile
+import subprocess
+import sys
 import unittest
 from unittest.mock import patch
 import roslaunch
@@ -108,6 +110,10 @@ class PointEntrypointTests(unittest.TestCase):
         self.assertTrue(node.completed)  # A tuning change never starts another run.
         updated=node.configure({'k_distance':float('nan'),'k_heading':2.0},0)
         self.assertEqual(updated['k_distance'],1.0)
+
+    def test_bundled_pid_import_does_not_hide_generated_configs(self):
+        code = "import sys; sys.path.insert(0, " + repr(str(ROOT/'src')) + "); import simple_pid; from abc_swarm.cfg import tf_pidConfig, point_controlConfig"
+        subprocess.run([sys.executable,'-c',code],check=True,capture_output=True,text=True)
 
     def test_site_override_and_config_priority_are_shared(self):
         config=load(DEMO,['vrpn_server_ip:=192.0.2.31','vrpn_port:=3999'])

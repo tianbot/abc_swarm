@@ -21,6 +21,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_course_guard.py -v
       - name: Verify AI experiment generation contract
         run: python3 -m unittest discover -s tests -p test_ai_harness.py -v
+      - name: Check bundled PID without site packages
+        run: python3 -m unittest discover -s tests -p test_vendored_pid.py -v
       - name: Check change whitespace
         run: git diff --check 1708f332ae900384b9e84889b7ab3979aaae9f5f...HEAD
       - name: Check Python syntax
@@ -47,13 +49,11 @@ jobs:
       - name: Install build and test dependencies
         run: |
           apt-get update
-          apt-get install -y --no-install-recommends git python3-pip python3-nose python3-numpy python3-yaml ros-noetic-tf ros-noetic-nav-msgs ros-noetic-std-srvs ros-noetic-dynamic-reconfigure
+          apt-get install -y --no-install-recommends git python3-nose python3-numpy python3-yaml ros-noetic-tf ros-noetic-nav-msgs ros-noetic-std-srvs ros-noetic-dynamic-reconfigure
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Install pinned Python dependency
-        run: python3 -m pip install --disable-pip-version-check -r requirements.txt
       - name: Build test and install in Noetic
         run: |
           source /opt/ros/noetic/setup.bash
@@ -89,6 +89,10 @@ jobs:
                   if path.suffix == '.launch':
                       assert Path(resolve_launch_arguments(['abc_swarm', path.name])[0]) == path, original
           assert (root / 'config/mocap.yaml').is_file()
+          import simple_pid
+          assert root.parent.parent in Path(simple_pid.__file__).resolve().parents, simple_pid.__file__
+          assert (root / 'licenses/simple_pid/LICENSE.md').is_file()
+          assert (root / 'licenses/simple_pid/UPSTREAM.json').is_file()
           print('Installed nodes and configuration verified')
           PY
       - name: Check installed AI delivery tool

@@ -6,6 +6,8 @@
 
 当前用户指南：
 
+- [随包第三方代码与许可证](third-party.md)
+
 - [控制参数核对、首轮调参与 ORCA 路线](control-tuning.md)
 
 - [新实验：三车点镇定到位与最终朝向](point-stabilization.md)

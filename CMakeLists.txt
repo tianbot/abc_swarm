@@ -17,7 +17,11 @@ install(DIRECTORY ai DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 install(FILES README.rst AGENTS.md LICENSE dependencies.repos dependencies-rmtt.repos requirements.txt
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
 
+install(FILES src/simple_pid/LICENSE.md src/simple_pid/UPSTREAM.json
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/licenses/simple_pid)
+
 if(CATKIN_ENABLE_TESTING)
+  catkin_add_nosetests(tests/test_vendored_pid.py)
   catkin_add_nosetests(tests/test_point_control.py)
   catkin_add_nosetests(tests/test_point_entrypoints.py)
   catkin_add_nosetests(tests/test_feedback.py)

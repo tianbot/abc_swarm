@@ -120,7 +120,7 @@ class PresetPathNode:
         self.stop()
         rospy.set_param(self.enabled_param, False)
         self.fault = True
-        self.status('fault: ' + reason + '; disable/reset before restarting')
+        self.status('fault: ' + reason + '; restart launch or reset before restarting')
 
     def step(self):
         enabled = rospy.get_param(self.enabled_param, False)
@@ -149,14 +149,14 @@ class PresetPathNode:
             self.settle_started = None
             self.wait_started = None
             self.followers_started = False
-            self.status('ready; disabled (path frozen)')
+            self.status('ready; waiting for feedback (path frozen)')
             return
         try:
             pose = self.pose(self.fixed, self.robot)
             if self.controller is None:
                 self.prepare(pose)
                 self.stop()
-                self.status('ready; disabled (path frozen)')
+                self.status('ready; waiting for feedback (path frozen)')
                 return
             if not all(self.follower_states.get(topic) == 'tracking' for topic in self.follower_topics):
                 self.stop()

@@ -25,7 +25,7 @@ class DemoEntrypointTests(unittest.TestCase):
         env.start()
         self.addCleanup(env.stop)
 
-    def test_ai_generated_customer_launch_resolves_roles_and_disabled_runtime(self):
+    def test_ai_generated_customer_launch_resolves_roles_and_initial_readiness_gate(self):
         import copy
         import json
         import runpy

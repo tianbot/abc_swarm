@@ -1,5 +1,5 @@
 {
-  "contract_version": 1,
+  "contract_version": 2,
   "name": "customer_three_mini_circle",
   "localization": "mocap_vrpn",
   "fixed_frame": "world",

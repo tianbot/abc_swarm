@@ -1,5 +1,5 @@
 {
-  "contract_version": 1,
+  "contract_version": 2,
   "stack": "ROS1 Noetic",
   "model": "tianbot_mini",
   "localization": "mocap_vrpn",

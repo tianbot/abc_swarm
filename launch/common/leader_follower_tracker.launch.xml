@@ -12,6 +12,7 @@
   <arg name="max_angular" default="0.6" />
   <arg name="tf_timeout" default="0.5" />
   <arg name="odom_timeout" default="0.5" />
+  <arg name="odom_future_tolerance" default="0.1" />
 
   <node pkg="tf2_ros" type="static_transform_publisher"
         name="$(arg follower_name)_lf_target"
@@ -32,6 +33,7 @@
     <param name="max_angular" value="$(arg max_angular)" />
     <param name="tf_timeout" value="$(arg tf_timeout)" />
     <param name="odom_timeout" value="$(arg odom_timeout)" />
+    <param name="odom_future_tolerance" value="$(arg odom_future_tolerance)" />
     <param name="enabled_param" value="/abc_swarm_demo/enabled" />
   </node>
 </launch>

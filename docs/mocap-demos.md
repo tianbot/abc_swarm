@@ -36,29 +36,23 @@ roslaunch abc_swarm demo_mocap_three_mini_leader_follower_triangle.launch
 roslaunch abc_swarm demo_mocap_three_mini_leader_follower_snake.launch
 ```
 
-默认同时启动 socket 驱动、VRPN、控制器和键盘终端；运动仍禁用。已有后台时传 `start_driver:=false start_vrpn:=false`。只保留一套控制同组车辆的算法。
+默认同时启动 socket 驱动、VRPN、控制器和键盘终端；反馈有效后自动运行，后车可立即向编队位置收敛。已有后台时传 `start_driver:=false start_vrpn:=false`。只保留一套控制同组车辆的算法。
 
-检查定位、摆位，等待统一状态 ready：
+启动前摆好车并确认活动空间；启动后观察统一状态：
 
 ```bash
 rostopic echo /abc_swarm_demo/status
 ```
 
-开始：
+反馈就绪后自动运行：
 
-```bash
-rosservice call /abc_swarm_demo/set_enabled "data: true"
-```
 
 键盘 i 前进，u/o 缓弯，k 停止。遥控请求初始 0.05 m/s、0.15 rad/s；统一入口超过 0.3 秒没有新指令时停车。旧键盘版本需要持续按键。GUI 接管时关闭默认键盘，并向 `/abc_swarm_demo/teleop_cmd` 发布，不能另开节点直接争用头车 cmd_vel。
 
-停止：
+停止整套实验：在 roslaunch 终端按 Ctrl+C，并确认三车静止。
 
-```bash
-rosservice call /abc_swarm_demo/set_enabled "data: false"
-```
 
-统一停止包括头车遥控门控与后车算法。确认实际静止后退出。PID 对照入口 `demo_mocap_three_mini_pid_tracking.launch` 采用相同启动和操作接口，但算法是目标点 PID，便于比较。
+键盘 k 只停止头车请求，后车仍可收敛；退出实验进程停止整套控制。PID 对照入口 `demo_mocap_three_mini_pid_tracking.launch` 采用相同启动和操作接口，但算法是目标点 PID，便于比较。
 
 ## 圆形与圆角矩形路径
 
@@ -84,15 +78,15 @@ roslaunch abc_swarm demo_mocap_snake_leader_follower_path_tracking.launch shape:
 
 默认圆半径 0.8 m；圆角矩形外轮廓宽 2.5 m、高 2.0 m、圆角半径 0.8 m；头车 0.05 m/s、一圈。可通过 `radius`、`width`、`height`、`speed`、`laps`、`clockwise`、`spacing` 调整。`front_distance` 同时传给跟随器和收敛判断，默认 0.1 m。路径几何、速度和圈数由 launch 参数负责；前视距离、容差等算法参数在 `config/path_tracking.yaml`，不再重复声明同名默认值。矩形宽高必须至少为圆角半径两倍。后车和车体尺寸会超出头车路径，先确认整个队形扫过范围；外侧车需要更大速度余量。
 
-RViz 使用 world，显示 `/abc_swarm_path/path`、`actual_path`、`target` 和 TF。确认预览与现场空间、摆位后，通过相同 set_enabled 服务开始。
+RViz 使用 world，显示 `/abc_swarm_path/path`、`actual_path`、`target` 和 TF。启动前确认完整编队活动空间和摆位；反馈有效后自动运行，RViz 显示运行路径。
 
-正常一圈后头车停下，等待后车前置控制点误差小于 0.1 m，或达到 30 秒上限，再共同禁用。`laps:=0` 连续运行，需要人工停止。新一轮先停止，再重置：
+正常一圈后头车停下，等待后车前置控制点误差小于 0.1 m，或达到 30 秒上限，再共同停止。`laps:=0` 连续运行，需要人工停止。新一轮可以重启 launch，也可在 completed/fault 后重置：
 
 ```bash
 rosservice call /abc_swarm_demo/reset
 ```
 
-服务响应只表示接受请求，等待新路径预览和 ready 后再开始。路径故障需要统一 reset，不通过反复写启用参数绕过。普通禁用保留路径与进度；禁用期间移动头车不会自动重建路径。
+重置接受后按实时头车位置重建路径并自动运行。运行期间不能重置；路径故障后不会自动恢复旧轨迹，需重启 launch 或重置。
 
 ## 边界
 

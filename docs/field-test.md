@@ -2,7 +2,7 @@
 
 本轮代码在 `teaching/main-reorg` 分支，从原 main 重新整理。原九个教学脚本未改，新增节点合在 nodes，动捕实验集中到 launch/mocap。下面是现场复验步骤，不是已经完成的实车结果。
 
-已完成：28 项本地检查、安装检查、六个新入口的合成 ROS 回归。待完成：本分支真实三车测试。GitHub CI 工作流已写好，但未推送运行，main 分支保护也未设置。原来另一分支测试过三角/逐车跟随，不能直接当作当前分支的验收。
+原准备阶段已完成本地检查、安装检查及合成 ROS 回归；2026-10-24 调整为反馈有效后自动运行，现场效果待重新验收。待完成：本分支真实三车测试。GitHub CI 工作流已写好，但未推送运行，main 分支保护也未设置。原来另一分支测试过三角/逐车跟随，不能直接当作当前分支的验收。
 
 ## 1. 开始前
 
@@ -54,7 +54,7 @@ export ROS_MASTER_URI=http://localhost:11311
 
 **新默认行为：一个 demo 会启动底盘驱动和 VRPN。**先退出旧实验。若后台已在运行，给所选命令追加 `start_driver:=false start_vrpn:=false`，不要重复启动；不再要求先手工启动一套后台。
 
-手动实验默认打开键盘终端；自动路径默认打开 RViz。运动都默认禁用。
+手动实验默认打开键盘终端；自动路径默认打开 RViz。反馈有效后自动运行，没有手动启用步骤；启动前准备好摆位和完整活动空间。
 
 ## 3. 先复验手动领航
 
@@ -70,29 +70,17 @@ roslaunch abc_swarm demo_mocap_three_mini_leader_follower_triangle.launch
 rostopic echo /abc_swarm_demo/status
 ```
 
-等待 state 为 ready、ready 为 true。若 waiting，先看 reason 指出的 frame 或 odom，不反复强行启用。
+正常时 state 为 running、ready 为 true。若 waiting，看 reason 指出的 frame 或 odom。头车未动时，后车也可能开始向编队位置收敛。
 
-摆位和反馈正确后开始：
+键盘 i 前进、u/o 缓弯、k 停止头车请求。初始请求 0.05 m/s、0.15 rad/s；输入超时 0.3 秒停止头车请求。不要另开直接向头车 cmd_vel 发速度的遥控节点。停止整套实验时在 roslaunch 终端按 Ctrl+C。
 
-```bash
-rosservice call /abc_swarm_demo/set_enabled "data: true"
-```
-
-服务应返回 success: true。在已打开的键盘终端低速操作：i 前进、u/o 缓弯、k 停止。初始请求 0.05 m/s、0.15 rad/s。输入超过 0.3 秒未更新会停，旧键盘版本需要持续按方向键。不要另开直接向头车 cmd_vel 发速度的遥控节点。
-
-停止所有实验控制输出：
-
-```bash
-rosservice call /abc_swarm_demo/set_enabled "data: false"
-```
-
-确认三车实际静止后 Ctrl+C 退出旧 demo。再摆成同向纵列、相邻间距 0.5 m，启动逐车跟随：
+退出旧 demo 并确认三车实际静止。再摆成同向纵列、相邻间距 0.5 m，启动逐车跟随：
 
 ```bash
 roslaunch abc_swarm demo_mocap_three_mini_leader_follower_snake.launch
 ```
 
-使用同一状态、开始和停止命令。确认 02 跟 01，03 跟 02；转弯可能切弯，不要求沿相同历史路径。
+同样启动即自动跟随，退出 launch 停止。确认 02 跟 01，03 跟 02；转弯可能切弯，不要求沿相同历史路径。
 
 ## 4. 再测自动路径，先单车
 
@@ -102,15 +90,15 @@ roslaunch abc_swarm demo_mocap_three_mini_leader_follower_snake.launch
 roslaunch abc_swarm demo_mocap_path_tracking.launch shape:=circle
 ```
 
-首次有效位姿确定起点和起始切线，路径固定在 world。默认逆时针、圆在初始车头左侧，半径 0.8 m、速度 0.05 m/s、一圈。先确认 RViz 预览在空旷范围内，再等统一状态 ready 并开始。
+首次有效位姿确定起点和起始切线，路径固定在 world。默认逆时针、圆在初始车头左侧，半径 0.8 m、速度 0.05 m/s、一圈。启动前确认整条轨迹及编队范围足够空旷；反馈就绪后自动跟踪，RViz 用于观察运行路径。
 
-完成应显示 completed 并禁用输出。再次测试先停止，再重置：
+完成应显示 completed 并停止输出。再次测试可重启 launch，或在 completed/fault 后重置：
 
 ```bash
 rosservice call /abc_swarm_demo/reset
 ```
 
-重置返回仅表示接受请求；等预览更新及 ready 再启用。禁用时移动车辆不会自动重画路径。故障后也需要统一 reset。
+重置接受后按实时头车位置生成新路径并自动运行，没有再次启用步骤。正在运行时不能重置。
 
 圆角矩形可在退出旧 demo 后测试：
 
@@ -134,7 +122,7 @@ roslaunch abc_swarm demo_mocap_formation_leader_follower_path_tracking.launch sh
 roslaunch abc_swarm demo_mocap_snake_leader_follower_path_tracking.launch shape:=rounded_rectangle
 ```
 
-同样先预览、ready 后开始。结束时头车先停止，后车继续收敛；满足前置控制点容差或等待 30 秒超时后共同禁用。超时会明确显示 formation settling timed out，需要记录，不能当成正常收敛。
+同样启动前准备好场地，反馈有效后自动开始。结束时头车先停止，后车继续收敛；满足前置控制点容差或等待 30 秒超时后共同禁用。超时会明确显示 formation settling timed out，需要记录，不能当成正常收敛。
 
 PID 对照为可选项，退出旧实验后使用：
 
@@ -187,3 +175,5 @@ rostopic echo /tianbot_mini_03_leader_follower/status
 | PID 对照（可选） | 未测 |
 
 更多参数与接口见 [动捕实验说明](mocap-demos.md)、[统一运行接口](demo-runtime.md)。CI 设置见 [课程兼容保障](course-compatibility.md)，不需要为现场试车先配置 GitHub。
+
+2026-10-24 启动流程修正验证：38 项本地测试及六入口私有 ROS 合成回归通过；已移除手动启用步骤，并修正 rosserial odom 小幅未来时间戳误判。当前现场旧进程未重启，不能把这些离线结果记为新的实车验收。

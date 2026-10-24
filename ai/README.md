@@ -29,7 +29,7 @@ python3 ai/generate_launch.py /tmp/customer-demo/experiment.json --output /tmp/c
 交付目录包括：
 
 - `experiment.json`：唯一客户配置，供人、AI 及后续 GUI 复用。
-- `experiment.launch`：只 include 一个白名单实验，参数明确，默认禁用运动。
+- `experiment.launch`：只 include 一个白名单实验，参数明确，反馈有效后自动运行，无需手动启用。
 - `README.md`：设备角色、人工摆位建议、解析/启动/启停步骤及待验收记录。
 - `composition.sha256.json`：生成器、能力表、相关 launch 和配置的内容哈希；更换版本后重新检查。完整算法版本另外记录仓库提交号。
 
@@ -48,7 +48,7 @@ python3 ai/generate_launch.py /tmp/customer-demo/experiment.json --output /tmp/c
 
 ## 实验单的准确含义
 
-`contract_version` 固定为整数 1。顶层及子对象只允许示例中的字段，未知字段报错，不静默丢弃。没有独立维护一份容易漂移的 JSON Schema；运行时契约在 `generate_launch.py:validate`，白名单在 `capabilities.json`，正反例由测试约束。
+`contract_version` 固定为整数 2（反馈有效后自动运行）。顶层及子对象只允许示例中的字段，未知字段报错，不静默丢弃。没有独立维护一份容易漂移的 JSON Schema；运行时契约在 `generate_launch.py:validate`，白名单在 `capabilities.json`，正反例由测试约束。
 
 | experiment | 数量 | 头车控制 | 编队 |
 | --- | --- | --- | --- |
@@ -65,7 +65,7 @@ python3 ai/generate_launch.py /tmp/customer-demo/experiment.json --output /tmp/c
 - 自动实验的 `path` 必须完整；shape 为 `circle` 或 `rounded_rectangle`，radius/width/height 均正，圆角矩形长宽至少两倍半径；speed 在 (0,0.1] m/s；laps 为正整数。circle 仍要求填写 width/height，它们对圆形无效。手动实验 `path: null`。
 - clockwise 明确方向。路径在启动/重置时根据实测头车位置生成；圆形逆时针在头车朝向左侧，顺时针在右侧。需要核对整个编队的扫掠区域，且逐车跟随可能切角。
 - `startup` 的四个字段均为真正的布尔值。start_driver/start_vrpn 为 true 表示本实验启动，为 false 表示复用现场已有后台。两者不表示运动开关；没有反馈不能 ready。use_rviz 控制界面，start_teleop 仅手动实验可为 true。自动实验禁止键盘并发控制。
-- 不提供 enabled=true、无限圈数、任意文件/节点/命令扩展。业务需要新能力时走下述维护流程。
+- 不提供手动 enabled 启动选项、无限圈数、任意文件/节点/命令扩展。业务需要新能力时走下述维护流程。
 
 ## 维护者如何扩展
 
@@ -99,8 +99,16 @@ python3 tests/check_course_compatibility.py
 
 ## 本轮验证记录（2026-10-24）
 
-- 本地 Noetic 独立 catkin 工作空间构建、测试与安装通过，36 项测试无失败；五种生成入口均解析并核对角色映射、默认禁用及复用后台参数。
+- 本地 Noetic 独立 catkin 工作空间构建、测试与安装通过，36 项测试无失败；五种生成入口均解析并核对角色映射、初始反馈检查及复用后台参数。
 - 命令行正反例涵盖重复/未知字段、设备数量/型号/名称、路径参数、表达式注入、文件篡改和拒绝覆盖。干净安装目录中的生成器也已实际生成并检查交付目录。
 - 冻结 main 的 48 个旧资源兼容检查通过；未改旧课程清单、检查器和例外规则。
 - 本轮显式新增能力表及生成器，更新根 AGENTS.md、CMake 测试/安装规则和 `.github/workflows/course-compatibility.yml`；CI 增加离线契约及安装后生成检查，供维护者审核。尚未推送运行远端 CI。
 - 未启动硬件、VRPN 或 Gazebo；本轮未重跑运动合成回归，也没有新增实车验收结果。
+
+2026-10-24 操作流程调整：不再要求手动启用 service；实验 launch 在反馈齐全后自动运行，停止使用 Ctrl+C 退出实验进程。旧生成目录必须重新生成。对话和生成器仍只负责交付，不自动执行 launch；启动后后车可能立即纠正位置，客户需提前准备场地。
+
+实验单契约已从 v1 升级到 v2，旧 v1 输入会被拒绝。迁移时先阅读自动运行说明、确认启动后可能立即运动，再明确改为 v2 并生成新目录；不静默改变旧交付的启动语义。
+
+本次启动流程修正验证：38 项本地测试通过；独立 master、合成名称、关闭真实驱动/VRPN/UI 的六入口回归通过，覆盖自动运行、反馈中断停车、手动恢复不重放旧输入、时间戳小幅超前容差及路径结束停车。实车进程未重启，现场效果待重新验收。
+
+后续计划的点镇定入队和 ORCA 避障尚未实现。现有 LF 启动后的相对目标收敛不等于无碰撞集结规划；客户要求自动集结规划或 ORCA 时，必须明确报告待实现，不以现有 manual_triangle 等入口冒充。

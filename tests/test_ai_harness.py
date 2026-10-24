@@ -29,7 +29,7 @@ def scenario(experiment):
 
 
 class AIHarnessTests(unittest.TestCase):
-    def test_all_supported_experiments_use_declared_arguments_and_remain_disabled(self):
+    def test_all_supported_experiments_use_existing_entrypoints_without_arming(self):
         for experiment, cap in harness.CATALOG['experiments'].items():
             with self.subTest(experiment=experiment):
                 root = ET.fromstring(harness.render(scenario(experiment)))
@@ -41,10 +41,7 @@ class AIHarnessTests(unittest.TestCase):
                 self.assertEqual(args['vrpn_server_ip'], EXAMPLE['vrpn']['server'])
                 self.assertEqual(args['rigid_body_1'], 'tianbot_mini_01')
                 self.assertNotIn('initial_pose', args)
-                if not cap['path']:
-                    self.assertEqual(args['enabled'], 'false')
-                else:
-                    self.assertNotIn('enabled', args)
+                self.assertNotIn('enabled', args)
 
     def test_rounded_rectangle_and_separate_backend_are_supported(self):
         spec = scenario('path_snake')
@@ -65,6 +62,7 @@ class AIHarnessTests(unittest.TestCase):
     def test_rejects_invalid_customer_inputs(self):
         changes = [
             lambda s: s.update(contract_version=True),
+            lambda s: s.update(contract_version=1),
             lambda s: s.update(unknown='ignored?'),
             lambda s: s.update(experiment='five_mini_snake'),
             lambda s: s.update(localization='gazebo'),

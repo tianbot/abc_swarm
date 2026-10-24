@@ -16,6 +16,7 @@ from nav_msgs.msg import Odometry
 from std_msgs.msg import String
 
 
+from abc_swarm.feedback import odometry_error
 from abc_swarm.leader_follower_control import tracking_velocity
 
 class LeaderFollower:
@@ -31,10 +32,11 @@ class LeaderFollower:
         self.max_angular = float(rospy.get_param('~max_angular', 0.6))
         self.tf_timeout = float(rospy.get_param('~tf_timeout', 0.5))
         self.odom_timeout = float(rospy.get_param('~odom_timeout', 0.5))
+        self.future_tolerance = float(rospy.get_param('~odom_future_tolerance', 0.1))
         self.enabled_param = rospy.get_param('~enabled_param',
                                              '/abc_swarm_demo/enabled')
         positive = (self.d, self.k_x, self.k_y, self.max_linear,
-                    self.max_angular, self.tf_timeout, self.odom_timeout)
+                    self.max_angular, self.tf_timeout, self.odom_timeout, self.future_tolerance)
         if (not all(math.isfinite(v) and v > 0 for v in positive)
                 or not all(math.isfinite(v) for v in self.offset)):
             raise ValueError('Invalid gains, distances, limits or timeouts')
@@ -80,13 +82,11 @@ class LeaderFollower:
             self.status('waiting for leader odometry')
             return
         stamp, received, v_leader, w_leader = odom
-        odom_age = (now - stamp).to_sec()
-        if (stamp == rospy.Time(0) or odom_age < 0
-                or odom_age > self.odom_timeout
-                or time.monotonic() - received > self.odom_timeout
-                or not all(math.isfinite(v) for v in (v_leader, w_leader))):
+        issue = odometry_error(stamp.to_sec(), now.to_sec(), time.monotonic() - received,
+                               v_leader, w_leader, self.odom_timeout, self.future_tolerance)
+        if issue:
             self.stop()
-            self.status('leader odometry stale or invalid')
+            self.status('leader odometry: ' + issue)
             return
 
         try:

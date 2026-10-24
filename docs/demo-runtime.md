@@ -1,105 +1,75 @@
-# 新 demo 的统一启动与 GUI 接口
+# 动捕 demo 的启动与 GUI 接口
 
-适用于 `launch/mocap/` 的六个新增 Mini 动捕实验；原有空地参考和原视频入口保持原操作。本轮不增加 Gazebo 入口。
+适用于 `launch/mocap/` 六个新增 Mini 实验。原视频入口保持原操作，本轮不增加 Gazebo 实验。
 
-## 一个文件启动完整实验
-
-例如三车三角形手动领航：
+## 启动即运行
 
 ```bash
 roslaunch abc_swarm demo_mocap_three_mini_leader_follower_triangle.launch
 ```
 
-默认启动 Mini socket 驱动、VRPN 客户端、跟随算法、统一运行节点及键盘遥控终端。自动路径入口默认启动驱动、VRPN、算法、运行节点和 RViz，不启动遥控。所有新实验默认禁用运动，反馈就绪后再开始。
+一个文件组合驱动、VRPN、算法及键盘/RViz。**反馈有效后自动运行，不需要调用启用 service。后车可能在头车静止时立即向编队位置运动。** 请在启动前准备场地和摆位；当前没有避障，也没有独立的自动入队规划阶段。
+
+- 手动实验：头车由键盘控制，02/03 自动跟踪编队目标；k 或键盘超时只停止头车请求，后车仍可收敛。
+- 自动路径：初次有效位姿确定路径起点，反馈及路径准备完成后自动跟踪。RViz 是运行时显示，不是启动前的确认门。先单车、低速验证，场地必须提前准备好。
+- 停止整套实验：在其 roslaunch 终端按 Ctrl+C，确认三车实际静止。切换实验时先退出旧进程，再启动新进程。
+
+2026-10-24 移除了此前未经确认加入的 `/abc_swarm_demo/set_enabled` 服务和 `enabled:=` 启动选项。旧脚本或生成目录若仍包含该步骤，应重新生成。`/abc_swarm_demo/enabled` 现在仅为节点之间的内部反馈有效标志，由运行节点维护；不要手动写它。
+
+## 后台和场地
 
 | 参数 | 用途 |
 | --- | --- |
-| `site_config` | 场地配置文件，默认 `config/mocap.yaml` |
-| `vrpn_server_ip`、`vrpn_port` | 覆盖配置文件中的服务器和端口 |
-| `start_driver`、`start_vrpn` | 默认 true；已有对应后台时设 false |
-| `start_teleop` | 手动领航默认 true，打开键盘终端；自动路径不提供此参数 |
-| `teleop_terminal` | 手动领航默认 `xterm -e`，可替换终端启动命令 |
-| `use_rviz` | 手动领航默认 false，自动路径默认 true |
-
-只运行一个控制同组车辆的实验。驱动或 VRPN 已运行时：
+| site_config | 场地 YAML，默认 config/mocap.yaml |
+| vrpn_server_ip / vrpn_port | 覆盖场地服务器/端口 |
+| start_driver / start_vrpn | 默认 true；复用已有后台时 false |
+| start_teleop | 手动实验默认 true；GUI 遥控时 false |
+| use_rviz | 手动默认 false，自动默认 true |
 
 ```bash
-roslaunch abc_swarm demo_mocap_formation_leader_follower_path_tracking.launch start_driver:=false start_vrpn:=false
+roslaunch abc_swarm demo_mocap_three_mini_leader_follower_triangle.launch start_driver:=false start_vrpn:=false
 ```
 
-## 地址只配置一次
-
-`config/mocap.yaml` 保存当前场地的 server、port 和 VRPN 客户端设置。需要部署到其他场地时，用独立文件，不必修改每个 demo：
-
-```bash
-roslaunch abc_swarm demo_mocap_formation_leader_follower_path_tracking.launch site_config:=/absolute/path/site.yaml
-```
-
-临时覆盖：
-
-```bash
-roslaunch abc_swarm demo_mocap_formation_leader_follower_path_tracking.launch vrpn_server_ip:=192.168.2.101 vrpn_port:=3883
-```
-
-服务器优先级：命令行 `vrpn_server_ip` > 环境变量 `ABC_SWARM_VRPN_SERVER` > 场地文件。端口优先级：命令行 `vrpn_port` > 场地文件。数值仅出现在场地配置中，不在每个 launch 中重复。原监控脚本未指定 `ping_target` 时读取实际 `/vrpn_client_node/server`，不再默认 ping 另一个地址；旧频率估算仍未作为正式就绪判断使用。
-
-## 准备、开始、停止
-
-查看统一状态：
-
-```bash
-rostopic echo /abc_swarm_demo/status
-```
-
-准备好再开始：
-
-```bash
-rosservice call /abc_swarm_demo/set_enabled "data: true"
-```
-
-停止头车遥控输出和后车算法：
-
-```bash
-rosservice call /abc_swarm_demo/set_enabled "data: false"
-```
-
-路径实验停止后重置：
-
-```bash
-rosservice call /abc_swarm_demo/reset
-```
-
-等待路径重新生成及 ready 后再开始。手动领航实验没有路径，reset 返回不支持；重新开始使用 set_enabled。
-
-原 `/abc_swarm_demo/enabled` 参数继续兼容，但直接设 true 也会受反馈检查约束。GUI 应使用服务，以便获得成功/拒绝及原因。路径故障锁定后需通过统一 reset 清除，不能反复设置启用参数强行恢复。
-
-## 键盘和 GUI 遥控共用入口
-
-手动领航时，键盘和 GUI 都向 `/abc_swarm_demo/teleop_cmd` 发布 `geometry_msgs/Twist`；统一运行节点向头车最终 `cmd_vel` 发布，是该话题唯一的实验控制输出。GUI 接管时关闭键盘：`start_teleop:=false`。不要另开键盘直接向头车 cmd_vel 发速度。
-
-启用前的输入不会重放；禁用、输入超过 0.3 秒未更新、位姿或所需里程计失效时输出零。GUI 遥控应持续更新，例如 20 Hz；键盘节点支持重复发布时采用 repeat_rate 和 key_timeout，旧版本则需要持续按方向键。默认头车上限 0.1 m/s、0.6 rad/s，键盘初始请求为 0.05 m/s、0.15 rad/s。
-
-自动路径时头车 cmd_vel 仍只由路径跟踪器发布，运行节点不发布第二路头车速度；统一停止通过启用参数让跟踪器和后车停止。
-
-就绪表示所需 TF、里程计及路径准备状态有效，不代表电机、电源、急停或遥控器模式已经经过设备诊断。真实停车延迟与遮挡冻结姿态仍需现场验收。
-
-## GUI 最小契约
-
-| 接口 | 类型 | 含义 |
-| --- | --- | --- |
-| `/abc_swarm_demo/set_enabled` | `std_srvs/SetBool` | 开始/停止，返回是否接受及原因 |
-| `/abc_swarm_demo/reset` | `std_srvs/Trigger` | 停止后重置路径，响应表示已接受请求 |
-| `/abc_swarm_demo/status` | `std_msgs/String`，JSON，latched | 状态快照，变化时发布，不是心跳 |
-| `/abc_swarm_demo/teleop_cmd` | `geometry_msgs/Twist` | 手动领航速度请求 |
-
-JSON `schema_version=1`，字段包括 `state`、`reason`、`enabled`、`ready`、`mode`、`vrpn_server`、`vrpn_port`。state 为 waiting、ready、running、completed 或 fault。GUI 要结合节点/进程存活判断连接，不能把 latched 消息当作实时心跳。服务调用成功也不替代随后反馈状态的监视。
-
-GUI 可以保持公共后台：
+VRPN 服务器优先级：命令行 > ABC_SWARM_VRPN_SERVER 环境变量 > 场地配置；端口为命令行 > 场地配置。
 
 ```bash
 roslaunch abc_swarm mocap_backend.launch site_config:=/absolute/path/site.yaml
 ```
 
-然后启动所选实验并传 `start_driver:=false start_vrpn:=false`，手动实验再传 `start_teleop:=false use_rviz:=false`，自动实验传 `use_rviz:=false`。切换前先停止、退出旧实验进程，再启动新实验；后台不需要重启。场地/VRPN 配置变化时停止实验后重启后台。算法参数当前主要在启动时加载，GUI 修改配置后重启实验，不承诺所有参数都可在线修改。
+后台可以常驻，GUI 启停实验进程时传 start_driver/start_vrpn 为 false。同一组车辆只运行一套实验，不能让多个控制器争用 cmd_vel。
 
-GUI 负责 launch 进程生命周期；本轮提供可复用组件和稳定 ROS 接口，尚未实现 GUI 或集中式进程管理器。
+## 反馈和恢复
+
+```bash
+rostopic echo /abc_swarm_demo/status
+```
+
+waiting 表示等待必需反馈；running 表示反馈有效且控制正在运行，并不表示车轮一定在转；completed 表示路径结束；fault 表示路径故障锁定。
+
+- odom 默认有效期 0.5 秒，同时检查消息时间戳和本机接收时间。允许时间戳小幅超前 0.1 秒，兼容现场 rosserial 同步抖动，仍拒绝过旧数据、长时间没有接收及非有限速度。
+- 手动实验：反馈失效时共同停止；反馈恢复后自动恢复跟随。头车旧键盘请求不会重放，需要新输入。
+- 自动路径：反馈失效或路径异常时停车并锁定，避免自行恢复旧轨迹；完成后也不会重复跑圈。重新测试可退出并重新启动 launch；或者在 completed/fault 时使用可选的路径重置。
+
+```bash
+rosservice call /abc_swarm_demo/reset
+```
+
+重置接受后按实时头车位置重建路径并自动运行，不需要再启用；不要在车辆运行时请求重置。手动实验不支持路径重置。
+
+## GUI 接口
+
+| 接口 | 类型 | 用途 |
+| --- | --- | --- |
+| /abc_swarm_demo/status | std_msgs/String，JSON，latched | 状态和原因，变化时发布，不是心跳 |
+| /abc_swarm_demo/teleop_cmd | geometry_msgs/Twist | 手动实验头车请求 |
+| /abc_swarm_demo/reset | std_srvs/Trigger | 路径完成/故障后的可选重试 |
+
+JSON schema_version=2，保留 state、reason、enabled、ready、mode、vrpn_server、vrpn_port。enabled 表示自动反馈门是否打开，不再表示操作员启用状态。GUI 用实验进程的启动/退出控制运行，不把 ROS service 调用作为开车前的必经步骤。
+
+键盘和 GUI 都通过 teleop_cmd 进入头车统一输出；GUI 使用 start_teleop:=false。输入超时 0.3 秒停止头车请求，默认限制 0.1 m/s、0.6 rad/s。路径实验的头车最终输出仍只由路径跟踪器发布。
+
+## 后续功能边界
+
+目标链条是：实时定位 → 分配每车目标/入队位置 → 点镇定或路径跟踪给出期望运动 → 避障修正 → 底盘控制。现有 LF 已能向相对编队目标收敛，但不等同于无碰撞的入队规划。
+
+点镇定入队和 ORCA 是后续独立实验/算法，不在本次实现中。引入时要明确机器人外形、定位输入、邻车状态、静态障碍来源及差速底盘约束；不能直接把全向速度输出当作 Mini 的 v/omega。旧课程和现有 LF 核心算法继续保留。

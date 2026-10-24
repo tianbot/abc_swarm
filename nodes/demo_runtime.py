@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Common demo services, feedback readiness and gated manual leader commands.
+"""Automatic feedback readiness and manual leader command forwarding.
 
 This owns the experiment lifecycle, not hardware health certification. GUI and
 keyboard use the same teleop input; autonomous path nodes retain their output.
@@ -14,7 +14,9 @@ import tf
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
 from std_msgs.msg import String
-from std_srvs.srv import SetBool, SetBoolResponse, Trigger, TriggerResponse
+from std_srvs.srv import Trigger, TriggerResponse
+
+from abc_swarm.feedback import odometry_error
 
 
 class DemoRuntime:
@@ -27,11 +29,12 @@ class DemoRuntime:
         self.frames = rospy.get_param('~robot_frames')
         self.topics = rospy.get_param('~feedback_topics', [])
         self.timeout = float(rospy.get_param('~feedback_timeout', 0.5))
+        self.future_tolerance = float(rospy.get_param('~odom_future_tolerance', 0.1))
         self.command_timeout = float(rospy.get_param('~command_timeout', 0.3))
         self.max_linear = float(rospy.get_param('~max_linear', 0.1))
         self.max_angular = float(rospy.get_param('~max_angular', 0.6))
         if not self.frames or any(not math.isfinite(v) or v <= 0 for v in
-                (self.timeout, self.command_timeout, self.max_linear, self.max_angular)):
+                (self.timeout, self.future_tolerance, self.command_timeout, self.max_linear, self.max_angular)):
             raise ValueError('Robot frames and positive finite limits are required')
         self.listener = tf.TransformListener()
         self.feedback = {}
@@ -52,8 +55,7 @@ class DemoRuntime:
         else:
             self.subscribers.append(rospy.Subscriber('/abc_swarm_path/status', String,
                                                      self.path_cb, queue_size=1))
-        self.services = [rospy.Service('~set_enabled', SetBool, self.set_enabled),
-                         rospy.Service('~reset', Trigger, self.reset)]
+        self.services = [rospy.Service('~reset', Trigger, self.reset)]
         rospy.on_shutdown(self.shutdown)
 
     def odom_cb(self, msg, topic):
@@ -90,10 +92,10 @@ class DemoRuntime:
             if sample is None:
                 return False, 'waiting for odometry: ' + topic
             stamp, received, v, w = sample
-            if (stamp == rospy.Time(0) or not 0 <= (now - stamp).to_sec() <= self.timeout
-                    or time.monotonic() - received > self.timeout
-                    or not all(math.isfinite(x) for x in (v, w))):
-                return False, 'stale/invalid odometry: ' + topic
+            issue = odometry_error(stamp.to_sec(), now.to_sec(), time.monotonic() - received,
+                                   v, w, self.timeout, self.future_tolerance)
+            if issue:
+                return False, topic + ': ' + issue
         if self.mode == 'path' and not self.path_status.startswith(
                 ('ready', 'tracking', 'settling', 'waiting for follower feedback')):
             return False, self.path_status or 'waiting for prepared path'
@@ -102,22 +104,6 @@ class DemoRuntime:
     def zero(self):
         if self.publisher is not None:
             self.publisher.publish(Twist())
-
-    def set_enabled(self, request):
-        with self.lock:
-            if request.data:
-                if self.mode == 'path' and self.fault:
-                    return SetBoolResponse(success=False, message='Reset the path experiment after a fault')
-                ready, reason = self.readiness()
-                if not ready:
-                    return SetBoolResponse(success=False, message=reason)
-            self.command = None  # Never replay input received before arming.
-            self.fault = ''
-            self.active = bool(request.data)
-            rospy.set_param(self.enabled_param, self.active)
-            if not self.active:
-                self.zero()
-            return SetBoolResponse(success=True, message='enabled' if self.active else 'stopped')
 
     def reset(self, request):
         with self.lock:
@@ -138,18 +124,16 @@ class DemoRuntime:
     def step(self):
         with self.lock:
             ready, reason = self.readiness()
-            requested = bool(rospy.get_param(self.enabled_param, False))
-            if requested and self.mode == 'path' and self.fault:
-                rospy.set_param(self.enabled_param, False)
-                requested = False
-            if requested and not ready:
-                rospy.set_param(self.enabled_param, False)
-                requested = False
+            # Readiness starts the experiment; there is no operator arming latch.
+            # Path faults/completion stay stopped until reset or launch restart.
+            was_active = self.active
+            terminal = self.mode == 'path' and self.path_status.startswith(('completed', 'fault:'))
+            if self.mode == 'path' and was_active and not ready and not terminal:
                 self.fault = reason
-            if requested and not self.active:
-                self.command = None
-                self.fault = ''
-            self.active = requested
+            self.active = ready and not terminal and not self.fault
+            if not self.active or not was_active:
+                self.command = None  # Do not replay input across a feedback interruption.
+            rospy.set_param(self.enabled_param, self.active)
             if self.publisher is not None:
                 cmd = Twist()
                 if (self.active and self.command is not None
@@ -157,14 +141,14 @@ class DemoRuntime:
                     cmd.linear.x = max(-self.max_linear, min(self.max_linear, self.command[1]))
                     cmd.angular.z = max(-self.max_angular, min(self.max_angular, self.command[2]))
                 self.publisher.publish(cmd)
-            state = 'running' if self.active else ('ready' if ready else 'waiting')
+            state = 'running' if self.active else 'waiting'
             if self.mode == 'path' and self.path_status.startswith('completed'):
                 state, reason = 'completed', self.path_status
             elif self.mode == 'path' and self.path_status.startswith('fault:'):
                 state, reason = 'fault', self.path_status
             elif self.fault:
                 state, reason = 'fault', self.fault
-            status = json.dumps({'schema_version': 1, 'state': state, 'reason': reason,
+            status = json.dumps({'schema_version': 2, 'state': state, 'reason': reason,
                                  'enabled': self.active, 'ready': ready and not (self.mode == 'path' and self.fault),
                                  'mode': self.mode,
                                  'vrpn_server': rospy.get_param('/vrpn_client_node/server', ''),

@@ -44,7 +44,7 @@ class LeaderFollowerTests(unittest.TestCase):
         node.odom_cb(msg)
         self.assertEqual(node.odom[2:], (.07, -.12))
 
-    def test_three_robot_topology_and_default_disabled(self):
+    def test_three_robot_topology_and_initial_feedback_gate(self):
         import roslaunch
         for formation, leader in [('triangle','tianbot_mini_01'),('snake','tianbot_mini_02')]:
             config = roslaunch.config.ROSLaunchConfig()

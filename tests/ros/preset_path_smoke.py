@@ -26,7 +26,7 @@ def main():
     from geometry_msgs.msg import Twist
     from nav_msgs.msg import Path as RosPath, Odometry
     from std_msgs.msg import String
-    from std_srvs.srv import Trigger, SetBool
+    from std_srvs.srv import Trigger
     from abc_swarm.preset_paths import preset_path
 
     processes, streams = [], []
@@ -76,7 +76,7 @@ def main():
                 for i in commands}
         poses = {1: (0, 0, 0), 2: (-0.5, 0, 0), 3: (-1, 0, 0)}
 
-        def pump(duration, missing=None, missing_odom=None):
+        def pump(duration, missing=None, missing_odom=None, odom_ahead=0.0):
             end = time.monotonic() + duration
             while time.monotonic() < end:
                 now = rospy.Time.now()
@@ -86,7 +86,7 @@ def main():
                             tf.transformations.quaternion_from_euler(0, 0, p[2]),
                             now, 'path_test_%02d' % i, 'world')
                     msg = Odometry()
-                    msg.header.stamp = now
+                    msg.header.stamp = now + rospy.Duration(odom_ahead)
                     if i != missing_odom:
                         odom[i].publish(msg)
                 time.sleep(0.025)
@@ -107,45 +107,35 @@ def main():
 
         process = launch('single')
         pump(3)
-        assert states[-1].startswith('ready'), states
-        assert paths[-1].header.frame_id == 'world' and len(paths[-1].poses) > 10
-        zeros()
-        enable = rospy.ServiceProxy('/abc_swarm_demo/set_enabled', SetBool)
-        assert enable(True).success
-        pump(0.5)
+        assert process.poll() is None, 'required ROS node exited; inspect logs in ' + str(folder)
         assert states[-1] == 'tracking', states
+        assert paths[-1].header.frame_id == 'world' and len(paths[-1].poses) > 10
         assert commands[1][-1][1] > 0
-        assert not any(s == 'completed' for s in states)
-        # Stale head pose disarms the whole experiment and requires reset.
+        services = rosgraph.Master('/smoke').getSystemState()[2]
+        assert '/abc_swarm_demo/set_enabled' not in dict(services)
+        # An autonomous path stops on feedback loss; reset/restart is optional recovery,
+        # never a prerequisite for initial startup.
         pump(0.8, missing=1)
         assert runtime_states[-1]['state'] == 'fault', runtime_states[-1]
         assert not rospy.get_param('/abc_swarm_demo/enabled')
         zeros()
-        rospy.set_param('/abc_swarm_demo/enabled', True)
-        pump(0.2)
-        assert not rospy.get_param('/abc_swarm_demo/enabled')
-        zeros()
+        pump(0.3)
+        zeros()  # A path fault does not silently resume an old trajectory.
         reset = rospy.ServiceProxy('/abc_swarm_demo/reset', Trigger)
         poses[1] = (1, 2, 0)
         assert reset().success
         pump(0.5)
-        assert states[-1].startswith('ready'), states
+        assert states[-1] == 'tracking', states
         assert abs(paths[-1].poses[0].pose.position.x - 1) < 1e-6
-        # Preview stays fixed when a disabled vehicle is moved.
+        # Moving away from the frozen start is rejected, not silently re-anchored.
         poses[1] = (1.4, 2, 0)
-        pump(0.2)
-        assert abs(paths[-1].poses[0].pose.position.x - 1) < 1e-6
-        rospy.set_param('/abc_swarm_demo/enabled', True)
         pump(0.3)
+        assert abs(paths[-1].poses[0].pose.position.x - 1) < 1e-6
         assert runtime_states[-1]['state'] == 'fault', runtime_states[-1]
-        assert not rospy.get_param('/abc_swarm_demo/enabled')
         assert reset().success
         pump(0.5)
-        # Feed a synthetic lap to test ROS progress and normal completion.
         reference = preset_path(radius=0.4, origin=poses[1])
-        rospy.set_param('/abc_swarm_demo/enabled', True)
-        pump(0.2)
-        assert not reset().success
+        assert not reset().success  # Cannot replace a running trajectory.
         for i, point in enumerate(reference):
             poses[1] = (*point, 2 * math.pi * i / (len(reference) - 1))
             pump(0.06)
@@ -163,11 +153,7 @@ def main():
                           3: (-0.5, -0.5, 0) if formation == 'triangle' else (-1, 0, 0)})
             process = launch(formation)
             pump(3)
-            assert states[-1].startswith('ready'), states
-            for i in commands:
-                zeros(i)
-            rospy.set_param('/abc_swarm_demo/enabled', True)
-            pump(0.5)
+            assert process.poll() is None, 'required ROS node exited; inspect logs in ' + str(folder)
             assert states[-1] == 'tracking', states
             assert commands[1][-1][1] > 0
             # Feedback loss stops every controller through the shared enable.
@@ -180,7 +166,6 @@ def main():
             assert reset().success
             pump(0.4)
             reference = preset_path(radius=0.4)
-            rospy.set_param('/abc_swarm_demo/enabled', True)
             for j, point in enumerate(reference):
                 yaw = 2 * math.pi * j / (len(reference) - 1)
                 poses[1] = (*point, yaw)
@@ -199,7 +184,6 @@ def main():
                 zeros(i)
             stop(process)
         for formation in ('triangle', 'snake'):
-            # Manual leader input is gated by the same GUI lifecycle, not sent directly.
             root = Path(__file__).resolve().parents[2]
             poses.update({1: (0, 0, 0), 2: (-0.5, 0.5 if formation == 'triangle' else 0, 0),
                           3: (-0.5, -0.5, 0) if formation == 'triangle' else (-1, 0, 0)})
@@ -209,40 +193,35 @@ def main():
                              'robot_name_3:=path_test_03', 'start_driver:=false',
                              'start_vrpn:=false', 'start_teleop:=false', 'use_rviz:=false'], 'manual_' + formation)
             pump(3)
-            assert runtime_states[-1]['state'] == 'ready', runtime_states[-1]
+            assert process.poll() is None, 'required ROS node exited; inspect logs in ' + str(folder)
+            assert runtime_states[-1]['state'] == 'running', runtime_states[-1]
+            assert rospy.get_param('/abc_swarm_demo/enabled')
             raw = rospy.Publisher('/abc_swarm_demo/teleop_cmd', Twist, queue_size=1)
             pump(0.3)
             msg = Twist()
             msg.linear.x, msg.angular.z = 0.08, 0.2
-            raw.publish(msg)
-            pump(0.1)
-            zeros()
-            assert enable(True).success
-            pump(0.1)
-            zeros()  # No replay of a command received before arming.
             for i in range(8):
                 raw.publish(msg)
-                pump(0.05)
+                pump(0.05, odom_ahead=0.05)
             assert abs(commands[1][-1][1] - 0.08) < 1e-6, commands[1][-1]
+            assert runtime_states[-1]['state'] == 'running', runtime_states[-1]
             pump(0.6)
-            zeros()  # Expired input stops the head even while enabled.
-            assert enable(False).success
-            for i in range(4):
-                raw.publish(msg)
-                pump(0.05)
-            zeros()
-            assert enable(True).success
+            zeros()  # Expired input stops the head.
             pump(0.8, missing=1)
             assert not rospy.get_param('/abc_swarm_demo/enabled')
-            assert runtime_states[-1]['state'] == 'fault', runtime_states[-1]
-            assert not enable(True).success
+            assert runtime_states[-1]['state'] == 'waiting', runtime_states[-1]
+            for i in commands:
+                zeros(i)
             pump(0.4)
-            assert enable(True).success
-            pump(0.3)
-            zeros()
-            assert enable(False).success
+            assert runtime_states[-1]['state'] == 'running', runtime_states[-1]
+            zeros()  # Feedback recovery never replays a previous leader command.
+            pump(0.7, odom_ahead=0.3)
+            assert not rospy.get_param('/abc_swarm_demo/enabled')
+            assert 'ahead' in runtime_states[-1]['reason'], runtime_states[-1]
+            pump(0.4)
+            assert runtime_states[-1]['state'] == 'running', runtime_states[-1]
             stop(process)
-        # The selected PID comparison also uses the same gated head and stop service.
+        # PID comparison starts on valid feedback too, without an enable service.
         poses.update({1: (0, 0, 0), 2: (-0.8, 0.5, 0), 3: (-0.5, -0.5, 0)})
         process = start(['roslaunch', str(root / 'launch/mocap' /
                          'demo_mocap_three_mini_pid_tracking.launch'),
@@ -252,16 +231,17 @@ def main():
                          'start_driver:=false', 'start_vrpn:=false',
                          'start_teleop:=false', 'use_rviz:=false'], 'pid')
         pump(3)
-        assert runtime_states[-1]['state'] == 'ready', runtime_states[-1]
-        assert enable(True).success
-        pump(0.6)
+        assert process.poll() is None, 'required ROS node exited; inspect logs in ' + str(folder)
+        assert runtime_states[-1]['state'] == 'running', runtime_states[-1]
+        deadline = time.monotonic() + 8
+        while not (0 < commands[2][-1][1] <= 0.1) and time.monotonic() < deadline:
+            pump(0.1)
         assert 0 < commands[2][-1][1] <= 0.1, commands[2][-1]
-        assert enable(False).success
-        pump(0.4)
+        pump(0.8, missing=1)
         for i in commands:
             zeros(i)
         stop(process)
-        print('PASS: private ROS path preview, disabled/start/stop, stale TF, reset, moved start, lap completion both formations, GUI services, manual command gating and PID comparison')
+        print('PASS: private ROS automatic startup, stale-feedback stop, path reset/completion, manual recovery, clock-jitter tolerance and PID comparison; no arming service')
         print('Logs: ' + str(folder))
     finally:
         for process in reversed(processes):

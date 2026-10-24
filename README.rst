@@ -41,7 +41,7 @@ ABC Swarm is the developer manual for ROS2GO, Tianbot Mini and RoboMaster TT ROS
 
    roslaunch abc_swarm demo_mocap_formation_leader_follower_path_tracking.launch shape:=circle
 
-一个文件组合驱动、VRPN、算法和所需交互，运动默认禁用。
+一个文件组合驱动、VRPN、算法和所需交互，反馈有效后自动运行，无需手动启用服务。
 已有后台时传入 ``start_driver:=false start_vrpn:=false``。
 地址和端口只需在 ``config/mocap.yaml`` 配置，也可通过启动参数覆盖。
 准备好后使用统一服务开始、停止，具体摆位和路径范围先看文档。
@@ -80,4 +80,4 @@ GitHub 工作流会运行兼容检查、算法回归以及 Noetic 构建和合�
 AI 配置客户实验
 ----------------
 
-从设备清单、刚体、起始位置及实验需求生成 launch 和现场运行单，见 `AI 客户实验指南 <ai/README.md>`_。生成器离线运行，默认禁用运动；当前支持 Mini 单车/三车动捕实验。
+从设备清单、刚体、起始位置及实验需求生成 launch 和现场运行单，见 `AI 客户实验指南 <ai/README.md>`_。生成器离线运行，生成的 launch 在反馈有效后自动运行；当前支持 Mini 单车/三车动捕实验。

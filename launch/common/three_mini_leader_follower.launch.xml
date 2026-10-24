@@ -9,6 +9,7 @@
   <arg name="max_angular" default="0.6"/>
   <arg name="tf_timeout" default="0.5"/>
   <arg name="odom_timeout" default="0.5"/>
+  <arg name="odom_future_tolerance" default="0.1"/>
   <arg name="robot_name_1" default="tianbot_mini_01"/>
   <arg name="rigid_body_1" default="$(arg robot_name_1)"/>
   <arg name="robot_name_2" default="tianbot_mini_02"/>
@@ -29,6 +30,7 @@
     <arg name="max_angular" value="$(arg max_angular)"/>
     <arg name="tf_timeout" value="$(arg tf_timeout)"/>
     <arg name="odom_timeout" value="$(arg odom_timeout)"/>
+    <arg name="odom_future_tolerance" value="$(arg odom_future_tolerance)"/>
   </include>
   <include file="$(find abc_swarm)/launch/common/leader_follower_tracker.launch.xml" if="$(eval arg('formation') == 'triangle')">
     <arg name="leader_name" value="$(arg robot_name_1)"/>
@@ -44,6 +46,7 @@
     <arg name="max_angular" value="$(arg max_angular)"/>
     <arg name="tf_timeout" value="$(arg tf_timeout)"/>
     <arg name="odom_timeout" value="$(arg odom_timeout)"/>
+    <arg name="odom_future_tolerance" value="$(arg odom_future_tolerance)"/>
   </include>
   <include file="$(find abc_swarm)/launch/common/leader_follower_tracker.launch.xml" if="$(eval arg('formation') == 'snake')">
     <arg name="leader_name" value="$(arg robot_name_1)"/>
@@ -59,6 +62,7 @@
     <arg name="max_angular" value="$(arg max_angular)"/>
     <arg name="tf_timeout" value="$(arg tf_timeout)"/>
     <arg name="odom_timeout" value="$(arg odom_timeout)"/>
+    <arg name="odom_future_tolerance" value="$(arg odom_future_tolerance)"/>
   </include>
   <include file="$(find abc_swarm)/launch/common/leader_follower_tracker.launch.xml" if="$(eval arg('formation') == 'snake')">
     <arg name="leader_name" value="$(arg robot_name_2)"/>
@@ -74,5 +78,6 @@
     <arg name="max_angular" value="$(arg max_angular)"/>
     <arg name="tf_timeout" value="$(arg tf_timeout)"/>
     <arg name="odom_timeout" value="$(arg odom_timeout)"/>
+    <arg name="odom_future_tolerance" value="$(arg odom_future_tolerance)"/>
   </include>
 </launch>

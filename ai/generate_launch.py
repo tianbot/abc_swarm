@@ -42,9 +42,10 @@ def identifier(value, where):
 def validate(spec):
     hint = CATALOG['experiments'].get(spec.get('experiment'), {}) if isinstance(spec, dict) and isinstance(spec.get('experiment'), str) else {}
     point = hint.get('point', False)
-    orca = hint.get('orca', False)
+    coordinated = hint.get('coordinated')
+    orca = hint.get('orca', False) or bool(coordinated and spec.get('orca') is not None)
     fields(spec, 'contract_version name localization fixed_frame vrpn robots experiment path startup'
-           + (' targets' if point else ' spacing') + (' orca' if orca else ''), 'experiment')
+           + (' trajectory orca' if coordinated else (' targets' if point else ' spacing') + (' orca' if orca else '')), 'experiment')
     require(type(spec['contract_version']) is int and spec['contract_version'] == 2, 'contract_version: expected 2 (automatic startup; review v1 input before migrating)')
     identifier(spec['name'], 'name')
     for key in ('localization', 'fixed_frame'):
@@ -77,11 +78,26 @@ def validate(spec):
         raise ValueError('vrpn.server: explicit IPv4 address required, no substitutions')
     require(isinstance(spec['vrpn']['server'], str), 'vrpn.server: string required')
     require(type(spec['vrpn']['port']) is int and 1 <= spec['vrpn']['port'] <= 65535, 'vrpn.port: 1..65535')
-    if not point:
+    if not point and not coordinated:
         number(spec['spacing'], 'spacing', positive=True)
     fields(spec['startup'], 'start_driver start_vrpn use_rviz start_teleop', 'startup')
     for key, value in spec['startup'].items():
         require(type(value) is bool, 'startup.' + key + ': boolean required')
+    if coordinated:
+        require(not spec['startup']['start_teleop'], 'coordinated tracking cannot start teleop')
+        trajectory = spec['trajectory']
+        dimension = 'diameter' if coordinated=='circle' else 'side_length'
+        fields(trajectory, dimension + ' speed laps clockwise reference origin', 'trajectory')
+        number(trajectory[dimension], 'trajectory.'+dimension, positive=True)
+        require(trajectory[dimension]>=1.5, 'trajectory size must be at least 1.5 m')
+        number(trajectory['speed'], 'trajectory.speed', positive=True)
+        require(trajectory['speed']<=0.15, 'trajectory.speed must not exceed 0.15 m/s')
+        require(type(trajectory['laps']) is int and trajectory['laps']>=1, 'trajectory.laps: positive integer required')
+        require(type(trajectory['clockwise']) is bool, 'trajectory.clockwise must be boolean')
+        require(trajectory['reference'] in ('world','initial_leader'), 'trajectory.reference: world or initial_leader')
+        require(isinstance(trajectory['origin'],list) and len(trajectory['origin'])==3, 'trajectory.origin: [x_m,y_m,yaw_rad] required')
+        for value in trajectory['origin']:number(value,'trajectory.origin')
+        require(trajectory['reference']=='world' or trajectory['origin']==[0,0,0], 'trajectory.origin requires reference=world')
     if point:
         require(not spec['startup']['start_teleop'], 'point stabilization cannot start teleop')
         fields(spec['targets'], 'reference poses', 'targets')
@@ -98,8 +114,21 @@ def validate(spec):
             number(value, 'orca.' + key, positive=key not in ('safety_margin','right_bias','velocity_buffer'))
             require(value >= 0, 'orca.' + key + ': cannot be negative')
         d = spec['orca']['front_distance']
-        centers = [(x+d*math.cos(yaw),y+d*math.sin(yaw)) for x,y,yaw in spec['targets']['poses']]
+        if coordinated:
+            # Start-goal spacing lower bound; actual assembly still checks measured geometry.
+            size = spec['trajectory']['diameter' if coordinated=='circle' else 'side_length']
+            sign = -1 if spec['trajectory']['clockwise'] else 1
+            if coordinated=='circle':
+                local = [(size/2*math.sin(2*math.pi*i/3), sign*size/2*(1-math.cos(2*math.pi*i/3)), sign*2*math.pi*i/3) for i in range(3)]
+            else:
+                local = [(0,0,0),(size,0,sign*2*math.pi/3),(size/2,sign*math.sqrt(3)*size/2,sign*4*math.pi/3)]
+            centers = [(x+d*math.cos(yaw),y+d*math.sin(yaw)) for x,y,yaw in local]
+        else:
+            centers = [(x+d*math.cos(yaw),y+d*math.sin(yaw)) for x,y,yaw in spec['targets']['poses']]
         clearance = 2*(spec['orca']['robot_radius']+spec['orca']['safety_margin']+d) + 2*spec['orca']['velocity_buffer']*spec['orca']['time_horizon']
+        if coordinated:
+            nominal = math.sqrt(3)*size/2 if coordinated=='circle' else size/2
+            require(nominal > clearance+0.10, 'orca: loop spacing cannot fit configured envelopes and phase window')
         require(all(math.hypot(a[0]-b[0],a[1]-b[1])>clearance for i,a in enumerate(centers) for b in centers[:i]),
                 'orca: target effective envelopes overlap; separate target poses')
     if capability['path']:
@@ -131,16 +160,21 @@ def render(spec):
         ET.SubElement(root, 'arg', name=key, default=text_value(value))
     include = ET.SubElement(root, 'include', file='$(find abc_swarm)/launch/mocap/' + capability['launch'])
     args = {'vrpn_server_ip': spec['vrpn']['server'], 'vrpn_port': spec['vrpn']['port']}
-    if not capability.get('point'):
+    if not capability.get('point') and not capability.get('coordinated'):
         args['spacing'] = spec['spacing']
     for key in spec['startup']:
-        if key != 'start_teleop' or not (capability['path'] or capability.get('point')):
+        if key != 'start_teleop' or not (capability['path'] or capability.get('point') or capability.get('coordinated')):
             args[key] = '$(arg ' + key + ')'
     for i, robot in enumerate(spec['robots'], 1):
         args['robot_name_' + str(i)] = robot['name']
         args['rigid_body_' + str(i)] = robot['rigid_body']
     if capability['path']:
         args.update(spec['path'])
+    if capability.get('coordinated'):
+        args.update({key:value for key,value in spec['trajectory'].items() if key!='origin'})
+        args.update(dict(zip(('origin_x','origin_y','origin_yaw'),spec['trajectory']['origin'])))
+        args['avoidance'] = 'orca' if spec['orca'] is not None else 'none'
+
     for key, value in args.items():
         ET.SubElement(include, 'arg', name=key, value=text_value(value))
     template = HERE.parent / 'launch/mocap' / capability['launch']
@@ -150,7 +184,7 @@ def render(spec):
         for key, value in [('target_reference', spec['targets']['reference']),
                            ('target_poses', spec['targets']['poses'])]:
             ET.SubElement(root, 'rosparam', param='/abc_swarm_demo/' + key).text = json.dumps(value)
-    if capability.get('orca'):
+    if capability.get('orca') or (capability.get('coordinated') and spec['orca'] is not None):
         ET.SubElement(root, 'rosparam', param='/abc_swarm_demo/orca').text = json.dumps(spec['orca'])
     # Python 3.8 (Noetic) has no ET.indent.
     return minidom.parseString(ET.tostring(root, encoding='utf-8')).toprettyxml(indent='  ')
@@ -158,6 +192,8 @@ def render(spec):
 
 def report(spec):
     capability = validate(spec)
+    if capability.get('coordinated'):
+        return loop_report(spec)
     if capability.get('point'):
         return point_report(spec)
     lines = ['# 客户实验运行单', '', '实验：`{}`；入口：`{}`。'.format(spec['experiment'], capability['launch']),
@@ -219,6 +255,29 @@ def point_report(spec):
     return '\n'.join(lines)
 
 
+def loop_report(spec):
+    shape=CATALOG['experiments'][spec['experiment']]['coordinated']
+    task=spec['trajectory']
+    lines=['# 三车动捕协调路径运行单', '',
+           ('任务：同一个圆，三车相隔约120°、同向绕行。' if shape=='circle' else '任务：正三角形三个顶点，每轮各走一条直边，到齐停车并原地转向后一起走下一边。'),
+           '参数：'+json.dumps(task,ensure_ascii=False),
+           'reference=initial_leader 时，按01启动实际位姿冻结第一起点及切线/第一条边；world 时 origin 是这一参考位姿，不能当成圆心。',
+           '流程：全体点镇定到起点/朝向并稳定 → 协调路径跟踪 → 指定圈数完成停车，没有人工启用 service。',
+           ('起点点镇定启用 ORCA，需三车有效 odom；路径段保持几何跟踪，不提供全程 ORCA 避障。' if spec['orca'] is not None else '起点点镇定未启用 ORCA；请准备互不冲突的摆位通道。路径段没有障碍感知。'), '',
+           '| 设备 | 动捕刚体 | 初始位姿记录 |','| --- | --- | --- |']
+    for robot in spec['robots']:
+        lines.append('| {} | {} | {} |'.format(robot['name'],robot['rigid_body'],robot['initial_pose']))
+    lines += ['', '启动前退出旧实验并核对完整活动范围。相位协调会降低快车速度以等待最慢车，0.15为上限。',
+              '加载 Noetic 和对应工作空间后，只解析：', '', '```bash',
+              'roslaunch --nodes ./experiment.launch start_driver:=false start_vrpn:=false use_rviz:=false','```','',
+              '由现场操作人员启动（反馈齐全即自动运动）：','','```bash','roslaunch ./experiment.launch','```','',
+              '```bash','rostopic echo /abc_swarm_demo/status','```','',
+              'mode=coordinated_tracking；stage 显示 assembling/tracking_circle/tracking_edge/turning/finishing/completed。',
+              '任一必需反馈失效全组停车，恢复后继续冻结的任务；偏离路径或无进展会 fault，需检查并重启。',
+              '停止用 roslaunch 终端 Ctrl+C，并确认实际静止。离线生成检查通过；ROS/实车验收需另记，不能把坐标示例当成已确认场地。','']
+    return '\n'.join(lines)
+
+
 def unique_pairs(pairs):
     result = {}
     for key, value in pairs:
@@ -238,6 +297,9 @@ def bundle(spec):
                       HERE.parent / 'config/point_control.cfg'])
     if validate(spec).get('orca'):
         paths.extend([HERE.parent / 'config/orca.yaml', HERE.parent / 'licenses/orca/UPSTREAM.json'])
+    if validate(spec).get('coordinated'):
+        paths.extend([HERE.parent / 'config/coordinated_tracking.yaml',HERE.parent / 'config/point_stabilization.yaml',
+                      HERE.parent / 'config/orca.yaml',HERE.parent / 'config/point_control.cfg'])
     hashes = {str(p.relative_to(HERE.parent)): hashlib.sha256(p.read_bytes()).hexdigest() for p in paths}
     return {'composition.sha256.json': json.dumps(hashes, indent=2, sort_keys=True) + '\n', ** {'experiment.json': json.dumps(spec, ensure_ascii=False, indent=2, allow_nan=False) + '\n',
             'experiment.launch': render(spec), 'README.md': report(spec)}}

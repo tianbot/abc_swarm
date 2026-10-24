@@ -8,12 +8,13 @@ import threading
 
 import rospy
 import tf
-from geometry_msgs.msg import Pose, PoseArray, Twist
+from geometry_msgs.msg import Pose, PoseArray, PoseStamped, Twist
 from std_msgs.msg import String
-from nav_msgs.msg import Odometry
+from nav_msgs.msg import Odometry, Path
 from dynamic_reconfigure.server import Server
 from abc_swarm.cfg import point_controlConfig
 
+from abc_swarm.coordinated_loop import CoordinatedLoop, LoopFault, loop_geometry
 from abc_swarm.orca import OrcaBlocked, orca_velocities
 from abc_swarm.feedback import odometry_error
 from abc_swarm.point_control import formation_targets, point_velocity, validate_pose, world_goals
@@ -22,9 +23,38 @@ from abc_swarm.point_control import formation_targets, point_velocity, validate_
 class PointStabilization:
     def __init__(self):
         self.fixed = rospy.get_param('~fixed_frame', 'world')
+        self.task = rospy.get_param('~task', 'point')
+        if self.task not in ('point','circle','triangle'):
+            raise ValueError('task must be point, circle or triangle')
+        self.loop = None
+        self.loop_options = None
+        self.loop_reference = 'initial_leader'
+        self.loop_origin = (0,0,0)
+        self.last_step_time = None
+        if self.task != 'point':
+            self.loop_options = rospy.get_param('~coordinated')
+            expected = {'diameter','side_length','clockwise','laps','speed','reference','origin',
+                        'lookahead','phase_window','settle_time','max_error','progress_timeout'}
+            if not isinstance(self.loop_options,dict) or set(self.loop_options)!=expected:
+                raise ValueError('Coordinated config fields do not match the launch contract')
+            self.loop_options = dict(self.loop_options)
+            self.loop_reference = self.loop_options.pop('reference')
+            self.loop_origin = self.loop_options.pop('origin')
+            if self.loop_reference not in ('world','initial_leader'):
+                raise ValueError('Coordinated reference must be world or initial_leader')
+            validate_pose(self.loop_origin)
+            if self.loop_reference=='initial_leader' and any(value!=0 for value in self.loop_origin):
+                raise ValueError('Configure reference=world to set an explicit origin')
+            CoordinatedLoop(self.task,origin=self.loop_origin,**self.loop_options)  # Validate before publishers.
+
         self.robots = rospy.get_param('~robots')
         self.formation = rospy.get_param('~formation', 'config')
-        if self.formation == 'config':
+        if self.task != 'point':
+            self.formation = self.task
+            self.targets = loop_geometry(self.task, self.loop_options['diameter'], self.loop_options['side_length'],
+                                         self.loop_options['clockwise'])[0]
+            self.reference = self.loop_reference
+        elif self.formation == 'config':
             self.targets = rospy.get_param('~target_poses')
             self.reference = rospy.get_param('~target_reference', 'initial_leader')
         else:
@@ -52,6 +82,8 @@ class PointStabilization:
                 raise ValueError('Duplicate robot ' + key)
         if not isinstance(self.targets, (list, tuple)) or len(self.targets) != len(self.robots):
             raise ValueError('One explicit target pose is required for every robot')
+        if self.task != 'point' and len(self.robots)!=3:
+            raise ValueError('Coordinated loops require exactly three robots')
         world_goals(self.targets, self.reference, (0, 0, 0))
         point_velocity((0, 0, 0), (0, 0, 0), **self.control)
         self.avoidance = rospy.get_param('~avoidance', 'none')
@@ -78,11 +110,18 @@ class PointStabilization:
             self.odom_timeout = cfg['odom_timeout']
             self.future_tolerance = cfg['odom_future_tolerance']
             self.stall_timeout = cfg['stall_timeout']
+            if self.task != 'point':
+                nominal = math.sqrt(3)*self.loop_options['diameter']/2 if self.task=='circle' else self.loop_options['side_length']/2
+                reserve = 2*(cfg['robot_radius']+cfg['safety_margin']+cfg['front_distance']) + self.loop_options['phase_window'] + 2*cfg['velocity_buffer']*cfg['time_horizon']
+                if nominal <= reserve:
+                    raise ValueError('Loop geometry cannot fit the configured ORCA envelopes and progress spacing')
         self.listener = tf.TransformListener()
         self.outputs = [rospy.Publisher('/' + r['name'] + '/cmd_vel', Twist, queue_size=1)
                         for r in self.robots]
         self.status_pub = rospy.Publisher('~status', String, queue_size=1, latch=True)
         self.goals_pub = rospy.Publisher('~goals', PoseArray, queue_size=1, latch=True)
+        self.path_outputs = [rospy.Publisher('~paths/'+r['name'], Path, queue_size=1, latch=True)
+                             for r in self.robots] if self.task != 'point' else []
         self.goals = None
         self.completed = False
         self.final_details = []
@@ -159,8 +198,15 @@ class PointStabilization:
         self.goals_pub.publish(msg)
 
     def status(self, state, reason, details=None):
-        value = json.dumps({'schema_version': 2, 'mode': 'point_stabilization',
-                            'avoidance': self.avoidance, 'state': state, 'ready': state in ('running', 'completed'),
+        value = json.dumps({'schema_version': 2, 'mode': 'point_stabilization' if self.task=='point' else 'coordinated_tracking',
+                            'task': self.task, 'stage': self.loop.stage if self.loop is not None else (state if self.task=='point' else 'waiting'),
+                            'common_progress': self.loop.common_progress if self.loop is not None else 0.0,
+                            'progress_spread': self.loop.progress_spread if self.loop is not None else 0.0,
+                            'edge_rounds_completed': self.loop.rounds_completed if self.loop is not None else 0,
+                            'avoidance': self.avoidance,
+                            'avoidance_scope': 'point' if self.task=='point' else 'assembly',
+                            'avoidance_active': self.avoidance=='orca' and state=='running' and (self.task=='point' or (self.loop is not None and self.loop.stage=='assembling')),
+                            'state': state, 'ready': state in ('running', 'completed'),
                             'enabled': state == 'running', 'reason': reason,
                             'robots': details or [], 'target_reference': self.reference, 'formation': self.formation,
                             'vrpn_server': rospy.get_param('/vrpn_client_node/server', ''),
@@ -170,6 +216,43 @@ class PointStabilization:
             self.status_pub.publish(String(data=value))
             self.last_status, self.last_publish = value, time.monotonic()
 
+    def publish_paths(self):
+        for points,output in zip(self.loop.paths,self.path_outputs):
+            path = Path();path.header.frame_id = self.fixed;path.header.stamp = rospy.Time.now()
+            for i,(x,y) in enumerate(points):
+                msg = PoseStamped();msg.header = path.header
+                msg.pose.position.x,msg.pose.position.y = x,y
+                nxt = points[(i+1) % (len(points)-1)]
+                yaw = math.atan2(nxt[1]-y,nxt[0]-x)
+                q = tf.transformations.quaternion_from_euler(0,0,yaw)
+                (msg.pose.orientation.x,msg.pose.orientation.y,msg.pose.orientation.z,msg.pose.orientation.w) = q
+                path.poses.append(msg)
+            output.publish(path)
+
+    def step_coordinated(self,poses,measured):
+        if self.loop is None:
+            origin = poses[0] if self.loop_reference=='initial_leader' else self.loop_origin
+            self.loop = CoordinatedLoop(self.task,origin=origin,**self.loop_options)
+            self.publish_paths()
+        now = time.monotonic()
+        dt = .05 if self.last_step_time is None else max(.001,min(.1,now-self.last_step_time))
+        self.last_step_time = now
+        commands = self.loop.step(poses,self.control,dt,measured,
+                                  self.orca if self.avoidance=='orca' else None)
+        if self.goals != self.loop.goals:
+            self.goals = list(self.loop.goals);self.publish_goals()
+        self.completed = self.loop.completed
+        details = []
+        for robot,pose,goal,(v,w,phase),output,error in zip(
+                self.robots,poses,self.goals,commands,self.outputs,self.loop.errors):
+            cmd = Twist();cmd.linear.x,cmd.angular.z = v,w;output.publish(cmd)
+            details.append({'name':robot['name'],'frame':robot['frame'],'goal':goal,'phase':phase,
+                            'position_error':math.hypot(goal[0]-pose[0],goal[1]-pose[1]),
+                            'yaw_error':math.atan2(math.sin(goal[2]-pose[2]),math.cos(goal[2]-pose[2])),
+                            'path_error':error,'command':[v,w]})
+        self.status('completed' if self.completed else 'running',
+                    'coordinated '+self.task+': '+self.loop.stage,details)
+
     def step(self):
         try:
             if self.avoidance_fault:
@@ -178,6 +261,9 @@ class PointStabilization:
                 return
             poses = self.poses()  # Validate the entire group before publishing any motion.
             measured = self.measured_velocities() if self.avoidance == 'orca' else None
+            if self.task != 'point':
+                self.step_coordinated(poses,measured)
+                return
             if self.goals is None:
                 self.goals = world_goals(self.targets, self.reference, poses[0])
                 self.publish_goals()
@@ -211,11 +297,12 @@ class PointStabilization:
             self.final_details = details
             self.status('completed' if self.completed else 'running',
                         'all target poses reached' if self.completed else 'tracking frozen target poses', details)
-        except OrcaBlocked as exc:
+        except (OrcaBlocked, LoopFault) as exc:
             self.avoidance_fault = str(exc)
             self.stop()
             self.status('fault', self.avoidance_fault)
         except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException, ValueError) as exc:
+            self.last_step_time = None
             if self.avoidance == 'orca' and self.progress_time is not None:
                 self.progress_time = time.monotonic()  # Feedback downtime is not planning stall time.
             self.stop()

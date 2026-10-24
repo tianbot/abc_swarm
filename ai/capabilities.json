@@ -49,6 +49,20 @@
       "point": true,
       "orca": true,
       "launch": "demo_mocap_three_mini_orca_point_stabilization.launch"
+    },
+    "coordinated_circle": {
+      "robots": 3,
+      "formation": "coordinated",
+      "path": false,
+      "coordinated": "circle",
+      "launch": "demo_mocap_three_mini_circle_tracking.launch"
+    },
+    "coordinated_triangle": {
+      "robots": 3,
+      "formation": "coordinated",
+      "path": false,
+      "coordinated": "triangle",
+      "launch": "demo_mocap_three_mini_triangle_tracking.launch"
     }
   }
 }

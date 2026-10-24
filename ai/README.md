@@ -59,6 +59,8 @@ python3 ai/generate_launch.py /tmp/customer-demo/experiment.json --output /tmp/c
 | path_snake | 3 | 预设路径 | 逐车跟随 |
 | point_stabilization | 3 | 各自位置与最终航向 | 独立目标，无跟随拓扑 |
 | point_stabilization_orca | 3 | 同上，途中车车避让 | 仅 mocap，需三车实际 odom |
+| coordinated_circle | 3 | 自动起点点镇定后同圆跟踪 | 约120°间隔，等待最慢车 |
+| coordinated_triangle | 3 | 自动起点点镇定后逐边跟踪 | 正三角形，顶点到齐再原地转向 |
 
 - 当前 model 仅 `tianbot_mini`，localization 仅 `mocap_vrpn`，fixed_frame 仅 `world`。型号、定位来源和数量不匹配就拒绝。比如“5 台 Mini”“Mini 混 RMTT”“Gazebo 下同一份新实验”当前均报告不支持，原视频 Gazebo 用法不受影响。
 - `name` 是交付名称；每台 `name` 是 ROS 名称，`rigid_body` 是 VRPN 刚体/frame；采用字母开头的扁平字母数字下划线名称，名称和刚体分别不能重复。不接收任意 topic/frame 表达式。
@@ -133,3 +135,14 @@ targets 包含 reference（world 或 initial_leader）与 poses（三个 [x_m,y_
 已增加 point_stabilization_orca，见 `orca.example.json` 与 [ORCA 实验说明](../docs/orca.md)。它复用点镇定，额外要求 orca 对象明确声明 robot_radius、safety_margin、front_distance、time_horizon、right_bias、velocity_buffer、odom_timeout、odom_future_tolerance、stall_timeout。生成器只将经过验证的数值写入固定 ROS 参数，不接收代码或任意节点。
 
 AI 必须说明：仅避让本实验三车，三车都需要有效动捕 TF 与实际 odom；启动后自动运动，可能倒车。半径按实际车体/动捕参考点核对；没有静态障碍感知、全局规划或任意目标可达保证。无解、包络冲突及长期无进展会停车报 fault，不能标为成功。目前范围以本节及 ORCA 指南为准，实车尚未验收。
+
+
+## 三车动捕同圆/三角形协调路径
+
+已提供 coordinated_circle 与 coordinated_triangle，示例分别为 coordinated-circle.example.json 和 coordinated-triangle.example.json，见 [使用指南](../docs/coordinated-tracking.md)。仍是 contract_version=2 的新增任务，旧输入不变。
+
+这两个任务用 trajectory 与 orca 取代 spacing/targets，path=null。trajectory 的公共字段为 speed/laps/clockwise/reference/origin，圆额外要求 diameter，三角形额外要求 side_length。尺寸至少1.5m，速度≤0.15m/s，AI 圈数为正整数。origin 是第一起点位姿，reference=initial_leader 时必须为[0,0,0]；world 时用显式世界坐标。两个任务自动先点镇定并等全体到齐，再执行协调跟踪，不需启用 service。
+
+orca=null 表示未启用避障，或提供与 ORCA 示例相同的完整对象。ORCA 仅作用于起点点镇定，路径跟踪不主动绕障；必须向客户说明，不能将此字段宣传成全程避障。所有尺寸、反馈条件、状态与边界按新指南执行。
+
+同圆任务是三车在同一个圆上约120°间隔；三角形是正三角形三个顶点，逐边到齐停车、原地转向后同步走下一边。不要用旧的头车路径+后车跟随入口替代它们，不要生成圆角三角形或三个独立圆。

@@ -22,7 +22,9 @@ def scenario(experiment):
     cap = harness.CATALOG['experiments'][experiment]
     spec['experiment'] = experiment
     spec['robots'] = spec['robots'][:cap['robots']]
-    if cap.get('point'):
+    if cap.get('coordinated'):
+        spec = json.loads((ROOT / ('ai/coordinated-'+cap['coordinated']+'.example.json')).read_text())
+    elif cap.get('point'):
         spec = json.loads((ROOT / ('ai/orca.example.json' if cap.get('orca') else 'ai/point-stabilization.example.json')).read_text())
     elif not cap['path']:
         spec['path'] = None
@@ -152,6 +154,21 @@ class AIHarnessTests(unittest.TestCase):
                        lambda s:s['targets'].update(poses=[[0,0,0],[0,0,0],[1,1,0]])]:
             invalid=copy.deepcopy(spec);change(invalid)
             with self.assertRaises(ValueError):harness.bundle(invalid)
+
+    def test_coordinated_contract_geometry_and_startup_are_explicit(self):
+        for experiment in ('coordinated_circle','coordinated_triangle'):
+            spec=scenario(experiment)
+            self.assertIn('协调路径',harness.report(spec))
+            self.assertIn('origin_x',harness.render(spec))
+            size='diameter' if experiment.endswith('circle') else 'side_length'
+            for change in [lambda s:s['trajectory'].update(speed=.16),lambda s:s['trajectory'].update(laps=0),
+                           lambda s:s['trajectory'].update(reference='bad'),lambda s:s['trajectory'].update(clockwise='false'),
+                           lambda s:s['trajectory'].__setitem__(size,1),lambda s:s['startup'].update(start_teleop=True),
+                           lambda s:s.pop('orca')]:
+                invalid=copy.deepcopy(spec);change(invalid)
+                with self.assertRaises(ValueError):harness.bundle(invalid)
+            spec['orca']=scenario('point_stabilization_orca')['orca']
+            self.assertIn('/abc_swarm_demo/orca',harness.render(spec))
 
     def test_duplicate_json_keys_rejected_without_creating_output(self):
         with tempfile.TemporaryDirectory() as directory:

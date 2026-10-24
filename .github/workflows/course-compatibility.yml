@@ -37,6 +37,11 @@ jobs:
           PYTHONPATH: src
         run: python3 -m unittest discover -s tests -p test_orca.py -v
 
+      - name: Check coordinated loop geometry and barriers without ROS
+        env:
+          PYTHONPATH: src
+        run: python3 -m unittest discover -s tests -p test_coordinated_loop.py -v
+
   noetic_build_tests:
     name: Noetic build and tests
     needs: course_compatibility
@@ -110,6 +115,11 @@ jobs:
           python3 "$ai_dir/generate_launch.py" "$RUNNER_TEMP/customer-point-demo/experiment.json" --output "$RUNNER_TEMP/customer-point-demo" --check
           python3 "$ai_dir/generate_launch.py" "$ai_dir/orca.example.json" --output "$RUNNER_TEMP/customer-orca-demo"
           python3 "$ai_dir/generate_launch.py" "$RUNNER_TEMP/customer-orca-demo/experiment.json" --output "$RUNNER_TEMP/customer-orca-demo" --check
+          for loop_shape in circle triangle
+          do
+            python3 "$ai_dir/generate_launch.py" "$ai_dir/coordinated-$loop_shape.example.json" --output "$RUNNER_TEMP/customer-$loop_shape-demo"
+            python3 "$ai_dir/generate_launch.py" "$RUNNER_TEMP/customer-$loop_shape-demo/experiment.json" --output "$RUNNER_TEMP/customer-$loop_shape-demo" --check
+          done
       - name: Run isolated synthetic ROS integration
         run: |
           source "$RUNNER_TEMP/abc_swarm_ws/install/setup.bash"
@@ -125,3 +135,8 @@ jobs:
           source "$RUNNER_TEMP/abc_swarm_ws/install/setup.bash"
           # Private loopback master 11435; synthetic TF/odom; driver/VRPN/UI off.
           python3 tests/ros/orca_point_smoke.py
+      - name: Run isolated mocap three-robot coordinated loops
+        run: |
+          source "$RUNNER_TEMP/abc_swarm_ws/install/setup.bash"
+          # Private loopback master 11436, synthetic TF/odom, driver/VRPN/UI off.
+          python3 tests/ros/coordinated_loop_smoke.py

@@ -11,7 +11,8 @@ import roslaunch
 ROOT = Path(__file__).resolve().parents[1]
 DEMOS = sorted(p for p in (ROOT / 'launch/mocap').glob('*.launch')
                if not p.name.startswith('demo_mocap_tf_tt_')
-               and 'point_stabilization' not in p.name)  # Covered by test_point_entrypoints.py.
+               and 'point_stabilization' not in p.name
+               and p.name not in ('demo_mocap_three_mini_circle_tracking.launch','demo_mocap_three_mini_triangle_tracking.launch'))  # Covered by test_point_entrypoints.py.
 
 
 def load(path, argv=None):
@@ -33,7 +34,7 @@ class DemoEntrypointTests(unittest.TestCase):
         harness = runpy.run_path(str(ROOT / 'ai/generate_launch.py'))
         example = json.loads((ROOT / 'ai/experiment.example.json').read_text())
         for experiment, cap in harness['CATALOG']['experiments'].items():
-            if cap.get('point'):
+            if cap.get('point') or cap.get('coordinated'):
                 continue  # Its non-following role mapping is checked in test_point_entrypoints.py.
             with self.subTest(experiment=experiment), tempfile.TemporaryDirectory() as folder:
                 spec = copy.deepcopy(example)

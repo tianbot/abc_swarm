@@ -6,6 +6,8 @@
 
 当前用户指南：
 
+- [三车动捕同圆绕行与正三角形逐边运动](coordinated-tracking.md)
+
 - [动捕点镇定中的 ORCA 车车避让](orca.md)
 
 - [随包第三方代码与许可证](third-party.md)

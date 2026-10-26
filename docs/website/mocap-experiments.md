@@ -1,6 +1,6 @@
 # Mini 三车动捕集群实验
 
-> Tianbot Docs 页面草稿，尚未发布。建议放在原 swarm 课程旁，保留原课程 URL。本页用于新增设备实验，不替代原视频教程。
+> Tianbot Docs 页面草稿，尚未发布。建议放在原 swarm 课程旁，保留原课程 URL。本页用于新增设备实验，不替代原视频教程。当前四项主实验和参数以[现场使用指南](../mocap-field-use.md)为准。
 
 本实验使用三台 Tianbot Mini 和动捕系统，观察三角形编队、逐车跟随以及预设路径下的集群运动。NOKOV 是动捕合作伙伴，ROS 当前通过 VRPN 获取位姿。没有动捕的原课程继续使用已有激光地图等实验，不要求重新录制视频。
 
@@ -16,7 +16,7 @@
 roslaunch abc_swarm demo_mocap_three_mini_leader_follower_triangle.launch
 ```
 
-观察统一状态，确认持续有效定位、实际前车里程计和摆位后反馈就绪后自动运行：
+默认先通过动捕反馈自动入位，进入following后接收遥控；速度来自动捕差分。观察统一状态：
 
 ```bash
 rostopic echo /abc_swarm_demo/status

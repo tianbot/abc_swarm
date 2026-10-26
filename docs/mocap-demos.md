@@ -1,12 +1,12 @@
 # 三车动捕实验
 
-首次现场复验直接按 [现场测试清单](field-test.md) 操作；下文保留完整实验说明。
+四项主实验按[现场使用](mocap-field-use.md)操作。本页另保留独立路径组合的用法。
 
 本轮从原 main 摘取有用的新功能，不转换原有无动捕实车 demo，也不增加 Gazebo 实验。Mini 三车仍为 `tianbot_mini_01/02/03`，动捕刚体默认同名，服务器和端口统一在 `config/mocap.yaml`。NOKOV 是动捕合作伙伴，当前通过 VRPN 接入。
 
 ## 从哪里找
 
-- 原视频脚本仍在 `nodes/`，原九个文件不动；四个新可执行节点也在同一目录。原课程 launch 保持原位。
+- 原视频脚本仍在 `nodes/`，原九个文件不动；新增可执行节点也在同一目录。原课程 launch 保持原位。
 - 新动捕入口都在 `launch/mocap/` 一层，名称全部为 `demo_mocap_*`。
 - 不再单独设置 `scripts/`；leader-follower、PID 对照、预设路径跟踪、统一运行节点都从 `nodes/` 查找。
 - 少量控制计算在 `src/abc_swarm/` 一层，供实车和未来的仿真复用，不带 sim/mocap 后缀。
@@ -18,7 +18,7 @@
 
 终端加载 `/opt/ros/noetic/setup.bash` 和 `~/tianbot_mini_ws/devel/setup.bash`。新增脚本后按根 README 编译本包；所需外部驱动快照在 `dependencies.repos`，RMTT 依赖只供原空地实验参考。
 
-动捕应持续发布 world 下刚体，原点对应底盘控制参考点，x 向前、y 向左、z 向上。leader-follower 还需前车带有效时间戳的实际 odom 速度。若车名与刚体不同，用 `robot_name_N`、`rigid_body_N` 分别指定。
+动捕应持续发布 world 下刚体，原点对应底盘控制参考点，x 向前、y 向左、z 向上。统一三角/蛇形任务默认以动捕差分获得速度；本页后半的独立路径组合仍需前车带有效时间戳的实际odom。若车名与刚体不同，用 `robot_name_N`、`rigid_body_N` 分别指定。
 
 三角形：三车同向，02 在 01 后方 0.5 m、左侧 0.5 m，03 在后方 0.5 m、右侧 0.5 m。拓扑为 01→02、01→03。
 
@@ -36,7 +36,7 @@ roslaunch abc_swarm demo_mocap_three_mini_leader_follower_triangle.launch
 roslaunch abc_swarm demo_mocap_three_mini_leader_follower_snake.launch
 ```
 
-默认同时启动 socket 驱动、VRPN、控制器和键盘终端；反馈有效后自动运行，后车可立即向编队位置收敛。已有后台时传 `start_driver:=false start_vrpn:=false`。只保留一套控制同组车辆的算法。
+默认同时启动 socket 驱动、VRPN、控制器和键盘终端；反馈有效后先自动入队，阶段到following后接收头车遥控。已有后台时传 `start_driver:=false start_vrpn:=false`。只保留一套控制同组车辆的算法。
 
 启动前摆好车并确认活动空间；启动后观察统一状态：
 
@@ -44,10 +44,7 @@ roslaunch abc_swarm demo_mocap_three_mini_leader_follower_snake.launch
 rostopic echo /abc_swarm_demo/status
 ```
 
-反馈就绪后自动运行：
-
-
-键盘 i 前进，u/o 缓弯，k 停止。遥控请求初始 0.15 m/s、0.15 rad/s；统一入口超过 0.3 秒没有新指令时停车。旧键盘版本需要持续按键。GUI 接管时关闭默认键盘，并向 `/abc_swarm_demo/teleop_cmd` 发布，不能另开节点直接争用头车 cmd_vel。
+键盘 i 前进，u/o 缓弯，k 停止头车请求。请求初始值为0.15m/s、0.6rad/s；统一入口超过0.3秒没有新指令时停止头车请求。在following且反馈有效、请求未超时时，头车原样转发该请求，不再限幅或按队形误差缩放。GUI接管时关闭默认键盘，并向 `/abc_swarm_demo/teleop_cmd` 发布，实际各车指令查看各自 `/机器人名/cmd_vel`。
 
 停止整套实验：在 roslaunch 终端按 Ctrl+C，并确认三车静止。
 
@@ -90,9 +87,9 @@ rosservice call /abc_swarm_demo/reset
 
 ## 边界
 
-控制器没有避障。leader-follower 控制车体前方 0.1 m 的点，该点误差与车体参考点误差不同，不单独约束最终朝向。TF 时间检查也不能识别服务器用新时间戳反复发送冻结姿态；底盘急停、模式和断网停车仍须现场确认。
+跟随阶段没有全程避障；默认startup=true的启动入位包含ORCA，旧独立路径组合及startup=false直接跟随不包含该入位流程。移动时leader-follower控制车体前方0.1m的点，该点误差与车体参考点误差不同；前车停止时后车仍使用同一前置点跟随控制律，不自动切换点镇定。TF时间检查不能识别服务器用新时间戳反复发送冻结姿态；底盘急停、模式和断网停车仍须现场确认。
 
 这一分支完成静态与合成反馈验证后，仍需现场复验。过去三车手动领航的测试不能代替新分支和自动路径实验的实际验收。统一参数、服务和 GUI 生命周期见 [运行接口](demo-runtime.md)。
 
 
-当前默认直线速度为 0.15 m/s：手动领航的键盘请求、运行节点及后车限幅共同使用 max_linear；路径 speed 默认为 0.15，后车限幅同为 0.15。点镇定详见[任务选择](point-stabilization.md)。0.15 是请求/上限，转弯与接近目标会减速；跟随算法还会按误差调整速度，不能保证每车每时刻都以同一速度运动。外侧车辆受相同限幅时，提速转弯会增大跟随误差，需现场验收。
+人工遥控初始请求由teleop_linear/teleop_angular设置，算法限幅由follow_config配置，互不覆盖。auto头车速度speed默认0.08m/s；本页独立路径组合默认0.15m/s。路径速度不代表每车的恒定实测速度。点镇定与参数归属见[说明](point-stabilization.md)。

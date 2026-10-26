@@ -59,7 +59,7 @@ roslaunch abc_swarm demo_mocap_three_mini_point_stabilization.launch formation:=
 
 点镇定蛇形是“排成一列并停住”，不等于 01→02→03 的持续跟随。它完成后不会自动切换到跟随实验。自定义 world 文件可以给 01 也指定新位置，使三台车都移动。
 
-直线速度默认上限为 0.15 m/s，可通过 `max_linear:=0.15` 覆盖；不传时使用目标配置文件的 max_linear。它不是全程恒速：接近目标会按距离减速，转向/最终对齐航向时直线速度为零。没有改角速度限制。
+直线速度默认上限为 0.15 m/s，可通过max_linear显式覆盖；不传时使用control_config的max_linear。它不是全程恒速：接近目标会按距离减速，转向/最终对齐航向时直线速度为零。没有改角速度限制。
 
 ## 看目标、误差和结束
 
@@ -67,9 +67,21 @@ roslaunch abc_swarm demo_mocap_three_mini_point_stabilization.launch formation:=
 rostopic echo /abc_swarm_demo/status
 ```
 
-状态是 JSON：mode=point_stabilization；waiting 表示某台定位缺失/过期；running 表示自动执行；completed 表示所有位置和航向都进入容差。robots 字段包含每车 goal、phase、position_error 和 yaw_error。
+状态是 JSON：mode=point_stabilization；waiting 表示某台定位缺失/过期；running 表示自动执行；completed表示所有位置和航向进入容差，且实测速度满足admission配置的停车门槛并保持稳定窗口。robots 字段包含每车 goal、phase、position_error 和 yaw_error。
 
-phase 分为 aligning、approaching、orienting、arrived。默认最大前进速度 0.15 m/s、角速度 0.5 rad/s，位置容差 0.04 m、航向容差 0.08 rad，使用前进与原地转向，不倒车。
+phase 分为 aligning、approaching、orienting、arrived。默认最大前进速度 0.15 m/s、角速度 0.5 rad/s，位置容差 0.10 m、航向容差 0.08 rad，使用前进与原地转向，不倒车。
+
+精定位使用明确的两个位置切换门槛：最终位置容差`position_tolerance=0.10m`，切换余量`position_hysteresis=0.07m`，均在point_control.yaml。先进入3cm后才开始对齐最终朝向；此后只要位置不超出10cm就保持朝向控制，超出10cm再返回位置调整。最终完成要求位置≤10cm、航向误差≤0.08rad并实测停车稳定；这是面向Mini教学实验明确放宽的位置验收值。设position_hysteresis=0可比较原来的单门槛行为。
+
+`align_angle`默认π/4，朝向目标位置的偏角超过它时先原地转向。线速度是距离比例项（先限制最大值，再乘朝向余弦），角速度是当前阶段角误差的比例项并限制最大值。源码point_velocity接收previous_phase，AdmissionController保存每车阶段；raw_cmd与最终命令使用同一阶段。没有速度渐变。
+
+直接查看计算链路：`/abc_swarm_demo/raw_cmd/机器人名`是未限幅比例需求，`point_cmd/机器人名`是点镇定控制结果，`preferred_cmd/机器人名`是规划器给ORCA的期望；ORCA结果直接发布到`/机器人名/cmd_vel`。阶段不使用的中间话题不发布，status中相应字段为null，避免把旧值当作当前值。
+
+```bash
+rostopic echo /abc_swarm_demo/effective_config
+```
+
+此话题列出实际生效的控制参数、标定、输入速度来源、动捕速度差分窗口和配置文件来源。动态修改比例增益时会同步更新。status中的`processing`指出当前计算步骤，`feedback_valid=false`表示本条状态没有新的有效反馈，位置误差按最后快照保留。新任务的`ready_criterion=pose_and_measured_stop`，同时判断位姿和实测停车。
 
 ```bash
 rostopic echo -n 1 /abc_swarm_demo/goals
@@ -94,7 +106,7 @@ target_poses:
 max_linear: 0.04
 ```
 
-数组顺序一对一对应 robot_name_1/2/3；位置单位 m，航向 rad。world 模式不会叠加启动头车坐标。保留原文件里的其他算法参数，或省略后使用节点默认值。
+数组顺序一对一对应 robot_name_1/2/3；位置单位 m，航向 rad。world 模式不会叠加启动头车坐标。目标文件只包含目标；算法参数修改point_control.yaml，并通过control_config加载；反馈参数通过feedback_config加载。
 
 ```bash
 roslaunch abc_swarm demo_mocap_three_mini_point_stabilization.launch goal_config:=/absolute/path/targets.yaml
@@ -120,16 +132,16 @@ python3 ai/generate_launch.py /tmp/customer-point-demo/experiment.json --output 
 roslaunch --nodes /tmp/customer-point-demo/experiment.launch start_driver:=false start_vrpn:=false use_rviz:=false
 ```
 
-生成目录中的运行单有准确的启动和停止步骤；AI 不会代替客户启动实验。新实验登记在能力表及测试中，旧输入的字段/行为不变。
+生成目录中的运行单有准确的启动和停止步骤；AI 不会代替客户启动实验。新实验登记在能力表及测试中，当前生成契约为v3，旧配置迁移见ai/README.md。
 
 ## 实现与后续
 
 - src/abc_swarm/point_control.py：点镇定计算和坐标转换，不依赖 ROS。
 - nodes/point_stabilization.py：整组定位检查、冻结目标、逐车限幅输出及到达停车。
 - launch/mocap/demo_mocap_three_mini_point_stabilization.launch：三台 Mini、VRPN、目标配置的组合。
-- config/point_stabilization.yaml：目标及算法参数，一层文件，保持教学可读。
+- config/point_stabilization.yaml：目标；config/point_control.yaml：算法；config/feedback.yaml：输入有效期和速度测量窗口。
 
-这里的无 ROS 计算只为共享算法和测试，并不新增纯 Python 教学课程。ORCA 已作为同一节点的可选模式接入，使用车体包络及邻车实测速度；障碍输入、自动目标分配及全局入队规划留待后续。ORCA 的参考入口是[官方项目与差速机器人论文](https://gamma-web.iacs.umd.edu/ORCA/)。普通到位控制本身没有避障，必须明确选择 avoidance=orca 并满足其反馈及几何条件。
+这里的无 ROS 计算只为共享算法和测试，并不新增纯 Python 教学课程。ORCA 已作为同一节点的可选模式接入，使用车体包络及邻车实测速度；障碍输入、自动目标分配及未知环境的全局规划留待后续；登记车辆之间的入位规划已提供。ORCA 的参考入口是[官方项目与差速机器人论文](https://gamma-web.iacs.umd.edu/ORCA/)。普通到位控制本身没有避障，必须明确选择 avoidance=orca 并满足其反馈及几何条件。
 
 ## 现场验收（由用户填写）
 
@@ -144,21 +156,3 @@ roslaunch --nodes /tmp/customer-point-demo/experiment.launch start_driver:=false
 | 全部到位持续停车、退出实际停车 | 未测 |
 
 记录启动命令、提交号、场地配置、实际初始位置和状态 reason。ROS1 Noetic 已结束上游常规支持，本包当前沿现有设备/课程环境维护，本轮不迁移 ROS2。
-
-
-## 本轮开发验证
-
-48 项本地测试通过；Noetic 独立 catkin 工作空间构建、测试和安装检查通过。安装后的新节点可被找到，AI 生成的点镇定 launch 已实际生成、只读检查并完成 ROS 参数解析。私有 ROS 闭环记录位于 `/tmp/abc_swarm_point_ros_6xp4bbiw`，验证冻结目标、三车位置及航向收敛、单车 TF 过期共同停车、恢复、world 目标、完成保持、退出零输出和重复映射拒绝。合成结果不代替实车验收。
-
-本轮显式修改 AI 能力表/生成器，登记已实现点镇定；CMake 增加新测试，CI 增加安装后生成和私有点镇定闭环步骤，供维护者审核。冻结 main 基线、旧课程检查器及例外清单未修改，48 个原资源兼容检查通过。未启动实车/VRPN/Gazebo，未推送代码或发布文档网站，远端 CI 尚未运行。
-
-
-2026-10-24 后续调整：新增 formation=triangle/snake/config 选择；新增动捕 demo 的键盘、头车/后车、路径默认速度与点镇定上限统一为 0.15 m/s。点镇定预设和自定义目标语义见上文；提速结果须重新做实车验收，旧课程资源不变。
-
-本次提速/任务选择验证：52 项本地测试通过，独立 Noetic 构建测试安装通过；点镇定闭环（含 snake 预设）日志 `/tmp/abc_swarm_point_ros_n56y1no9`，路径/手动跟随/PID 回归日志 `/tmp/abc_swarm_path_ros_q6bfxlvk`。新速度下的测试使用对应 0.15 限幅，并保留原 0.05 路径回归；提速圆角矩形的编队收敛按生产 0.1 m 容差验证。未改旧课程检查规则，48 个原资源仍兼容。现场运行进程未重启，实车提速效果未验收。
-
-
-点镇定现提供 k_distance/k_heading 动态调参，候选默认调整为 0.9/2.0；方法、离线结果与实车边界见[控制调参说明](control-tuning.md)。调整动态增益不会重新启动已完成任务。
-
-
-现在可在同一点镇定节点上选择 `avoidance:=orca`，仍只面向三车 mocap；普通模式默认 none。具体几何/速度反馈、启动和验收见 [ORCA 动捕说明](orca.md)。普通模式没有避障的限制继续成立。

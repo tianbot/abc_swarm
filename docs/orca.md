@@ -8,7 +8,7 @@
 
 两个leader–follower入口现在默认复用这套入队，再自动交给manual/auto跟随；完整阶段和GUI接口见[编队启动流程](formation-workflow.md)。
 
-普通点镇定默认 avoidance=none，行为保持原样。ORCA 复用同一个 nodes/point_stabilization.py；新增入口只是明确选择避障模式，没有复制整套节点。
+普通点镇定默认avoidance=none，不加入ORCA。ORCA 复用同一个 nodes/point_stabilization.py；新增入口只是明确选择避障模式，没有复制整套节点。
 
 **启动后反馈齐全即运动，ORCA 模式可能短距离倒车。** 没有人工启用 service。它只避让本实验列出的三台车：墙、桌子、人、未登记车辆都不在这个模型里。仅有动捕不等于自动获得静态障碍几何。
 
@@ -44,15 +44,7 @@ roslaunch abc_swarm demo_mocap_three_mini_orca_point_stabilization.launch format
 
 ## 参数和反馈
 
-现场存在约1秒的 odom 间断时，可选用 `config/orca_delayed_feedback.yaml`，将里程计接收/消息年龄容忍窗口设为1.5秒，其他参数保持默认。期间使用最后收到的实测速度；动捕 TF 仍需在0.5秒内有效，超过窗口全组停车并在反馈恢复后自动继续。2026-10-25 三车测试已跨过此前约0.7～0.9秒的断流，03位置误差约2.7cm；该轮因02刚体朝向与实际移动方向不一致而未完成全组到位，不能据此声称延迟反馈下的避碰保证。
-
-后台已运行时：
-
-```bash
-roslaunch abc_swarm demo_mocap_three_mini_orca_point_stabilization.launch formation:=triangle start_driver:=false start_vrpn:=false orca_config:=$(rospack find abc_swarm)/config/orca_delayed_feedback.yaml
-```
-
-圆形/正三角形任务也可传同一个 `orca_config`，同时显式设置 `avoidance:=orca`，只影响起点点镇定阶段。需确认刚体坐标 +X 与实际车头一致，否则控制器会按错误朝向计算目标运动。AI 生成交付仍使用客户配置中显式填写的 `orca.odom_timeout`，不会自动选择本现场配置。
+默认velocity_source=mocap，由动捕控制位姿差分得到实测速度，不依赖底盘odom。窗口在feedback.yaml的mocap_velocity配置。显式选择velocity_source:=odom时，odom_timeout/odom_future_tolerance也从feedback.yaml加载；需要延长容忍期请编辑自己的feedback_config，而不是ORCA几何文件。较大窗口会使用更旧的反馈，不能据此保证避碰。AI对应字段是mocap_control.feedback。
 
 `config/orca.yaml` 是一层配置文件，启动时加载：
 
@@ -64,21 +56,18 @@ roslaunch abc_swarm demo_mocap_three_mini_orca_point_stabilization.launch format
 | time_horizon | 3.0 s | 两两速度障碍预测时域 |
 | right_bias | 0.01 m/s | 小幅靠右的期望速度偏置，用于打破对向对称；不放松约束 |
 | velocity_buffer | 0.002 m/s | 将避碰半平面稍向内收紧，给离散更新留数值余量；不是实测误差保证 |
-| odom_timeout | 0.5 s | 速度消息时间戳及本机接收有效期 |
-| odom_future_tolerance | 0.1 s | 允许 rosserial 轻微未来时间戳 |
-| stall_timeout | 30 s | 总目标误差长期无改进时停车报错 |
 
 2026-10-26 操作者确认Mini车体可用直径15cm圆包络，默认车体半径改为7.5cm。旧值13cm来自导航footprint，明显大于本次设备实物；不再用它代表本实验Mini。半径以差速轴心/控制中心为参考，仍须覆盖标记架、载荷和参考点偏移，不能将车体半径调到实际尺寸以下来绕过检查。
 
 前置点有效半径 R=robot_radius+front_distance+safety_margin，当前为0.125m；有效圆心在每车前方4cm，两个有效圆心距离需超过25cm。这个门槛来自差速外包圆，不表示车体直径25cm；不同车头朝向下也不等于实际轴心间距门槛。目标检查额外保留2×velocity_buffer×time_horizon，默认1.2cm。精定位捕获区和入队交接仍检查自身条件，不因包络缩小而跳过。
 
-前置距离从8cm减为4cm，降低虚拟外包圆的膨胀；它也决定可实现的横向前置点速度，不能只为压缩空间而无限减小。3cm在当前交叉入队模型出现停滞，4cm通过该模型；这不是实车调参验收。当前几何配置与延迟配置、AI示例同步，运行中的节点不会自动热加载这些更改。
+前置距离从8cm减为4cm，降低虚拟外包圆的膨胀；它也决定可实现的横向前置点速度，不能只为压缩空间而无限减小。3cm在当前交叉入队模型出现停滞，4cm通过该模型；这不是实车调参验收。当前几何配置与AI示例同步，运行中的节点不会自动热加载这些更改。
 
-所有三台需要 world→rigid_body_N 的有效 TF。`velocity_source:=odom` 保持原默认，使用对应 `/robot_name_N/odom` 的实际 linear.x/angular.z；`velocity_source:=mocap` 使用控制中心位姿约0.2秒窗口估计实测速度，约0.08秒样本积累后开始，不依赖底盘 odom。反馈缺失或时钟/时间窗失效时全组停车，恢复后继续。ORCA 使用实测速度，不把 cmd_vel 当作反馈；车辆仍需连接底盘驱动才能接收命令。原无避障点镇定仍不要求 odom。最大车体直线速度指令为 ±0.15 m/s，角速度默认 ±0.5 rad/s，接近目标、转弯和避让时会更低。
+所有三台需要 world→rigid_body_N 的有效 TF。显式选择`velocity_source:=odom`时，使用对应 `/robot_name_N/odom` 的实际 linear.x/angular.z；`velocity_source:=mocap` 使用控制中心位姿约0.2秒窗口估计实测速度，约0.08秒样本积累后开始，不依赖底盘 odom。反馈缺失或时钟/时间窗失效时全组停车，恢复后继续。ORCA 使用实测速度，不把 cmd_vel 当作反馈；车辆仍需连接底盘驱动才能接收命令。无避障点镇定同样检查所选速度反馈，以确认实际停车。最大车体直线速度指令为 ±0.15 m/s，角速度默认 ±0.5 rad/s，接近目标、转弯和避让时会更低。
 
-动捕原点不是差速轴心，或刚体朝向不对应车头时，通过控制/目标 YAML 的 `mocap_calibration` 显式配置 yaw_offset 与 marker_offset。节点只转换内部控制位姿，不覆盖原始 TF。当前现场专用配置和命令见[现场用法](mocap-field-use.md)，不要把其中02的补偿复制给新设备。点镇定通过 goal_config 加载，圆/三角通过 control_config 加载。
+动捕原点不是差速轴心，或刚体朝向不对应车头时，通过控制/目标 YAML 的 `mocap_calibration` 显式配置 yaw_offset 与 marker_offset。节点只转换内部控制位姿，不覆盖原始 TF。当前现场专用配置和命令见[现场用法](mocap-field-use.md)，不要把其中02的补偿复制给新设备。所有新入口均通过control_config加载标定和点镇定参数；goal_config只加载目标。
 
-点镇定会先到最终位置容差的一半范围，再稳定调整朝向；位置小幅变化时保留转向阶段，超过两倍容差则重新靠近。只有位置与航向都进入原定容差才报告 arrived/completed，避免阈值附近反复切换，未扩大最终完成容差。
+精定位按显式position_hysteresis切换：默认3cm内进入最终朝向控制，超过10cm才返回位置调整，最终位置验收是10cm；详见点镇定说明。没有额外速度渐变。入位稳定时长、实测停车门槛及无进展超时统一在admission.yaml。raw_cmd、point_cmd、preferred_cmd和各车cmd_vel可对照各处理步骤。
 
 切换与稳定窗口由 `config/admission.yaml` 配置，可通过 `admission_config` 替换；各参数归属见[完整流程](formation-workflow.md#参数归属)。
 
@@ -151,14 +140,3 @@ roslaunch --nodes /tmp/customer-orca-demo/experiment.launch start_driver:=false 
 | 故障锁定、退出实际停车 | 未测 |
 
 已有三角形、蛇形跟随实测结果不代表 ORCA 通过。记录场地、提交、配置、初始/目标位姿、最小实际间距及状态原因。
-
-
-## 本轮开发验证记录
-
-65 项本地测试通过，Noetic 独立 catkin 构建/测试/安装及实际工作空间编译通过。ORCA 的单元闭环覆盖对向、交叉、三车换位和两种积分步长，检查几何间距、位置/航向收敛及车体速度限制；不可行投影、无效配置和冲突目标也有拒绝测试。
-
-私有 ROS master 11435 的合成动捕/实际速度反馈模型完成三种任务，采样的最小车体中心间距约 0.443、0.417、0.569 m，日志 `/tmp/abc_swarm_orca_ros_lejpc0tf`。这是加速测试模型，不是实车测量或运行时间指标。TF/odom 中断共同停车及恢复、完成保持、冲突目标/初始包络/无进展的故障锁定和退出零输出均通过。
-
-普通点镇定回归日志 `/tmp/abc_swarm_point_ros_mt8hurau`，原六入口回归日志 `/tmp/abc_swarm_path_ros_ygklh15i`。安装后 ORCA 模块、许可证、配置、AI 生成/只读检查及 launch 解析已核对。冻结 main 的 48 个原资源不变，课程检查器和例外规则未修改。
-
-本轮显式增加 AI 能力表/契约与 CI 的 ORCA 生成及私有 ROS 检查，CMake 增加算法/入口测试和许可证安装，供维护者审核。未运行远端 CI，未推送代码或发布网站，未启动实车或真实 VRPN 客户端，实车验收全部保留待测。

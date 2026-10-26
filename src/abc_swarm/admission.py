@@ -2,12 +2,13 @@
 import math
 
 from .orca import OrcaBlocked, OrcaInfeasible, orca_velocities
-from .point_control import PointPhaseTracker, angle, validate_pose
+from .point_control import point_velocity, angle, validate_pose
 from .admission_planner import AdmissionPlanner
 
 
 DEFAULT_ADMISSION = dict(handoff_distance=.15, clearance=.02, position_margin=.005,
-                         handoff_time=.3, settle_time=.5, progress_timeout=45.)
+                         handoff_time=.3, settle_time=.5, progress_timeout=45.,
+                         stop_linear=.02, stop_angular=.05, waypoint_tolerance=.025)
 
 
 class AdmissionController:
@@ -30,13 +31,14 @@ class AdmissionController:
         self.ready = False
         self.handoff_hold = self.settle_hold = 0.
         self.capture = None
-        self.point = PointPhaseTracker()
         self.signature = None
         self.blocked = False
         self.recovering = False
         self.planner = AdmissionPlanner() if planning else None
         self.precision_progress = 0.
         self.best_pose_error = None
+        self.trace = {}
+        self.point_phases = None
 
     @property
     def progress(self):
@@ -51,6 +53,7 @@ class AdmissionController:
             self.best_pose_error = error
 
     def pause(self):
+        self.trace = {}
         if self.planner is not None:
             self.planner.pause()
         self.recovering = False
@@ -58,6 +61,13 @@ class AdmissionController:
         self.ready = False
         if self.stage == 'ready':
             self.stage = 'fine_positioning'
+
+    def record(self, raw, point, preferred, output, processing):
+        """Observe each computation stage without altering its returned command."""
+        self.trace = {key: [tuple(c[:2]) for c in values] for key, values in
+                      [('raw',raw),('point',point),('preferred',preferred),('output',output)]}
+        self.trace['processing'] = list(processing)
+        return output
 
     def _regions(self, poses, goals, control, orca):
         errors = [math.hypot(p[0]-g[0], p[1]-g[1]) for p, g in zip(poses, goals)]
@@ -94,6 +104,8 @@ class AdmissionController:
             raise ValueError('ORCA admission requires measured velocities')
         if orca is not None and self.settings['handoff_distance'] < control['position_tolerance']:
             raise ValueError('handoff_distance must cover the final position tolerance')
+        raw = [point_velocity(p,g,limit_output=False,**control) for p,g in zip(poses,goals)]
+        point = [point_velocity(p,g,**control) for p,g in zip(poses,goals)]
         if self.planner is None:
             self._observe_pose_progress(poses, goals)
         if orca is None:
@@ -106,9 +118,9 @@ class AdmissionController:
                         for i, p in enumerate(poses) for q in poses[:i])
             if outside or close:
                 self.stage = 'assembling_orca'
+                self.point_phases = None
                 self.ready = False
                 self.handoff_hold = self.settle_hold = 0.
-                self.point = PointPhaseTracker()
         if self.stage == 'assembling_orca':
             capture = self._regions(poses, goals, control, orca)
             self.handoff_hold = self.handoff_hold+dt if capture is not None else 0.
@@ -118,29 +130,37 @@ class AdmissionController:
                     self.planner.state = 'positions_ready'
                 self.capture = capture
                 self.stage = 'fine_positioning'
-                self.point = PointPhaseTracker()
-                return [(0., 0., 'handoff_barrier')]*len(poses)
-            preferred = (self.planner.commands(poses, goals, control, orca, self.settings['clearance'])
-                         if self.planner is not None else self.point.commands(poses, goals, control))
+                zeros = [(0., 0., 'handoff_barrier')]*len(poses)
+                return self.record(raw,point,zeros,zeros,['handoff_barrier'])
+            preferred = (self.planner.commands(poses, goals, control, orca, self.settings['clearance'],self.settings['waypoint_tolerance'])
+                         if self.planner is not None else point)
             try:
                 commands = orca_velocities(poses, goals, velocities, control,
                                           preferred_commands=preferred, **orca)
                 self.recovering = any(c[2]=='recovering' for c in commands)
-                return commands
+                return self.record(raw,point,preferred,commands,['point_control','planning','orca'] if self.planner is not None else ['point_control','orca'])
             except OrcaInfeasible:
                 self.blocked = True
                 self.settle_hold = 0.
-                return [(0., 0., 'avoidance_wait')]*len(poses)
-        commands = self.point.commands(poses, goals, control)
+                zeros = [(0., 0., 'avoidance_wait')]*len(poses)
+                return self.record(raw,point,preferred,zeros,['orca_wait'])
+        # 精定位记住各车阶段：先进入内圈，再对齐最终方向；超出最终
+        # 位置容差才返回位置调整。余量来自position_hysteresis，不放宽到位判定。
+        previous = self.point_phases or ['approaching']*len(poses)
+        raw = [point_velocity(p,g,previous_phase=phase,limit_output=False,**control)
+               for p,g,phase in zip(poses,goals,previous)]
+        commands = [point_velocity(p,g,previous_phase=phase,**control)
+                    for p,g,phase in zip(poses,goals,previous)]
+        self.point_phases = [c[2] for c in commands]
         if self.planner is not None:
             self._observe_pose_progress(poses, goals)
         ready = all(phase == 'arrived' for _, _, phase in commands)
         if velocities is not None:
-            ready = ready and all(abs(v) < .02 and abs(w) < .05 for v, w in velocities)
+            ready = ready and all(abs(v) < self.settings['stop_linear'] and abs(w) < self.settings['stop_angular'] for v, w in velocities)
         self.settle_hold = self.settle_hold+dt if ready else 0.
         self.ready = self.settle_hold >= self.settings['settle_time']
         if self.ready:
             self.stage = 'ready'
         elif self.stage == 'ready':
             self.stage = 'fine_positioning'
-        return commands
+        return self.record(raw,commands,commands,commands,['point_control','output_limits'])

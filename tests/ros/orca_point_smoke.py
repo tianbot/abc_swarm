@@ -49,7 +49,9 @@ def main():
             time.sleep(.1)
         rospy.init_node('orca_mocap_test',disable_signals=True)
         package=Path(rospkg.RosPack().get_path('abc_swarm'))
-        default_goals=yaml.safe_load((package/'config/point_stabilization.yaml').read_text())
+        default_goals=yaml.safe_load((package/'config/point_control.yaml').read_text())
+        # This precision regression deliberately keeps its original 4cm target.
+        default_goals.update(position_tolerance=.04,position_hysteresis=.01)
         default_orca=yaml.safe_load((package/'config/orca.yaml').read_text())
         launch=package/'launch/mocap/demo_mocap_three_mini_orca_point_stabilization.launch'
         rows={i:[] for i in range(3)};states=[];goal_msgs=[]
@@ -91,7 +93,7 @@ def main():
                 recent=[r for r in rows[i] if r[0]>time.monotonic()-.25]
                 assert recent and all(v==0 and w==0 for _,v,w in recent),(i,recent)
 
-        def launch_case(name,initial,targets,orca_override=None):
+        def launch_case(name,initial,targets,orca_override=None,progress_timeout=None):
             nonlocal poses,minimum,body_clearance
             poses=dict(enumerate(initial));minimum=100
             states.clear();goal_msgs.clear()
@@ -102,7 +104,10 @@ def main():
             body_clearance=2*(settings['robot_radius']+settings['safety_margin'])
             orca_file=folder/(name+'_orca.yaml');orca_file.write_text(yaml.safe_dump(settings))
             args=['roslaunch',str(launch),'start_driver:=false','start_vrpn:=false','use_rviz:=false',
-                  'goal_config:='+str(goal_file),'orca_config:='+str(orca_file)]
+                  'goal_config:='+str(goal_file),'orca_config:='+str(orca_file),'velocity_source:=odom']
+            if progress_timeout is not None:
+                admission=yaml.safe_load((package/'config/admission.yaml').read_text());admission['progress_timeout']=progress_timeout
+                af=folder/(name+'_admission.yaml');af.write_text(yaml.safe_dump(admission));args+=['admission_config:='+str(af)]
             args += ['robot_name_%d:=orca_test_%02d'%(i+1,i) for i in rows]
             p=start(args,name)
             deadline=time.monotonic()+10
@@ -152,7 +157,7 @@ def main():
         pump(.3,move=False);zeros()
         assert states[-1]['state']=='fault' and 'overlap' in states[-1]['reason'],states[-1]
         stop(p)
-        p=launch_case('stall',head,head_goals,{'stall_timeout':.6})
+        p=launch_case('stall',head,head_goals,progress_timeout=.6)
         pump(1,move=False);zeros()
         assert states[-1]['state']=='fault' and 'timeout' in states[-1]['reason'],states[-1]
         stop(p)

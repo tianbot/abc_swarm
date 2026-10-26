@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import json
 import rospy
 
 import math
@@ -11,6 +12,7 @@ from dynamic_reconfigure.server import Server
 from abc_swarm.cfg import tf_pidConfig
 import numpy as np
 from simple_pid import PID
+from std_msgs.msg import String
 
 # Match tf_pid.cfg startup defaults; Server loads configured private parameters.
 pid_linear = PID(1.0, 0.0, 0.0)
@@ -18,10 +20,17 @@ pid_linear.output_limits = (-0.15, 0.15)
 pid_angular = PID(1.0, 0.0, 0.0)
 pid_angular.output_limits = (-1.57, 1.57)
 
+effective_pub = None
+
 def callback(config, level):
     rospy.loginfo("""Reconfigure Request: {linear_kp}, {linear_ki}, {linear_kd}, {angular_kp}, {angular_ki}, {angular_kd}""".format(**config))
     pid_linear.tunings = [float(config.get(key)) for key in ['linear_kp', 'linear_ki', 'linear_kd']]
     pid_angular.tunings = [float(config.get(key)) for key in ['angular_kp','angular_ki','angular_kd']]
+    if effective_pub is not None:
+        effective_pub.publish(String(data=json.dumps(dict(node_type='pid_tracker',target_frame=target_frame,
+            tracker_frame=tracker_frame,linear_gains=list(pid_linear.tunings),angular_gains=list(pid_angular.tunings),
+            linear_output_limits=pid_linear.output_limits,angular_output_limits=pid_angular.output_limits,
+            tf_timeout=tf_timeout),sort_keys=True)))
     return config
 
 
@@ -45,6 +54,8 @@ if __name__ == '__main__':
 
     follower_vel = rospy.Publisher(tracker_motion_topic, geometry_msgs.msg.Twist, queue_size=1)
 
+    pid_vel = rospy.Publisher('~pid_cmd', geometry_msgs.msg.Twist, queue_size=1)
+
     def stop():
         follower_vel.publish(geometry_msgs.msg.Twist())
         pid_linear.reset()
@@ -52,6 +63,7 @@ if __name__ == '__main__':
 
     rospy.on_shutdown(stop)
 
+    effective_pub=rospy.Publisher('~effective_config',String,queue_size=1,latch=True)
     rate = rospy.Rate(10.0)
 
     #pid_linear.sample_time = pid_angular.sample_time = 0.1
@@ -82,21 +94,15 @@ if __name__ == '__main__':
         rospy.logdebug('L2_dis: {}, Yaw_gap: {}'.format(dis, angular_z_gap))
         linear =  pid_linear(set_distance - dis)
 
-        if abs(linear) < 0.02:
-            linear = 0
-
-        # bias tuning
-        if abs(linear) < 0.02 and abs(angular_z_gap) != 0:
-            linear = 0
-            angular = angular_z_gap * 0.5
-
-        if abs(angular) * 180 / math.pi <= 3 and abs(dis) != 0:
-            # Keep the requested linear speed while suppressing tiny yaw corrections.
-            angular = 0
+        # PID includes its configured output bounds and integral anti-windup.
+        # Publish that result directly, without deadbands or a second yaw law.
+        raw = geometry_msgs.msg.Twist()
+        raw.linear.x, raw.angular.z = linear, angular
+        pid_vel.publish(raw)
 
         msg = geometry_msgs.msg.Twist()
-        msg.linear.x = max(-max_linear, min(max_linear, linear))
-        msg.angular.z = max(-max_angular, min(max_angular, angular))
+        msg.linear.x = linear
+        msg.angular.z = angular
         follower_vel.publish(msg)
         rospy.logdebug('{}, linear.x: {}, angular.z: {}'.format(tracker_frame, linear, angular))
 

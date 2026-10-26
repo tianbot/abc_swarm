@@ -26,7 +26,7 @@ class OrcaEntrypointTests(unittest.TestCase):
                      POINT.parent/'demo_mocap_three_mini_triangle_tracking.launch']:
             cfg=load(path,['velocity_source:=mocap','start_driver:=false','start_vrpn:=false','use_rviz:=false'])
             self.assertEqual(cfg.params['/abc_swarm_demo/velocity_source'].value,'mocap')
-            self.assertEqual(load(path).params['/abc_swarm_demo/velocity_source'].value,'odom')
+            self.assertEqual(load(path).params['/abc_swarm_demo/velocity_source'].value,'mocap')
 
     def test_regular_point_stays_unmodified_and_orca_is_explicit(self):
         base=load(POINT)

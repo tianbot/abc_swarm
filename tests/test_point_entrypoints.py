@@ -31,7 +31,12 @@ class PointEntrypointTests(unittest.TestCase):
         self.assertFalse(any(n.package=='teleop_twist_keyboard' for n in config.nodes))
         self.assertNotIn('/abc_swarm_demo/enabled',config.params)
         expected=yaml.safe_load((ROOT/'config/point_stabilization.yaml').read_text())
-        for key,value in expected.items():self.assertEqual(config.params['/abc_swarm_demo/'+key].value,value)
+        def check(prefix, values):
+            for key, value in values.items():
+                name=prefix+'/'+key
+                if isinstance(value,dict):check(name,value)
+                else:self.assertEqual(config.params[name].value,value)
+        check('/abc_swarm_demo',expected)
 
     def test_custom_goal_file_device_mapping_and_existing_backend(self):
         with tempfile.TemporaryDirectory() as folder:

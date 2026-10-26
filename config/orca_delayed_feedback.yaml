@@ -1,13 +1,9 @@
-# Delayed-feedback profile: timeout tested 2026-10-25; geometry updated 2026-10-26.
-# Compact Mini geometry matches orca.yaml; not yet field validated.
-# Holds the last measured body velocity for at most 1.5s; TF freshness remains 0.5s.
-# This tolerance does not provide a collision guarantee for delayed feedback.
+# Historical geometry alias; identical to orca.yaml.
+# Feedback windows now belong to feedback_config (config/feedback.yaml).
+# This file no longer changes feedback timeouts.
 robot_radius: 0.075
 safety_margin: 0.01
 front_distance: 0.04
 time_horizon: 3.0
 right_bias: 0.01
 velocity_buffer: 0.002
-odom_timeout: 1.5
-odom_future_tolerance: 0.1
-stall_timeout: 30.0

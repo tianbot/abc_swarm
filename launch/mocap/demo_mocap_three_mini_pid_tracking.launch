@@ -1,46 +1,59 @@
 <?xml version="1.0" ?>
 <launch>
+  <!-- 交互与后台：键盘/RViz 可关闭，已有驱动或 VRPN 时关闭对应 start 参数。 -->
   <arg name="use_rviz" default="false"/>
   <arg name="teleop_terminal" default="xterm -e"/>
   <arg name="start_teleop" default="true"/>
+  <arg name="teleop_linear" default="0.15"/>
+  <arg name="teleop_angular" default="0.15"/>
+  <arg name="command_timeout" default="0.3"/>
   <arg name="vrpn_port" default=""/>
   <arg name="site_config" default="$(find abc_swarm)/config/mocap.yaml"/>
   <arg name="vrpn_server_ip" default="$(optenv ABC_SWARM_VRPN_SERVER)"/>
   <arg name="start_vrpn" default="true"/>
   <arg name="start_driver" default="true"/>
+  <!-- 编队与控制：后两台追踪01车体系中的偏移目标，PID 输出受速度上限约束。 -->
   <arg name="spacing" default="0.5"/>
   <arg name="max_linear" default="0.15"/>
   <arg name="max_angular" default="0.6"/>
-  <arg name="tf_timeout" default="0.5"/>
+  <arg name="feedback_config" default="$(find abc_swarm)/config/feedback.yaml"/>
+  <arg name="tf_timeout" default=""/>
+  <!-- 设备映射：robot_name 用于话题，rigid_body 用于 TF。 -->
   <arg name="robot_name_1" default="tianbot_mini_01"/>
   <arg name="rigid_body_1" default="tianbot_mini_01"/>
   <arg name="robot_name_2" default="tianbot_mini_02"/>
   <arg name="rigid_body_2" default="tianbot_mini_02"/>
   <arg name="robot_name_3" default="tianbot_mini_03"/>
   <arg name="rigid_body_3" default="tianbot_mini_03"/>
+  <!-- 内部就绪标志：反馈有效后由运行节点自动维护。 -->
   <param name="/abc_swarm_demo/enabled" value="false" type="bool"/>
+  <!-- 02目标与 PID：目标挂在01刚体下，pid_tracker 直接发布02的 cmd_vel。 -->
   <node pkg="tf2_ros" type="static_transform_publisher" name="swarm_target_2" args="$(eval '%s %s 0 0 0 0 %s abc_swarm_demo/target_2' % (-1 * float(arg('spacing')), 1 * float(arg('spacing')), arg('rigid_body_1')))"/>
-  <node pkg="abc_swarm" type="pid_tracker.py" name="mini_2_tracker" output="screen" required="true">
+  <node pkg="abc_swarm" type="pid_tracker.py" name="mini_2_tracker" output="screen" required="true" clear_params="true">
+    <rosparam command="load" file="$(arg feedback_config)"/>
     <param name="target_frame" value="abc_swarm_demo/target_2"/>
     <param name="tracker_frame" value="$(arg rigid_body_2)"/>
     <param name="tracker_motion_topic" value="/$(arg robot_name_2)/cmd_vel"/>
     <param name="set_distance" value="0.0"/>
     <param name="max_linear" value="$(arg max_linear)"/>
     <param name="max_angular" value="$(arg max_angular)"/>
-    <param name="tf_timeout" value="$(arg tf_timeout)"/>
+    <param if="$(eval arg('tf_timeout') != '')" name="tf_timeout" value="$(arg tf_timeout)"/>
     <param name="enable_param" value="/abc_swarm_demo/enabled"/>
   </node>
+  <!-- 03目标与 PID：目标挂在01刚体下，pid_tracker 直接发布03的 cmd_vel。 -->
   <node pkg="tf2_ros" type="static_transform_publisher" name="swarm_target_3" args="$(eval '%s %s 0 0 0 0 %s abc_swarm_demo/target_3' % (-1 * float(arg('spacing')), -1 * float(arg('spacing')), arg('rigid_body_1')))"/>
-  <node pkg="abc_swarm" type="pid_tracker.py" name="mini_3_tracker" output="screen" required="true">
+  <node pkg="abc_swarm" type="pid_tracker.py" name="mini_3_tracker" output="screen" required="true" clear_params="true">
+    <rosparam command="load" file="$(arg feedback_config)"/>
     <param name="target_frame" value="abc_swarm_demo/target_3"/>
     <param name="tracker_frame" value="$(arg rigid_body_3)"/>
     <param name="tracker_motion_topic" value="/$(arg robot_name_3)/cmd_vel"/>
     <param name="set_distance" value="0.0"/>
     <param name="max_linear" value="$(arg max_linear)"/>
     <param name="max_angular" value="$(arg max_angular)"/>
-    <param name="tf_timeout" value="$(arg tf_timeout)"/>
+    <param if="$(eval arg('tf_timeout') != '')" name="tf_timeout" value="$(arg tf_timeout)"/>
     <param name="enable_param" value="/abc_swarm_demo/enabled"/>
   </node>
+  <!-- 后台模块：按开关启动 Mini 驱动和 VRPN。 -->
   <include file="$(find abc_swarm)/launch/common/mocap_backend.launch.xml">
     <arg name="site_config" value="$(arg site_config)"/>
     <arg name="vrpn_server_ip" value="$(arg vrpn_server_ip)"/>
@@ -48,20 +61,24 @@
     <arg name="start_driver" value="$(arg start_driver)"/>
     <arg name="start_vrpn" value="$(arg start_vrpn)"/>
   </include>
-  <node pkg="abc_swarm" type="demo_runtime.py" name="abc_swarm_demo" output="screen" required="true" clear_params="false">
+  <!-- 头车转发模块：就绪且未超时时，teleop_cmd 的 v/omega 原样发布到01。 -->
+  <node pkg="abc_swarm" type="demo_runtime.py" name="abc_swarm_demo" output="screen" required="true" clear_params="true">
+    <rosparam command="load" file="$(arg feedback_config)"/>
     <param name="mode" value="manual"/>
-    <param name="max_linear" value="$(arg max_linear)"/>
-    <param name="fixed_frame" value="world"/>
+    <param if="$(eval arg('tf_timeout') != '')" name="tf_timeout" value="$(arg tf_timeout)"/>
+    <param name="command_timeout" value="$(arg command_timeout)"/>
     <rosparam param="robot_frames" subst_value="true">[&quot;$(arg rigid_body_1)&quot;, &quot;$(arg rigid_body_2)&quot;, &quot;$(arg rigid_body_3)&quot;]</rosparam>
     <rosparam param="feedback_topics" subst_value="true">[]</rosparam>
     <param name="cmd_topic" value="/$(arg robot_name_1)/cmd_vel"/>
   </node>
+  <!-- 键盘输入模块：显示的是请求值，最终发给01的指令须查看01/cmd_vel。 -->
   <node if="$(arg start_teleop)" pkg="teleop_twist_keyboard" type="teleop_twist_keyboard.py" name="leader_teleop" output="screen" launch-prefix="$(arg teleop_terminal)">
     <remap from="cmd_vel" to="/abc_swarm_demo/teleop_cmd"/>
-    <param name="speed" value="$(arg max_linear)"/>
-    <param name="turn" value="0.15"/>
+    <param name="speed" value="$(arg teleop_linear)"/>
+    <param name="turn" value="$(arg teleop_angular)"/>
     <param name="repeat_rate" value="20.0"/>
-    <param name="key_timeout" value="0.3"/>
+    <param name="key_timeout" value="$(arg command_timeout)"/>
   </node>
+  <!-- 显示模块：可选显示目标与 TF。 -->
   <node if="$(arg use_rviz)" pkg="rviz" type="rviz" name="demo_rviz" args="-d $(find abc_swarm)/rviz/path_following.rviz"/>
 </launch>

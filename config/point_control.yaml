@@ -1,0 +1,12 @@
+# 点镇定控制与反馈；目标坐标在 point_stabilization.yaml。
+max_linear: 0.15
+max_angular: 0.5
+position_tolerance: 0.10
+# Mini教学默认允许10cm位置误差，不要求场地补偿；航向仍单独检查。
+# 精定位先进入3cm再对齐最终朝向；转向时超出10cm才返回位置控制。
+# 7cm切换余量覆盖小车原地转向时刚体原点的位置变化，不增加滤波或速度缩放。
+position_hysteresis: 0.07
+yaw_tolerance: 0.08
+k_distance: 0.9
+k_heading: 2.0
+align_angle: 0.7853981633974483

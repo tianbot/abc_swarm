@@ -31,6 +31,24 @@ def node_params(cfg):
 
 
 class FormationEntrypointTests(unittest.TestCase):
+    def test_yaml_values_survive_defaults_and_cli_only_changes_its_owner(self):
+        path=ROOT/'launch/mocap/demo_mocap_three_mini_leader_follower_triangle.launch'
+        with tempfile.TemporaryDirectory() as folder:
+            files={}
+            for key,name,changes in [('control','point_control.yaml',dict(max_linear=.07,max_angular=.2,k_heading=1.1)),
+                                      ('follow','leader_follower.yaml',dict(max_linear=.11,max_angular=1.2,k_x=.8)),
+                                      ('feedback','feedback.yaml',dict(tf_timeout=.9,odom_timeout=1.5))]:
+                data=yaml.safe_load((ROOT/'config'/name).read_text());data.update(changes)
+                p=Path(folder)/name;p.write_text(yaml.safe_dump(data));files[key]=p
+            args=[k+'_config:='+str(p) for k,p in files.items()]
+            p=node_params(load(path,args))
+            self.assertEqual(p['~max_linear'],.07);self.assertEqual(p['~max_angular'],.2)
+            self.assertEqual(p['~follow']['max_linear'],.11);self.assertEqual(p['~follow']['max_angular'],1.2)
+            self.assertEqual(p['~tf_timeout'],.9);self.assertEqual(p['~odom_timeout'],1.5)
+            p=node_params(load(path,args+['max_linear:=.13','point_max_angular:=.3']))
+            self.assertEqual(p['~follow']['max_linear'],.13);self.assertEqual(p['~max_linear'],.07)
+            self.assertEqual(p['~max_angular'],.3);self.assertEqual(p['~follow']['max_angular'],1.2)
+
     def test_default_pipeline_has_one_owner_and_reuses_backend_in_both_modes(self):
         settings=yaml.safe_load((ROOT/'config/admission.yaml').read_text())
         for shape in ['triangle','snake']:
@@ -42,12 +60,15 @@ class FormationEntrypointTests(unittest.TestCase):
                 self.assertEqual(sum(n.type=='teleop_twist_keyboard.py' for n in cfg.nodes),mode=='manual')
                 p=node_params(cfg)
                 self.assertEqual(p['~task'],'leader_follower');self.assertEqual(p['~velocity_source'],'mocap')
+                self.assertEqual(p['~max_angular'],.5)
+                self.assertEqual(p['~follow']['max_angular'],.6)
                 self.assertEqual(p['~admission'],settings)
                 self.assertEqual(p['~follow']['mode'],mode)
                 expected='tianbot_mini_02' if shape=='snake' else 'tianbot_mini_01'
                 self.assertEqual(p['~follow']['edges'][-1]['leader'],expected)
                 raw=load(path,['startup:=false','mode:='+mode,'start_driver:=false','start_vrpn:=false','use_rviz:=false'])
-                self.assertEqual(sum(n.type=='leader_follower_tracker.py' for n in raw.nodes),2)
+                self.assertEqual(sum(n.type=='point_stabilization.py' for n in raw.nodes),1)
+                self.assertFalse(node_params(raw)['~startup'])
 
     def test_field_profile_and_custom_vehicle_mapping_are_explicit(self):
         path=ROOT/'launch/mocap/demo_mocap_three_mini_leader_follower_triangle.launch'
@@ -55,11 +76,12 @@ class FormationEntrypointTests(unittest.TestCase):
         params=node_params(cfg)
         self.assertEqual(params['~position_tolerance'],.08)
         self.assertGreater(params['~mocap_calibration']['tianbot_mini_02']['yaw_offset'],1.9)
-        self.assertEqual(params['~max_linear'],.12)
+        self.assertEqual(params['~max_linear'],.15)
+        self.assertEqual(params['~follow']['max_linear'],.12)
+        self.assertEqual(params['~max_angular'],.5)
         cfg=load(path,['robot_name_2:=client_02','rigid_body_2:=body_02'])
         params=node_params(cfg)
         self.assertEqual(params['~robots'][1],{'name':'client_02','frame':'body_02'})
-        self.assertEqual(params['~stationary_hold']['settle_time'],.4)
         self.assertEqual(params['~follow']['edges'][0]['follower'],'client_02')
 
     def test_invalid_mission_configuration_fails_before_publishers(self):
@@ -70,9 +92,8 @@ class FormationEntrypointTests(unittest.TestCase):
                        lambda p:p['~follow'].update(edges=[]),
                        lambda p:p['~follow']['edges'][0].update(leader='missing'),
                        lambda p:p['~admission'].update(settle_time=-1),
-                       lambda p:p['~stationary_hold'].update(settle_time=-1),
                        lambda p:p.update({'~velocity_source':'cmd_vel'}),
-                       lambda p:p.update({'~avoidance':'none'})]:
+                       lambda p:p.update({'~avoidance':'invalid'})]:
             p=copy.deepcopy(base);change(p)
             with patch('rospy.get_param',side_effect=lambda key,default=None:p.get(key,default)),patch('rospy.Publisher') as pub:
                 with self.assertRaises(ValueError):module['PointStabilization']()

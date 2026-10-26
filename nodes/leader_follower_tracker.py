@@ -5,6 +5,7 @@ Adapted from the original nodes/leader_follower.py. Offsets
 describe the desired follower axle position in the leader's body frame.
 """
 
+import json
 import math
 import threading
 import time
@@ -46,8 +47,14 @@ class LeaderFollower:
         self.listener = tf.TransformListener()
         self.velocity_pub = rospy.Publisher(rospy.get_param('~cmd_topic'),
                                              Twist, queue_size=1)
+        self.raw_pub = rospy.Publisher('~raw_cmd', Twist, queue_size=1)
         self.status_pub = rospy.Publisher('~status', String, queue_size=1,
                                          latch=True)
+        self.config_pub=rospy.Publisher('~effective_config',String,queue_size=1,latch=True)
+        self.config_pub.publish(String(data=json.dumps(dict(node_type='leader_follower',
+            leader_frame=self.leader_frame,follower_frame=self.follower_frame,offset=self.offset,
+            front_distance=self.d,k_x=self.k_x,k_y=self.k_y,max_linear=self.max_linear,max_angular=self.max_angular,
+            tf_timeout=self.tf_timeout,odom_timeout=self.odom_timeout,enabled_param=self.enabled_param),sort_keys=True)))
         self.last_status = None
         self.odom_sub = rospy.Subscriber(rospy.get_param('~leader_odom_topic'),
                                          Odometry, self.odom_cb, queue_size=1)
@@ -115,6 +122,8 @@ class LeaderFollower:
             self.stop()
             self.status('invalid velocity')
             return
+        raw = Twist(); raw.linear.x, raw.angular.z = linear, angular
+        self.raw_pub.publish(raw)
         cmd = Twist()
         cmd.linear.x = max(-self.max_linear, min(self.max_linear, linear))
         cmd.angular.z = max(-self.max_angular, min(self.max_angular, angular))

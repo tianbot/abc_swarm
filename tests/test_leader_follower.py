@@ -51,8 +51,7 @@ class LeaderFollowerTests(unittest.TestCase):
             roslaunch.xmlloader.XmlLoader().load(str(ROOT / 'launch/mocap' /
                 ('demo_mocap_three_mini_leader_follower_'+formation+'.launch')), config,
                 verbose=False, argv=['startup:=false','start_driver:=false','start_vrpn:=false','start_teleop:=false'])
-            prefix = '/tianbot_mini_03_leader_follower/'
-            self.assertEqual(config.params[prefix+'leader_frame'].value, leader)
-            self.assertEqual(config.params[prefix+'leader_odom_topic'].value, '/'+leader+'/odom')
-            self.assertFalse(config.params['/abc_swarm_demo/enabled'].value)
+            self.assertEqual(config.params['/abc_swarm_demo/follow/edges'].value[-1]['leader'],leader)
+            self.assertFalse(config.params['/abc_swarm_demo/startup'].value)
+            self.assertEqual(sum(n.type=='point_stabilization.py' for n in config.nodes),1)
             self.assertFalse(any(n.package=='rosserial_server' for n in config.nodes))

@@ -107,10 +107,13 @@ def main():
             args=['roslaunch',str(path),'start_driver:=false','start_vrpn:=false','use_rviz:=false',
                   ('diameter' if shape=='circle' else 'side_length')+':='+str(size),
                   'clockwise:='+str(cw).lower()]
+            if shape=='triangle':
+                # Triangle origin is now its centroid, explicitly place this test at (1,2).
+                args+=['reference:=world','origin_x:=1','origin_y:=2','origin_yaw:=0.3']
             args += ['robot_name_%d:=loops_test_%02d'%(i+1,i) for i in rows]
             if index==0:args+=['avoidance:=orca']
             if index==4:
-                control=yaml.safe_load((package/'config/point_stabilization.yaml').read_text())
+                control=yaml.safe_load((package/'config/point_control.yaml').read_text())
                 control['mocap_calibration']={'loops_test_%02d'%i:{'yaw_offset':.6,'marker_offset':[.03,.01]} for i in rows}
                 profile=folder/'calibrated_control.yaml';profile.write_text(yaml.safe_dump(control))
                 args+=['avoidance:=orca','velocity_source:=mocap','control_config:='+str(profile)]

@@ -1,5 +1,5 @@
 {
-  "contract_version": 2,
+  "contract_version": 3,
   "stack": "ROS1 Noetic",
   "model": "tianbot_mini",
   "localization": "mocap_vrpn",
@@ -14,7 +14,9 @@
       "startup_admission": true,
       "mocap_control": true,
       "admission_planning": true,
-      "stationary_pose_hold": true
+      "stationary_pose_hold": false,
+      "leader_speed_scaling": false,
+      "manual_command_passthrough": true
     },
     "manual_snake": {
       "robots": 3,
@@ -25,7 +27,9 @@
       "startup_admission": true,
       "mocap_control": true,
       "admission_planning": true,
-      "stationary_pose_hold": true
+      "stationary_pose_hold": false,
+      "leader_speed_scaling": false,
+      "manual_command_passthrough": true
     },
     "path_single": {
       "robots": 1,
@@ -42,7 +46,8 @@
       "mocap_control": true,
       "mode": "auto",
       "admission_planning": true,
-      "stationary_pose_hold": true
+      "stationary_pose_hold": false,
+      "leader_speed_scaling": false
     },
     "path_snake": {
       "robots": 3,
@@ -53,7 +58,8 @@
       "mocap_control": true,
       "mode": "auto",
       "admission_planning": true,
-      "stationary_pose_hold": true
+      "stationary_pose_hold": false,
+      "leader_speed_scaling": false
     },
     "point_stabilization": {
       "robots": 3,
@@ -80,7 +86,8 @@
       "coordinated": "circle",
       "launch": "demo_mocap_three_mini_circle_tracking.launch",
       "mocap_control": true,
-      "admission_planning": true
+      "admission_planning": true,
+      "progress_speed_scaling": false
     },
     "coordinated_triangle": {
       "robots": 3,
@@ -89,7 +96,12 @@
       "coordinated": "triangle",
       "launch": "demo_mocap_three_mini_triangle_tracking.launch",
       "mocap_control": true,
-      "admission_planning": true
+      "admission_planning": true,
+      "progress_speed_scaling": false
     }
+  },
+  "teleop_defaults": {
+    "linear": 0.15,
+    "angular": 0.6
   }
 }

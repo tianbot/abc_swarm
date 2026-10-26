@@ -1,5 +1,5 @@
 {
-  "contract_version": 2,
+  "contract_version": 3,
   "name": "three_mini_triangle",
   "localization": "mocap_vrpn",
   "fixed_frame": "world",
@@ -52,8 +52,8 @@
     "speed": 0.15,
     "laps": 1,
     "clockwise": false,
-    "reference": "initial_leader",
-    "origin": [
+    "reference": "world",
+    "center": [
       0,
       0,
       0

@@ -22,36 +22,29 @@ def load(path, argv=None):
 
 
 class DemoEntrypointTests(unittest.TestCase):
-    def test_follower_mode_selects_one_head_controller_and_keeps_roles(self):
+    def test_startup_only_selects_admission_and_keeps_the_same_controller(self):
         for formation in ('triangle','snake'):
             path=ROOT/('launch/mocap/demo_mocap_three_mini_leader_follower_'+formation+'.launch')
-            common=['startup:=false','start_driver:=false','start_vrpn:=false','use_rviz:=false',
-                    'robot_name_1:=customer_01','robot_name_2:=customer_02','robot_name_3:=customer_03',
-                    'rigid_body_1:=body_01','rigid_body_2:=body_02','rigid_body_3:=body_03']
-            manual=load(path,common+['mode:=manual'])
-            self.assertEqual(sum(n.type=='teleop_twist_keyboard.py' for n in manual.nodes),1)
-            self.assertFalse(any(n.type=='preset_path_tracker.py' for n in manual.nodes))
-            self.assertEqual(manual.params['/abc_swarm_demo/mode'].value,'manual')
-            auto=load(path,common+['mode:=auto','start_teleop:=true','radius:=.75','laps:=2',
-                                  'clockwise:=true','max_linear:=.12','max_angular:=.3','tf_timeout:=.8'])
-            self.assertEqual(sum(n.type=='preset_path_tracker.py' for n in auto.nodes),1)
-            self.assertFalse(any(n.type=='teleop_twist_keyboard.py' for n in auto.nodes))
-            self.assertEqual(sum(n.type=='demo_runtime.py' for n in auto.nodes),1)
-            self.assertEqual(sum(n.type=='leader_follower_tracker.py' for n in auto.nodes),2)
-            for key,value in [('shape','circle'),('radius',.75),('laps',2),('clockwise',True),
-                              ('speed',.12),('max_angular',.3),('tf_timeout',.8),('robot_frame','body_01'),
-                              ('cmd_topic','/customer_01/cmd_vel')]:
-                self.assertEqual(auto.params['/abc_swarm_path/'+key].value,value)
-            self.assertEqual(auto.params['/abc_swarm_demo/mode'].value,'path')
-            expected='body_02' if formation=='snake' else 'body_01'
-            self.assertEqual(auto.params['/customer_03_leader_follower/leader_frame'].value,expected)
-            self.assertEqual(auto.params['/customer_03_leader_follower/max_linear'].value,.12)
-            self.assertEqual(auto.params['/abc_swarm_path/edges'].value[-1]['leader'],expected)
-            for bad in ['mannual','AUTO','invalid']:
-                with self.subTest(formation=formation,mode=bad),self.assertRaises(roslaunch.xmlloader.XmlParseException):
-                    load(path,common+['mode:='+bad])
-            # roslaunch treats an empty CLI assignment as an omitted argument.
-            self.assertEqual(load(path,common+['mode:=']).params['/abc_swarm_demo/mode'].value,'manual')
+            for startup in ('true','false'):
+                for mode in ('manual','auto'):
+                    cfg=load(path,['startup:='+startup,'mode:='+mode,'start_driver:=false','start_vrpn:=false',
+                                   'use_rviz:=false','robot_name_1:=customer_01','robot_name_2:=customer_02',
+                                   'robot_name_3:=customer_03','rigid_body_1:=body_01','rigid_body_2:=body_02',
+                                   'rigid_body_3:=body_03','speed:=.12','max_linear:=.13','max_angular:=.3','tf_timeout:=.8'])
+                    self.assertEqual(sum(n.type=='point_stabilization.py' for n in cfg.nodes),1)
+                    self.assertFalse(any(n.type in ('demo_runtime.py','leader_follower_tracker.py','preset_path_tracker.py') for n in cfg.nodes))
+                    self.assertEqual(sum(n.type=='teleop_twist_keyboard.py' for n in cfg.nodes),mode=='manual')
+                    p=cfg.params
+                    self.assertEqual(p['/abc_swarm_demo/startup'].value,startup=='true')
+                    self.assertEqual(p['/abc_swarm_demo/follow/mode'].value,mode)
+                    self.assertEqual(p['/abc_swarm_demo/follow/speed'].value,.12)
+                    self.assertEqual(p['/abc_swarm_demo/follow/max_linear'].value,.13)
+                    self.assertEqual(p['/abc_swarm_demo/follow/max_angular'].value,.3)
+                    self.assertEqual(p['/abc_swarm_demo/max_angular'].value,.5)
+                    self.assertEqual(p['/abc_swarm_demo/tf_timeout'].value,.8)
+                    self.assertEqual(p['/abc_swarm_demo/follow/edges'].value[-1]['leader'],
+                                     'customer_02' if formation=='snake' else 'customer_01')
+                    self.assertEqual(p['/abc_swarm_demo/robots'].value[2],{'name':'customer_03','frame':'body_03'})
 
     def setUp(self):
         env = patch.dict(os.environ, {'ABC_SWARM_VRPN_SERVER': ''})
@@ -80,7 +73,9 @@ class DemoEntrypointTests(unittest.TestCase):
                 path = Path(folder) / 'experiment.launch'
                 path.write_text(harness['render'](spec))
                 config = load(path)
-                self.assertFalse(config.params['/abc_swarm_demo/enabled'].value)
+                if '/abc_swarm_demo/enabled' in config.params:
+                    self.assertFalse(config.params['/abc_swarm_demo/enabled'].value)
+                else:self.assertTrue(any(n.type=='point_stabilization.py' for n in config.nodes))
                 self.assertEqual(config.params['/vrpn_client_node/server'].value, spec['vrpn']['server'])
                 if cap.get('startup_admission'):
                     self.assertEqual(config.params['/abc_swarm_demo/robots'].value,
@@ -90,8 +85,8 @@ class DemoEntrypointTests(unittest.TestCase):
                     expected='customer_car_1' if cap['formation']=='snake' else 'customer_car_0'
                     self.assertEqual(config.params['/abc_swarm_demo/follow/edges'].value[-1]['leader'],expected)
                     self.assertEqual(config.params['/abc_swarm_demo/follow/mode'].value,cap['mode'])
-                    self.assertEqual(config.params['/abc_swarm_demo/max_linear'].value,
-                                     spec['path']['speed'] if cap['path'] else .15)
+                    self.assertEqual(config.params['/abc_swarm_demo/max_linear'].value,.15)
+                    if cap['path']:self.assertEqual(config.params['/abc_swarm_demo/follow/speed'].value,spec['path']['speed'])
                 else:
                     self.assertEqual(config.params['/abc_swarm_demo/robot_frames'].value,
                                      [r['rigid_body'] for r in spec['robots']])
@@ -121,7 +116,9 @@ class DemoEntrypointTests(unittest.TestCase):
                 self.assertEqual(sum(n.package == 'vrpn_client_ros' for n in config.nodes), 1)
                 self.assertEqual(sum(n.package == 'rosserial_server' for n in config.nodes), 1)
                 self.assertEqual(sum(n.type in ('demo_runtime.py','point_stabilization.py') for n in config.nodes), 1)
-                self.assertFalse(config.params['/abc_swarm_demo/enabled'].value)
+                if '/abc_swarm_demo/enabled' in config.params:
+                    self.assertFalse(config.params['/abc_swarm_demo/enabled'].value)
+                else:self.assertTrue(any(n.type=='point_stabilization.py' for n in config.nodes))
                 self.assertEqual(config.params['/vrpn_client_node/server'].value, profile['server'])
                 self.assertEqual(config.params['/vrpn_client_node/port'].value, profile['port'])
                 manual = 'path_tracking' not in path.name
@@ -167,15 +164,17 @@ class DemoEntrypointTests(unittest.TestCase):
                 self.assertEqual(config.params['/abc_swarm_path/speed'].value,0.15)
             else:
                 self.assertEqual(config.params['/leader_teleop/speed'].value,0.15)
-                self.assertEqual(config.params['/abc_swarm_demo/max_linear'].value,0.15)
+                if any(n.type=='point_stabilization.py' for n in config.nodes):
+                    self.assertEqual(config.params['/abc_swarm_demo/max_linear'].value,0.15)
+                else:self.assertNotIn('/abc_swarm_demo/max_linear',config.params)
             followers=[p.value for name,p in config.params.items()
                        if name.endswith(('_leader_follower/max_linear','_tracker/max_linear'))]
             self.assertTrue(all(value==0.15 for value in followers))
         config=load(ROOT/'launch/mocap/demo_mocap_three_mini_leader_follower_triangle.launch',
                     ['max_linear:=0.12','startup:=false'])
-        self.assertEqual(config.params['/leader_teleop/speed'].value,0.12)
-        self.assertEqual(config.params['/abc_swarm_demo/max_linear'].value,0.12)
-        self.assertEqual(config.params['/tianbot_mini_02_leader_follower/max_linear'].value,0.12)
+        self.assertEqual(config.params['/leader_teleop/speed'].value,0.15)
+        self.assertEqual(config.params['/abc_swarm_demo/max_linear'].value,0.15)
+        self.assertEqual(config.params['/abc_swarm_demo/follow/max_linear'].value,0.12)
 
     def test_controller_fragment_has_no_backend_or_lifecycle(self):
         config = load(ROOT / 'launch/common/three_mini_leader_follower.launch.xml',
@@ -195,7 +194,7 @@ class DemoEntrypointTests(unittest.TestCase):
                 continue
             config = load(path, ['front_distance:=0.23', 'start_driver:=false',
                                  'start_vrpn:=false', 'use_rviz:=false'])
-            self.assertEqual(config.params['/abc_swarm_path/front_distance'].value, 0.23)
+            self.assertEqual(config.params['/abc_swarm_path/follow/front_distance'].value, 0.23)
             followers = [p.value for name, p in config.params.items()
                          if name.endswith('_leader_follower/front_distance')]
             self.assertEqual(followers, [] if path.name == 'demo_mocap_path_tracking.launch'

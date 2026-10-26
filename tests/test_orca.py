@@ -72,7 +72,7 @@ class OrcaTests(unittest.TestCase):
         options=dict(mode='manual',edges=[dict(leader='r0',follower='r1',x=-.5,y=.5),
                                         dict(leader='r0',follower='r2',x=-.5,y=-.5)],
                      shape='circle',radius=1.,width=2.,height=2.,laps=1,clockwise=False,
-                     front_distance=.1,k_x=.5,k_y=.5,lookahead=.25,max_error=.5,tracking_window=.15)
+                     front_distance=.1,k_x=.5,k_y=.5,lookahead=.25,max_error=.5,speed=.08,max_linear=.15,max_angular=.6)
         geometry=dict(robot_radius=.075,safety_margin=.01,front_distance=.04,
                       time_horizon=3.,right_bias=.01,velocity_buffer=.002)
         for dt in (.02,.05):
@@ -138,7 +138,7 @@ class OrcaTests(unittest.TestCase):
         options=dict(mode='manual',edges=[dict(leader='r0',follower='r1',x=-.5,y=.5),
                                         dict(leader='r0',follower='r2',x=-.5,y=-.5)],
                      shape='circle',radius=1.,width=2.,height=2.,laps=1,clockwise=False,
-                     front_distance=.1,k_x=.5,k_y=.5,lookahead=.25,max_error=.5,tracking_window=.15)
+                     front_distance=.1,k_x=.5,k_y=.5,lookahead=.25,max_error=.5,speed=.08,max_linear=.15,max_angular=.6)
         geometry=dict(robot_radius=.075,safety_margin=.01,front_distance=.04,
                       time_horizon=3.,right_bias=.01,velocity_buffer=.002)
         # Snapshot of the actual stop: bodies separated, front-point disks overlap.

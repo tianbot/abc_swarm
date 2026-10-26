@@ -1,6 +1,6 @@
 # Controls shared by the two mocap loop demos. Geometry/roles belong to launch.
 lookahead: 0.20
-phase_window: 0.10
 settle_time: 0.5
 max_error: 0.25
 progress_timeout: 30.0
+vertex_tolerance: 0.15  # 顶点转向允许的偏离量，须容纳10cm到点误差及转向位置变化

@@ -56,19 +56,22 @@ def main():
         rospy.init_node('mission_smoke',disable_signals=True)
         names=['mission_test_%02d'%i for i in range(1,4)]
         frames=['mission_body_%02d'%i for i in range(1,4)]
-        commands={n:[] for n in names};states=[];starts=[];targets=[];visited=[]
+        commands={n:[] for n in names};states=[];starts=[];targets=[];visited=[];configs=[]
         def status(msg):
             s=json.loads(msg.data);states.append(s)
             if not visited or visited[-1]!=s['stage']:visited.append(s['stage'])
         subs=[rospy.Subscriber('/'+n+'/cmd_vel',Twist,lambda m,key=n:commands[key].append((time.monotonic(),m.linear.x,m.angular.z))) for n in names]
-        subs += [rospy.Subscriber('/abc_swarm_demo/status',String,status),
+        subs += [rospy.Subscriber('/abc_swarm_demo/effective_config',String,lambda m:configs.append(json.loads(m.data))),
+                 rospy.Subscriber('/abc_swarm_demo/status',String,status),
                  rospy.Subscriber('/abc_swarm_demo/startup_goals',PoseArray,lambda m:starts.append(m)),
                  rospy.Subscriber('/abc_swarm_demo/goals',PoseArray,lambda m:targets.append(m))]
         clock=rospy.Publisher('/clock',Clock,queue_size=1,latch=True)
         teleop=rospy.Publisher('/abc_swarm_demo/teleop_cmd',Twist,queue_size=1)
         broadcaster=tf.TransformBroadcaster();sim=100.;poses=[];minimum=100.;peak=0.
         package=Path(rospkg.RosPack().get_path('abc_swarm'))
-        profile=yaml.safe_load((package/'config/point_stabilization.yaml').read_text())
+        profile=yaml.safe_load((package/'config/point_control.yaml').read_text())
+        # Preserve this regression's explicit 4cm precision contract.
+        profile.update(position_tolerance=.04,position_hysteresis=.01)
         profile['mocap_calibration']={n:{'yaw_offset':.6 if i==1 else 0.,'marker_offset':[.03,.01]} for i,n in enumerate(names)}
         control=folder/'control.yaml';control.write_text(yaml.safe_dump(profile))
 
@@ -114,7 +117,7 @@ def main():
                 for rows in commands.values():rows.clear()
                 pump(.5,move=False)
                 args=['roslaunch',str(package/('launch/mocap/demo_mocap_three_mini_leader_follower_'+shape+'.launch')),
-                      'mode:='+mode,'radius:=0.6','control_config:='+str(control),'use_sim_time:=true',
+                      'mode:='+mode,'speed:=0.06','radius:=0.6','control_config:='+str(control),'use_sim_time:=true',
                       'start_driver:=false','start_vrpn:=false','start_teleop:=false','use_rviz:=false']
                 for i,n in enumerate(names):args+=['robot_name_%d:=%s'%(i+1,n),'rigid_body_%d:=%s'%(i+1,frames[i])]
                 p=start(args,shape+'_'+mode);wall=time.monotonic()+12
@@ -142,19 +145,24 @@ def main():
                         x,y,yaw=poses[i-1];heading=angle(yaw+delta)
                         poses[i]=(x-.4*math.cos(yaw)-.1*math.cos(heading),
                                   y-.4*math.sin(yaw)-.1*math.sin(heading),heading)
-                    wall=time.monotonic()+25
-                    while time.monotonic()<wall:
-                        pump(.2)
-                        assert states[-1]['state']!='fault',states[-1]
-                        if len(states[-1]['robots'])==3 and all(
-                                r['phase']=='holding_arrived' and r['position_error']<=.04 and abs(r['yaw_error'])<=.08
-                                for r in states[-1]['robots'][1:]):break
-                    else:raise AssertionError(('stationary snake pose hold failed',states[-1],poses))
-                    print('stationary snake: full pose correction PASS',flush=True)
+                    # A stopped parent must not silently select pose stabilization.
+                    pump(1.,move=False)
+                    assert states[-1]['state']!='fault',states[-1]
+                    for r in states[-1]['robots'][1:]:
+                        assert r['phase']=='following',r
+                        assert r['raw_command'] is not None,r
+                    print('stationary snake: same follower controller PASS',flush=True)
+                assert configs and configs[-1]['point_control']['position_tolerance']==.04,configs
+                assert configs[-1]['mocap_velocity']=={'window':.2,'min_interval':.08},configs
+                for n in names:
+                    for key in ['raw','point','preferred']:
+                        assert '/abc_swarm_demo/'+key+'_cmd/'+n in publishers,publishers
                 if mode=='manual':
                     pump(1.)
                     assert abs(commands[names[0]][-1][1])<1e-8,commands[names[0]][-1]
-                    pump(2.,request=(.08,.08));assert commands[names[0]][-1][1]>0
+                    pump(2.,request=(.08,.08))
+                    assert commands[names[0]][-1][1:]==(.08,.08),commands[names[0]][-1]
+                    assert states[-1]['robots'][0]['raw_command']==[.08,.08],states[-1]
                     pump(3.);assert abs(commands[names[0]][-1][1])<1e-8
                     pump(1.,missing=2);assert states[-1]['state']=='waiting',states[-1]
                     pump(1.,missing=2);zeros()  # Observe a full zero-output interval after the timeout.

@@ -1,10 +1,14 @@
 <?xml version="1.0" ?>
 <launch>
+  <!-- 反馈与跟随参数各自加载；命令行非空值才覆盖配置。 -->
+  <arg name="feedback_config" default="$(find abc_swarm)/config/feedback.yaml"/>
+  <arg name="follow_config" default="$(find abc_swarm)/config/leader_follower.yaml"/>
+  <!-- 完整路径实验的公共参数：场地、几何、速度、设备映射由外层 demo 传入。 -->
   <arg name="vrpn_port" default=""/>
   <arg name="site_config" default="$(find abc_swarm)/config/mocap.yaml"/>
   <arg name="formation"/>
-  <arg name="use_sim_time" default="false"/>
-  <param name="/use_sim_time" value="$(arg use_sim_time)" type="bool"/>
+  <arg name="use_sim_time" default=""/>
+  <param if="$(eval arg('use_sim_time') != '')" name="/use_sim_time" value="$(arg use_sim_time)" type="bool"/>
   <arg name="shape" default="circle"/>
   <arg name="radius" default="0.8"/>
   <arg name="width" default="2.5"/>
@@ -16,7 +20,7 @@
   <arg name="start_driver" default="false"/>
   <arg name="vrpn_server_ip" default="$(optenv ABC_SWARM_VRPN_SERVER)"/>
   <arg name="spacing" default="0.5"/>
-  <arg name="front_distance" default="0.1"/>
+  <arg name="front_distance" default=""/>
   <arg name="backward_spacing" default="$(eval -float(arg('spacing')))"/>
   <arg name="robot_name_1" default="tianbot_mini_01"/>
   <arg name="rigid_body_1" default="$(arg robot_name_1)"/>
@@ -24,8 +28,12 @@
   <arg name="rigid_body_2" default="$(arg robot_name_2)"/>
   <arg name="robot_name_3" default="tianbot_mini_03"/>
   <arg name="rigid_body_3" default="$(arg robot_name_3)"/>
+  <!-- 内部就绪标志：路径与跟随节点共享，由下面的 runtime 自动维护。 -->
   <param name="/abc_swarm_demo/enabled" value="false" type="bool"/>
+  <!-- 三角形后车模块：02/03分别跟随01，跟随器速度限幅使用其默认值。 -->
   <include if="$(eval arg('formation') == 'triangle')" file="$(find abc_swarm)/launch/common/three_mini_leader_follower.launch.xml">
+    <arg name="follow_config" value="$(arg follow_config)"/>
+    <arg name="feedback_config" value="$(arg feedback_config)"/>
     <arg name="spacing" value="$(arg spacing)"/>
     <arg name="front_distance" value="$(arg front_distance)"/>
     <arg name="robot_name_1" value="$(arg robot_name_1)"/>
@@ -36,7 +44,10 @@
     <arg name="rigid_body_3" value="$(arg rigid_body_3)"/>
     <arg name="formation" value="triangle"/>
   </include>
+  <!-- 蛇形后车模块：01到02到03，跟随器速度限幅使用其默认值。 -->
   <include if="$(eval arg('formation') == 'snake')" file="$(find abc_swarm)/launch/common/three_mini_leader_follower.launch.xml">
+    <arg name="follow_config" value="$(arg follow_config)"/>
+    <arg name="feedback_config" value="$(arg feedback_config)"/>
     <arg name="spacing" value="$(arg spacing)"/>
     <arg name="front_distance" value="$(arg front_distance)"/>
     <arg name="robot_name_1" value="$(arg robot_name_1)"/>
@@ -47,7 +58,10 @@
     <arg name="rigid_body_3" value="$(arg rigid_body_3)"/>
     <arg name="formation" value="snake"/>
   </include>
+  <!-- 头车模块：独立路径节点根据几何、前视点和反馈计算01速度。 -->
   <include file="$(find abc_swarm)/launch/common/leader_path_tracker.launch.xml">
+    <arg name="follow_config" value="$(arg follow_config)"/>
+    <arg name="feedback_config" value="$(arg feedback_config)"/>
     <arg name="formation" value="$(arg formation)"/>
     <arg name="shape" value="$(arg shape)"/>
     <arg name="radius" value="$(arg radius)"/>
@@ -66,6 +80,7 @@
     <arg name="robot_name_3" value="$(arg robot_name_3)"/>
     <arg name="rigid_body_3" value="$(arg rigid_body_3)"/>
   </include>
+  <!-- 后台模块：仅在需要启动驱动或 VRPN 时包含；可复用已运行后台。 -->
   <include if="$(eval arg('start_driver') or arg('start_vrpn'))" file="$(find abc_swarm)/launch/common/mocap_backend.launch.xml">
     <arg name="site_config" value="$(arg site_config)"/>
     <arg name="vrpn_server_ip" value="$(arg vrpn_server_ip)"/>
@@ -74,24 +89,30 @@
     <arg name="use_sim_time" value="$(arg use_sim_time)"/>
     <arg name="start_vrpn" value="$(arg start_vrpn)"/>
   </include>
+  <!-- 单车运行管理：只检查头车 TF，路径完成/故障后停止；reset 服务用于下一轮。 -->
   <group if="$(eval arg('formation') == 'single')">
-    <node pkg="abc_swarm" type="demo_runtime.py" name="abc_swarm_demo" output="screen" required="true" clear_params="false">
+    <node pkg="abc_swarm" type="demo_runtime.py" name="abc_swarm_demo" output="screen" required="true" clear_params="true">
+      <rosparam command="load" file="$(arg feedback_config)"/>
       <param name="mode" value="path"/>
       <param name="fixed_frame" value="world"/>
       <rosparam param="robot_frames" subst_value="true">[&quot;$(arg rigid_body_1)&quot;]</rosparam>
       <rosparam param="feedback_topics" subst_value="true">[]</rosparam>
     </node>
   </group>
+  <!-- 三角形运行管理：检查三车 TF 与01 odom，统一发布运行状态。 -->
   <group if="$(eval arg('formation') == 'triangle')">
-    <node pkg="abc_swarm" type="demo_runtime.py" name="abc_swarm_demo" output="screen" required="true" clear_params="false">
+    <node pkg="abc_swarm" type="demo_runtime.py" name="abc_swarm_demo" output="screen" required="true" clear_params="true">
+      <rosparam command="load" file="$(arg feedback_config)"/>
       <param name="mode" value="path"/>
       <param name="fixed_frame" value="world"/>
       <rosparam param="robot_frames" subst_value="true">[&quot;$(arg rigid_body_1)&quot;, &quot;$(arg rigid_body_2)&quot;, &quot;$(arg rigid_body_3)&quot;]</rosparam>
       <rosparam param="feedback_topics" subst_value="true">[&quot;/$(arg robot_name_1)/odom&quot;]</rosparam>
     </node>
   </group>
+  <!-- 蛇形运行管理：检查三车 TF 与01/02 odom，统一发布运行状态。 -->
   <group if="$(eval arg('formation') == 'snake')">
-    <node pkg="abc_swarm" type="demo_runtime.py" name="abc_swarm_demo" output="screen" required="true" clear_params="false">
+    <node pkg="abc_swarm" type="demo_runtime.py" name="abc_swarm_demo" output="screen" required="true" clear_params="true">
+      <rosparam command="load" file="$(arg feedback_config)"/>
       <param name="mode" value="path"/>
       <param name="fixed_frame" value="world"/>
       <rosparam param="robot_frames" subst_value="true">[&quot;$(arg rigid_body_1)&quot;, &quot;$(arg rigid_body_2)&quot;, &quot;$(arg rigid_body_3)&quot;]</rosparam>

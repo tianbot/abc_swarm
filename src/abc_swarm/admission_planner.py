@@ -109,8 +109,10 @@ class AdmissionPlanner:
                     return i, min(choices, key=lambda x:x[0])[1], True
         return None, [], False
 
-    def commands(self, poses, goals, control, orca, clearance):
-        tolerance = min(.025, control['position_tolerance']*.5)
+    def commands(self, poses, goals, control, orca, clearance, waypoint_tolerance=.025):
+        tolerance = waypoint_tolerance
+        if type(tolerance) not in (int,float) or not math.isfinite(tolerance) or tolerance<=0:
+            raise ValueError('waypoint_tolerance must be positive and finite')
         base = 2*(orca['robot_radius']+orca['safety_margin']+orca['front_distance'])
         spacing = min((distance(g,h) for i,g in enumerate(goals) for h in goals[:i]), default=math.inf)
         radius = max(base, min(base+max(clearance, control['position_tolerance']), .95*spacing))

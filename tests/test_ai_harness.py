@@ -3,11 +3,14 @@
 import copy
 import importlib.util
 import json
+import hashlib
+import shutil
 from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -33,22 +36,45 @@ def scenario(experiment):
 
 
 class AIHarnessTests(unittest.TestCase):
+    def test_v3_explicit_input_and_planning_are_validated(self):
+        spec=scenario('manual_triangle')
+        old=copy.deepcopy(spec);old['contract_version']=2
+        with self.assertRaisesRegex(ValueError,'expected 3'):harness.validate(old)
+        spec['teleop']={'linear':.09,'angular':.7};spec['planning']=False
+        spec['mocap_control']={'velocity_source':'mocap','position_tolerance':.04,'calibration':None,
+                              'feedback':{'tf_timeout':.6,'odom_timeout':1.5,'odom_future_tolerance':.1},
+                              'velocity_window':{'window':.25,'min_interval':.1}}
+        root=ET.fromstring(harness.render(spec))
+        self.assertEqual(root.find('include/arg[@name="teleop_linear"]').get('value'),'0.09')
+        self.assertEqual(root.find('include/arg[@name="teleop_angular"]').get('value'),'0.7')
+        self.assertEqual(root.find('include/arg[@name="planning"]').get('value'),'false')
+        self.assertEqual(root.find('param[@name="/abc_swarm_demo/odom_timeout"]').get('value'),'1.5')
+        self.assertIsNotNone(root.find('rosparam[@param="/abc_swarm_demo/mocap_velocity"]'))
+        self.assertIn('0.7rad/s',harness.report(spec))
+        for change in [lambda s:s['teleop'].update(angular=float('nan')),
+                       lambda s:s.update(planning='false'),lambda s:s['teleop'].update(linear=.3)]:
+            bad=copy.deepcopy(spec);change(bad)
+            with self.assertRaises(ValueError):harness.validate(bad)
+        spec=scenario('coordinated_circle');spec['planning']=True
+        with self.assertRaisesRegex(ValueError,'ORCA'):harness.validate(spec)
+
     def test_admission_planning_is_declared_only_when_avoidance_is_enabled(self):
         for experiment,enabled in [('manual_triangle',True),('point_stabilization_orca',True),
                                    ('point_stabilization',False),('coordinated_circle',False)]:
             spec=scenario(experiment)
-            self.assertEqual('/abc_swarm_demo/planning' in harness.render(spec),enabled)
+            arg=ET.fromstring(harness.render(spec)).find('include/arg[@name="planning"]')
+            self.assertEqual(arg is not None and arg.get('value')=='true',enabled)
             self.assertEqual('入位规划已启用' in harness.report(spec),enabled)
         spec=scenario('manual_triangle');spec['admission']={'enabled':False}
-        self.assertNotIn('/abc_swarm_demo/planning',harness.render(spec))
+        self.assertEqual(ET.fromstring(harness.render(spec)).find('include/arg[@name="planning"]').get('value'),'false')
 
     def test_follower_admission_is_explicit_validated_and_can_opt_out(self):
-        settings=dict(handoff_distance=.15,clearance=.02,position_margin=.005,handoff_time=.3,settle_time=.5,progress_timeout=45.)
+        settings=dict(handoff_distance=.15,clearance=.02,position_margin=.005,handoff_time=.3,settle_time=.5,progress_timeout=45.,stop_linear=.02,stop_angular=.05,waypoint_tolerance=.025)
         orca=json.loads((ROOT/'ai/orca.example.json').read_text())['orca']
         for experiment in ['manual_triangle','manual_snake','path_triangle','path_snake']:
             spec=scenario(experiment);spec['admission']={'enabled':True,'settings':settings,'orca':orca}
-            self.assertTrue(harness.CATALOG['experiments'][experiment]['stationary_pose_hold'])
-            self.assertIn('完整目标位置和朝向',harness.report(spec))
+            self.assertFalse(harness.CATALOG['experiments'][experiment]['stationary_pose_hold'])
+            self.assertIn('同一前置点leader-follower控制律',harness.report(spec))
             root=ET.fromstring(harness.render(spec))
             self.assertEqual(root.find('include/arg[@name="startup"]').get('value'),'true')
             self.assertIsNotNone(root.find('rosparam[@param="/abc_swarm_demo/admission"]'))
@@ -60,7 +86,8 @@ class AIHarnessTests(unittest.TestCase):
             spec['admission']={'enabled':False}
             self.assertEqual(ET.fromstring(harness.render(spec)).find('include/arg[@name="startup"]').get('value'),'false')
             spec['mocap_control']={'velocity_source':'mocap','position_tolerance':.04,'calibration':None}
-            with self.assertRaises(ValueError):harness.validate(spec)
+            harness.validate(spec)
+            self.assertIn('velocity_source',harness.render(spec))
 
     def test_mocap_control_extension_is_explicit_and_rejects_bad_calibration(self):
         for experiment in ['point_stabilization','point_stabilization_orca','coordinated_circle','coordinated_triangle']:
@@ -222,6 +249,43 @@ class AIHarnessTests(unittest.TestCase):
                 with self.assertRaises(ValueError):harness.bundle(invalid)
             spec['orca']=scenario('point_stabilization_orca')['orca']
             self.assertIn('/abc_swarm_demo/orca',harness.render(spec))
+
+    def test_installed_bundle_hashes_installed_control_files(self):
+        with tempfile.TemporaryDirectory() as directory:
+            prefix = Path(directory)
+            share = prefix/'share/abc_swarm'
+            for name in ('ai', 'config', 'launch', 'licenses'):
+                shutil.copytree(ROOT/name, share/name)
+            core = prefix/'lib/python3/dist-packages/abc_swarm'
+            nodes = prefix/'lib/abc_swarm'
+            shutil.copytree(ROOT/'src/abc_swarm', core)
+            shutil.copytree(ROOT/'nodes', nodes)
+            # Detect installed content, rather than silently hashing another checkout.
+            installed = nodes/'point_stabilization.py'
+            installed.write_text(installed.read_text()+'\n# installed fixture\n')
+            with patch.object(harness, 'HERE', share/'ai'):
+                hashes = json.loads(harness.bundle(scenario('manual_triangle'))['composition.sha256.json'])
+            self.assertEqual(hashes['nodes/point_stabilization.py'], hashlib.sha256(installed.read_bytes()).hexdigest())
+            self.assertIn('src/abc_swarm/formation_control.py', hashes)
+
+    def test_explicit_position_hysteresis_is_validated_rendered_and_reported(self):
+        spec=scenario('coordinated_triangle')
+        spec['mocap_control']={'velocity_source':'mocap','position_tolerance':.10,
+                               'position_hysteresis':.07,'calibration':None}
+        root=ET.fromstring(harness.render(spec))
+        self.assertEqual(root.find('rosparam[@param="/abc_swarm_demo/position_hysteresis"]').text,'0.07')
+        self.assertIn('切换余量：0.07 m',harness.report(spec))
+        for value in [True,-.01,.10,float('nan')]:
+            spec['mocap_control']['position_hysteresis']=value
+            with self.assertRaises(ValueError):harness.validate(spec)
+
+    def test_triangle_requires_explicit_centroid_instead_of_old_vertex_origin(self):
+        spec=scenario('coordinated_triangle')
+        self.assertEqual(spec['trajectory']['reference'],'world')
+        self.assertEqual(spec['trajectory']['center'],[0,0,0])
+        self.assertIn('重心',harness.report(spec))
+        spec['trajectory']['origin']=spec['trajectory'].pop('center')
+        with self.assertRaisesRegex(ValueError,'replace origin'):harness.validate(spec)
 
     def test_duplicate_json_keys_rejected_without_creating_output(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -79,66 +79,49 @@ def formation_targets(formation, spacing):
 
 def point_velocity(pose, goal, max_linear=0.15, max_angular=0.5,
                    position_tolerance=0.04, yaw_tolerance=0.08,
-                   k_distance=0.9, k_heading=2.0):
+                   k_distance=0.9, k_heading=2.0, align_angle=math.pi/4,
+                   limit_output=True, position_hysteresis=0.01, previous_phase=None):
+    """Return (v, omega, phase); limit_output=False exposes the raw P demand.
+
+    A caller retaining previous_phase enters final rotation at tolerance minus
+    position_hysteresis, and leaves it only outside position_tolerance. The
+    final arrived criterion always uses the configured position/yaw tolerances.
+    Stateless callers retain the original single position gate.
+    """
     validate_pose(pose)
     validate_pose(goal)
     limits = (max_linear, max_angular, position_tolerance, yaw_tolerance,
-              k_distance, k_heading)
+              k_distance, k_heading, align_angle)
     if any(type(v) not in (int, float) or not math.isfinite(v) or v <= 0 for v in limits):
         raise ValueError('Limits, tolerances and gains must be finite and positive')
+    if type(limit_output) is not bool or align_angle > math.pi/2:
+        raise ValueError('Use a boolean output limit flag and align_angle <= pi/2')
+    if (type(position_hysteresis) not in (int, float) or not math.isfinite(position_hysteresis)
+            or position_hysteresis < 0
+            or (previous_phase is not None and position_hysteresis >= position_tolerance)):
+        raise ValueError('position_hysteresis must be nonnegative and smaller than the stateful position tolerance')
+    if previous_phase not in (None, 'aligning', 'approaching', 'orienting', 'arrived'):
+        raise ValueError('Unknown previous point-control phase')
     x, y, yaw = pose
     gx, gy, gyaw = goal
     distance = math.hypot(gx - x, gy - y)
     heading = angle(gyaw - yaw)
-    if distance <= position_tolerance:
+    position_gate = position_tolerance
+    if previous_phase in ('aligning', 'approaching'):
+        position_gate -= position_hysteresis
+    if distance <= position_gate:
         if abs(heading) <= yaw_tolerance:
             return 0.0, 0.0, 'arrived'
-        return 0.0, max(-max_angular, min(max_angular, k_heading*heading)), 'orienting'
+        angular = k_heading*heading
+        return 0.0, max(-max_angular, min(max_angular, angular)) if limit_output else angular, 'orienting'
     bearing = angle(math.atan2(gy - y, gx - x) - yaw)
-    angular = max(-max_angular, min(max_angular, k_heading*bearing))
-    if abs(bearing) > math.pi/4:
+    angular = k_heading*bearing
+    if limit_output:
+        angular = max(-max_angular, min(max_angular, angular))
+    if abs(bearing) > align_angle:
         return 0.0, angular, 'aligning'
-    linear = min(max_linear, k_distance*distance)*max(0.0, math.cos(bearing))
+    linear = k_distance*distance
+    if limit_output:
+        linear = min(max_linear, linear)
+    linear *= max(0.0, math.cos(bearing))
     return linear, angular, 'approaching'
-
-
-class PointPhaseTracker:
-    """Keep final orientation stable across small position excursions.
-
-    Approach to half the accepted position tolerance before turning. Retain
-    that phase up to twice the tolerance, but only report arrival inside the
-    original position/yaw bounds. A changed goal resets the phase history.
-    """
-    def __init__(self):
-        self.signature = None
-        self.turning = []
-
-    def commands(self, poses, goals, control):
-        if len(poses) != len(goals):
-            raise ValueError('One goal is required for every pose')
-        # Validate the complete control contract before updating phase history.
-        for pose, goal in zip(poses, goals):
-            point_velocity(pose, goal, **control)
-        tolerance = control.get('position_tolerance', .04)
-        yaw_tolerance = control.get('yaw_tolerance', .08)
-        signature = (tuple(tuple(g) for g in goals), tolerance, yaw_tolerance)
-        if signature != self.signature:
-            self.signature = signature
-            self.turning = [False] * len(goals)
-        result = []
-        for i, (pose, goal) in enumerate(zip(poses, goals)):
-            distance = math.hypot(pose[0]-goal[0], pose[1]-goal[1])
-            heading = angle(goal[2]-pose[2])
-            yaw_ready = abs(heading) <= yaw_tolerance
-            if self.turning[i] and (distance > 2*tolerance or (yaw_ready and distance > tolerance)):
-                self.turning[i] = False
-            if not self.turning[i] and (distance <= .5*tolerance or (distance <= tolerance and yaw_ready)):
-                self.turning[i] = True
-            if self.turning[i]:
-                limit = control.get('max_angular', .5)
-                angular = max(-limit, min(limit, control.get('k_heading', 2.)*heading))
-                result.append((0., 0. if yaw_ready else angular,
-                               'arrived' if yaw_ready and distance <= tolerance else 'orienting'))
-            else:
-                result.append(point_velocity(pose, goal, **dict(control, position_tolerance=.5*tolerance)))
-        return result

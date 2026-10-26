@@ -1,13 +1,17 @@
 <launch>
+  <!-- 场地与后台开关：YAML 提供 VRPN 配置，非空命令行地址/端口再覆盖。 -->
   <arg name="site_config" default="$(find abc_swarm)/config/mocap.yaml"/>
   <arg name="vrpn_server_ip" default="$(optenv ABC_SWARM_VRPN_SERVER)"/>
   <arg name="vrpn_port" default=""/>
   <arg name="start_driver" default="true"/>
   <arg name="start_vrpn" default="true"/>
-  <arg name="use_sim_time" default="false"/>
-  <param name="/use_sim_time" value="$(arg use_sim_time)" type="bool"/>
+  <arg name="use_sim_time" default=""/>
+  <!-- ROS 时钟：设置全局 use_sim_time，实车通常为 false；复用 master 时也会写入。 -->
+  <param if="$(eval arg('use_sim_time') != '')" name="/use_sim_time" value="$(arg use_sim_time)" type="bool"/>
+  <!-- Mini 驱动：接收各车 cmd_vel，经 socket 与底盘通信；本节点自身不计算编队控制。 -->
   <node if="$(arg start_driver)" pkg="rosserial_server" type="socket_node"
         name="tianbot_manager" output="screen" required="true"/>
+  <!-- 动捕客户端：发布刚体 pose/TF；required=true 表示此进程退出会结束所在 launch。 -->
   <node if="$(arg start_vrpn)" pkg="vrpn_client_ros" type="vrpn_client_node"
         name="vrpn_client_node" output="screen" required="true" clear_params="true">
     <rosparam command="load" file="$(arg site_config)"/>

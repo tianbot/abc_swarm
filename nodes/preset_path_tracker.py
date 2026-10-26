@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """TF/ROS lifecycle for the independent preset-path Pure Pursuit algorithm."""
+import json
 import math
 import time
 
@@ -24,13 +25,15 @@ class PresetPathNode:
         self.settle_tolerance = float(rospy.get_param('~settle_tolerance', 0.1))
         self.start_tolerance = float(rospy.get_param('~start_tolerance', 0.15))
         self.edges = rospy.get_param('~edges', [])
-        self.front_distance = float(rospy.get_param('~front_distance', 0.1))
+        self.front_distance = float(rospy.get_param('~follow/front_distance', 0.1))
         if not all(math.isfinite(v) and v > 0 for v in
                    (self.timeout, self.settle_timeout, self.settle_tolerance,
                     self.start_tolerance, self.front_distance)):
             raise ValueError('Timeouts and tolerances must be positive and finite')
         self.listener = tf.TransformListener()
         self.cmd = rospy.Publisher(rospy.get_param('~cmd_topic'), Twist, queue_size=1)
+        self.raw_pub=rospy.Publisher('~raw_cmd',Twist,queue_size=1)
+        self.config_pub=rospy.Publisher('~effective_config',String,queue_size=1,latch=True)
         self.path_pub = rospy.Publisher('~path', Path, queue_size=1, latch=True)
         self.actual_pub = rospy.Publisher('~actual_path', Path, queue_size=1)
         self.target_pub = rospy.Publisher('~target', PointStamped, queue_size=1)
@@ -94,6 +97,11 @@ class PresetPathNode:
             max_angular=float(rospy.get_param('~max_angular', 0.5)),
             goal_tolerance=float(rospy.get_param('~goal_tolerance', 0.05)),
             max_error=float(rospy.get_param('~max_error', 0.5)))
+        self.config_pub.publish(String(data=json.dumps(dict(node_type='path_tracker',algorithm='pure_pursuit',
+            frame=self.fixed,robot=self.robot,start_pose=list(pose),speed=self.controller.speed,
+            lookahead=self.controller.lookahead,max_angular=self.controller.max_angular,
+            goal_tolerance=self.controller.goal_tolerance,max_error=self.controller.max_error,
+            front_distance=self.front_distance,tf_timeout=self.timeout),sort_keys=True)))
         self.start_yaw = pose[2]
         self.settle_started = None
         self.wait_started = None
@@ -177,6 +185,7 @@ class PresetPathNode:
             linear, angular = self.controller.step(pose)
             cmd = Twist()
             cmd.linear.x, cmd.angular.z = linear, angular
+            self.raw_pub.publish(cmd)
             self.cmd.publish(cmd)
             if self.controller.completed:
                 if self.settle_started is None:

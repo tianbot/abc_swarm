@@ -81,7 +81,12 @@ def main():
         import rospkg
         package=Path(rospkg.RosPack().get_path('abc_swarm'))
         launch=package/'launch/mocap/demo_mocap_three_mini_point_stabilization.launch'
-        args=['roslaunch',str(launch),'start_driver:=false','start_vrpn:=false','use_rviz:=false']
+        import yaml
+        precision=yaml.safe_load((package/'config/point_control.yaml').read_text())
+        precision.update(position_tolerance=.04,position_hysteresis=.01)
+        precision_file=folder/'precision.yaml';precision_file.write_text(yaml.safe_dump(precision))
+        args=['roslaunch',str(launch),'start_driver:=false','start_vrpn:=false','use_rviz:=false',
+              'control_config:='+str(precision_file)]
         for i in rows:args += ['robot_name_%d:=point_test_%02d'%(i+1,i)]
         p=start(args,'initial_leader')
         pump(3,move=False)
@@ -140,7 +145,7 @@ def main():
             assert abs(pose.position.x-goal[0])<1e-6 and abs(pose.position.y-goal[1])<1e-6
         stop(p)
 
-        data=yaml.safe_load((package/'config/point_stabilization.yaml').read_text())
+        data=yaml.safe_load((package/'config/point_control.yaml').read_text())
         data.update(target_reference='world',target_poses=[[p[0]+0.2,p[1],p[2]] for p in poses.values()])
         config=folder/'world.yaml';config.write_text(yaml.safe_dump(data))
         states.clear();goals.clear()

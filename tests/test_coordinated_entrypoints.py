@@ -32,6 +32,7 @@ class CoordinatedEntrypointTests(unittest.TestCase):
                 self.assertEqual(len(config.nodes),1)
                 self.assertEqual(config.params['/abc_swarm_demo/velocity_source'].value,'mocap')
                 self.assertEqual(config.params['/abc_swarm_demo/position_tolerance'].value,.08)
+                self.assertEqual(config.params['/abc_swarm_demo/position_hysteresis'].value,.01)
                 self.assertEqual(config.params['/abc_swarm_demo/mocap_calibration/tianbot_mini_02/yaw_offset'].value,.3)
 
     def test_both_demos_have_one_owner_default_size_speed_and_optional_backend(self):
@@ -42,6 +43,10 @@ class CoordinatedEntrypointTests(unittest.TestCase):
             self.assertEqual(sum(n.package=='rosserial_server' for n in config.nodes),1)
             self.assertEqual(sum(n.package=='vrpn_client_ros' for n in config.nodes),1)
             self.assertEqual(config.params['/abc_swarm_demo/task'].value,shape)
+            self.assertEqual(config.params['/abc_swarm_demo/coordinated/reference'].value,
+                             'world' if shape=='triangle' else 'initial_leader')
+            self.assertEqual(config.params['/abc_swarm_demo/position_tolerance'].value,.10)
+            self.assertEqual(config.params['/abc_swarm_demo/position_hysteresis'].value,.07)
             self.assertEqual(config.params['/abc_swarm_demo/coordinated/diameter'].value,2)
             self.assertEqual(config.params['/abc_swarm_demo/coordinated/side_length'].value,2)
             self.assertEqual(config.params['/abc_swarm_demo/coordinated/speed'].value,.15)
@@ -55,7 +60,8 @@ class CoordinatedEntrypointTests(unittest.TestCase):
                            'robot_name_2:=customer_02','rigid_body_2:=body_02','avoidance:=orca'])
             self.assertEqual(len(config.nodes),1)
             self.assertEqual(config.params['/abc_swarm_demo/coordinated/'+size].value,1.5)
-            self.assertEqual(config.params['/abc_swarm_demo/max_linear'].value,.12)
+            self.assertEqual(config.params['/abc_swarm_demo/max_linear'].value,.15)
+            self.assertEqual(config.params['/abc_swarm_demo/coordinated/speed'].value,.12)
             self.assertEqual(config.params['/abc_swarm_demo/coordinated/origin'].value,[1.2,2.1,.4])
             self.assertEqual(config.params['/abc_swarm_demo/robots'].value[1],{'name':'customer_02','frame':'body_02'})
             self.assertEqual(config.params['/abc_swarm_demo/orca/robot_radius'].value,.075)
@@ -66,12 +72,14 @@ class CoordinatedEntrypointTests(unittest.TestCase):
         for shape in ('circle','triangle'):
             spec=json.loads((ROOT/('ai/coordinated-'+shape+'.example.json')).read_text())
             spec['orca']=orca
-            spec['trajectory'].update(reference='world',origin=[1,2,.4])
+            spec['trajectory'].update(reference='world')
+            spec['trajectory']['origin' if shape=='circle' else 'center']=[1,2,.4]
             with tempfile.TemporaryDirectory() as folder:
                 p=Path(folder)/'demo.launch';p.write_text(harness['render'](spec))
                 config=load(p,['start_driver:=false','start_vrpn:=false','use_rviz:=false'])
                 self.assertEqual(len(config.nodes),1)
                 self.assertEqual(config.params['/abc_swarm_demo/task'].value,shape)
+                self.assertEqual(config.params['/abc_swarm_demo/coordinated/reference'].value,'world')
                 self.assertEqual(config.params['/abc_swarm_demo/coordinated/origin'].value,[1,2,.4])
                 self.assertEqual(config.params['/abc_swarm_demo/avoidance'].value,'orca')
 

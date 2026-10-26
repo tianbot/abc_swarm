@@ -19,7 +19,7 @@ from abc_swarm.formation_control import LeaderFollowerMission
 from abc_swarm.coordinated_loop import CoordinatedLoop, LoopFault, loop_geometry
 from abc_swarm.orca import OrcaBlocked, orca_velocities
 from abc_swarm.feedback import MocapVelocityEstimator, odometry_error
-from abc_swarm.point_control import (PointPhaseTracker, formation_targets, point_velocity,
+from abc_swarm.point_control import (formation_targets, point_velocity,
                                      validate_pose, world_goals, validate_mocap_calibration,
                                      mocap_control_pose)
 
@@ -29,6 +29,8 @@ class PointStabilization:
         self.fixed = rospy.get_param('~fixed_frame', 'world')
         self.sim_time = rospy.get_param('/use_sim_time', False)
         self.task = rospy.get_param('~task', 'point')
+        self.startup = rospy.get_param('~startup',True)
+        if type(self.startup) is not bool:raise ValueError('startup must be boolean')
         if self.task not in ('point','circle','triangle','leader_follower'):
             raise ValueError('task must be point, circle, triangle or leader_follower')
         self.loop = None
@@ -39,7 +41,7 @@ class PointStabilization:
         if self.task in ('circle','triangle'):
             self.loop_options = rospy.get_param('~coordinated')
             expected = {'diameter','side_length','clockwise','laps','speed','reference','origin',
-                        'lookahead','phase_window','settle_time','max_error','progress_timeout'}
+                        'lookahead','settle_time','max_error','progress_timeout','vertex_tolerance'}
             if not isinstance(self.loop_options,dict) or set(self.loop_options)!=expected:
                 raise ValueError('Coordinated config fields do not match the launch contract')
             self.loop_options = dict(self.loop_options)
@@ -78,7 +80,7 @@ class PointStabilization:
         if self.task == 'leader_follower':
             self.follow_options = rospy.get_param('~follow')
             self.mission = LeaderFollowerMission([r['name'] for r in self.robots], self.follow_options, self.admission_settings,
-                                                self.planning,rospy.get_param('~stationary_hold',None))
+                                                self.planning,startup=self.startup)
             self.targets = self.mission.local_goals
             self.reference = 'initial_leader'
         elif self.task in ('circle','triangle'):
@@ -95,8 +97,8 @@ class PointStabilization:
         self.timeout = rospy.get_param('~tf_timeout', 0.5)
         self.control = {key: rospy.get_param('~' + key, default) for key, default in
                         [('max_linear', 0.15), ('max_angular', 0.5),
-                         ('position_tolerance', 0.04), ('yaw_tolerance', 0.08),
-                         ('k_distance', 0.9), ('k_heading', 2.0)]}
+                         ('position_tolerance', 0.10), ('position_hysteresis', 0.01), ('yaw_tolerance', 0.08),
+                         ('k_distance', 0.9), ('k_heading', 2.0), ('align_angle', math.pi/4)]}
         if type(self.timeout) not in (int, float) or not math.isfinite(self.timeout) or self.timeout <= 0:
             raise ValueError('tf_timeout must be positive and finite')
         if not isinstance(self.targets, (list, tuple)) or len(self.targets) != len(self.robots):
@@ -104,24 +106,33 @@ class PointStabilization:
         if self.task in ('circle','triangle') and len(self.robots)!=3:
             raise ValueError('Coordinated loops require exactly three robots')
         world_goals(self.targets, self.reference, (0, 0, 0))
-        point_velocity((0, 0, 0), (0, 0, 0), **self.control)
+        point_velocity((0, 0, 0), (0, 0, 0), previous_phase='approaching', **self.control)
         self.avoidance = rospy.get_param('~avoidance', 'none')
-        if self.task=='leader_follower' and self.avoidance!='orca':
+        if self.task=='leader_follower' and self.startup and self.avoidance!='orca':
             raise ValueError('Leader-follower startup requires avoidance=orca')
         if self.avoidance not in ('none', 'orca'):
             raise ValueError('avoidance must be none or orca')
-        self.velocity_source = rospy.get_param('~velocity_source', 'odom')
+        self.velocity_source = rospy.get_param('~velocity_source', 'mocap')
         if self.velocity_source not in ('odom', 'mocap'):
             raise ValueError('velocity_source must be odom or mocap')
         self.calibration = validate_mocap_calibration(
             rospy.get_param('~mocap_calibration', {}), [r['name'] for r in self.robots])
-        self.mocap_velocity = MocapVelocityEstimator(max_gap=max(.2, self.timeout))
+        if not self.calibration:
+            rospy.loginfo('未加载额外标定：直接使用刚体原点作为控制点；实际配置见 ~effective_config。')
+        self.velocity_settings = rospy.get_param('~mocap_velocity', dict(window=.2,min_interval=.08))
+        if (not isinstance(self.velocity_settings,dict) or set(self.velocity_settings)!={'window','min_interval'}
+                or any(type(v) not in (int,float) or not math.isfinite(v) or v<=0 for v in self.velocity_settings.values())):
+            raise ValueError('mocap_velocity requires positive window and min_interval in seconds')
+        self.mocap_velocity = MocapVelocityEstimator(max_gap=max(self.velocity_settings['window'], self.timeout),
+                                                    **self.velocity_settings)
         self.pose_stamps = []
         self.orca = {}
         self.feedback = {}
         self.feedback_lock = threading.Lock()
         self.teleop_command = None
+        self.teleop_state = 'not_following'
         self.feedback_live = False
+        self.feedback_checked = False
         self.last_enabled = None
         self.command_timeout = rospy.get_param('~command_timeout', .3)
         if type(self.command_timeout) not in (int,float) or not math.isfinite(self.command_timeout) or self.command_timeout<=0:
@@ -129,11 +140,16 @@ class PointStabilization:
         self.avoidance_fault = ''
         self.progress_time = None
         self.best_error = None
-        if self.avoidance == 'orca':
+        self.odom_timeout = rospy.get_param('~odom_timeout',.5)
+        self.future_tolerance = rospy.get_param('~odom_future_tolerance',.1)
+        if any(type(v) not in (int,float) or not math.isfinite(v) or v<=0 for v in (self.odom_timeout,self.future_tolerance)):
+            raise ValueError('odom feedback timeouts must be positive and finite')
+        self.stall_timeout = self.admission.settings['progress_timeout']
+        if self.avoidance == 'orca' or self.mission is not None:
             cfg = rospy.get_param('~orca')
-            defaults = dict(robot_radius=0.13, safety_margin=0.02, front_distance=0.08,
+            defaults = dict(robot_radius=0.075, safety_margin=0.01, front_distance=0.04,
                             time_horizon=3.0, right_bias=0.01, velocity_buffer=0.002)
-            if not isinstance(cfg, dict) or set(cfg) != set(defaults) | {'odom_timeout','odom_future_tolerance','stall_timeout'}:
+            if not isinstance(cfg, dict) or set(cfg) != set(defaults):
                 raise ValueError('ORCA config must contain exactly the fields in config/orca.yaml')
             for key, value in cfg.items():
                 if type(value) not in (int,float) or not math.isfinite(value) or value < 0:
@@ -141,18 +157,20 @@ class PointStabilization:
                 if key not in ('safety_margin','right_bias','velocity_buffer') and value <= 0:
                     raise ValueError('ORCA value must be positive: ' + key)
             self.orca = {key:cfg[key] for key in defaults}
-            self.odom_timeout = cfg['odom_timeout']
-            self.future_tolerance = cfg['odom_future_tolerance']
-            self.stall_timeout = cfg['stall_timeout']
             if self.task in ('circle','triangle'):
                 nominal = math.sqrt(3)*self.loop_options['diameter']/2 if self.task=='circle' else self.loop_options['side_length']/2
-                reserve = 2*(cfg['robot_radius']+cfg['safety_margin']+cfg['front_distance']) + self.loop_options['phase_window'] + 2*cfg['velocity_buffer']*cfg['time_horizon']
+                reserve = 2*(cfg['robot_radius']+cfg['safety_margin']+cfg['front_distance']) + 2*cfg['velocity_buffer']*cfg['time_horizon']
                 if nominal <= reserve:
                     raise ValueError('Loop geometry cannot fit the configured ORCA envelopes and progress spacing')
         self.listener = tf.TransformListener()
         self.outputs = [rospy.Publisher('/' + r['name'] + '/cmd_vel', Twist, queue_size=1)
                         for r in self.robots]
         self.status_pub = rospy.Publisher('~status', String, queue_size=1, latch=True)
+        self.config_pub = rospy.Publisher('~effective_config', String, queue_size=1, latch=True)
+        self.trace_outputs = {key:[rospy.Publisher('~'+key+'_cmd/'+r['name'],Twist,queue_size=1)
+                                   for r in self.robots] for key in ('raw','point','preferred')}
+        self.command_trace = {}
+        self.measured = None
         self.goals_pub = rospy.Publisher('~goals', PoseArray, queue_size=1, latch=True)
         self.control_poses_pub = rospy.Publisher('~control_poses', PoseArray, queue_size=1)
         self.path_outputs = [rospy.Publisher('~paths/'+r['name'], Path, queue_size=1, latch=True)
@@ -162,14 +180,13 @@ class PointStabilization:
         self.goals = None
         self.completed = False
         self.final_details = []
-        self.point_control = PointPhaseTracker()
         self.last_status = None
         self.last_phase = None
         self.last_publish = 0
         rospy.on_shutdown(self.stop)
         self.tuning = Server(point_controlConfig, self.configure)
         self.odom_subscribers = []
-        if self.avoidance == 'orca' and self.velocity_source == 'odom':
+        if self.velocity_source == 'odom':
             self.odom_subscribers = [rospy.Subscriber('/'+robot['name']+'/odom', Odometry,
                                      self.odom_cb, callback_args=robot['name'], queue_size=1)
                                      for robot in self.robots]
@@ -212,10 +229,51 @@ class PointStabilization:
             return config
         # Replace the complete settings snapshot; a control cycle uses one version.
         self.control = dict(self.control, k_distance=gains[0], k_heading=gains[1])
+        if hasattr(self,'config_pub'):
+            self.publish_effective_config()
         return config
+
+    def publish_effective_config(self):
+        config = dict(task=self.task, fixed_frame=self.fixed, robots=self.robots,
+                      target_reference=self.reference, point_control=self.control,
+                      mocap_calibration=self.calibration, velocity_source=self.velocity_source,
+                      measured_velocity_used=True, startup=self.startup, mocap_velocity=self.velocity_settings,
+                      tf_timeout=self.timeout, odom_timeout=getattr(self,'odom_timeout',None),
+                      odom_future_tolerance=getattr(self,'future_tolerance',None),
+                      admission=self.admission.settings, planning=self.planning, orca=self.orca,
+                      follow=self.follow_options, coordinated=self.loop_options,
+                      point_max_angular=self.control['max_angular'],
+                      command_timeout=self.command_timeout,
+                      sources=rospy.get_param('~config_sources',{}))
+        self.config_pub.publish(String(data=json.dumps(config,sort_keys=True)))
+
+    def observe_commands(self, trace, measured):
+        """Publish intermediate calculations; this method never edits a command."""
+        self.command_trace, self.measured = trace, measured
+        for key,outputs in self.trace_outputs.items():
+            values=trace.get(key,[])
+            if len(values)!=len(outputs):continue
+            for output,(v,w) in zip(outputs,values):
+                msg=Twist();msg.linear.x,msg.angular.z=v,w;output.publish(msg)
+
+    def command_details(self, index, command):
+        v,w,phase=command
+        result={'command':[v,w], 'processing':list(self.command_trace.get('processing',[]))}
+        for key in ('raw','point','preferred'):
+            values=self.command_trace.get(key,[])
+            result[key+'_command']=list(values[index]) if len(values)==len(self.robots) else None
+        result['command_changed']=result['raw_command'] is not None and tuple(result['raw_command'])!=(v,w)
+        result['measured_velocity']=list(self.measured[index]) if self.measured is not None else None
+        if phase=='leader_manual':result['processing']=['manual_forward']
+        elif phase=='leader_auto':result['processing']=['pure_pursuit']
+        elif phase=='following':result['processing']=['leader_follower','output_limits']
+        if phase.endswith('barrier') or phase=='avoidance_wait':result['processing'].append(phase)
+        return result
 
     def stop(self):
         self.feedback_live = False
+        self.command_trace = {}
+        self.measured = None
         with self.feedback_lock:
             self.teleop_command = None
         for output in self.outputs:
@@ -266,7 +324,12 @@ class PointStabilization:
     def status(self, state, reason, details=None):
         admission = self.mission.admission if self.mission is not None else self.loop.admission if self.loop is not None else self.admission
         stage = self.mission.stage if self.mission is not None else self.loop.stage if self.loop is not None else admission.stage if self.avoidance=='orca' and state=='running' else state
-        data = {'schema_version': 2, 'mode': 'leader_follower' if self.mission is not None else 'point_stabilization' if self.task=='point' else 'coordinated_tracking',
+        if details is None:details=self.final_details
+        if not self.feedback_live:
+            details=[dict(r,command=[0.,0.],raw_command=None,point_command=None,preferred_command=None,
+                          measured_velocity=None,phase=state,command_changed=False,processing=[state]) for r in details]
+        admission_complete=self.loop.stage!='assembling' if self.loop is not None else self.completed
+        data = {'schema_version': 3, 'node_type':'swarm_task', 'services':[], 'mode': 'leader_follower' if self.mission is not None else 'point_stabilization' if self.task=='point' else 'coordinated_tracking',
                             'admission_planning': {'state': admission.planner.state,
                                 'active_robot': self.robots[admission.planner.active]['name'] if admission.planner.active is not None else None,
                                 'waypoints': admission.planner.route} if self.avoidance=='orca' and admission.planner is not None else None,
@@ -277,17 +340,21 @@ class PointStabilization:
                             'edge_rounds_completed': self.loop.rounds_completed if self.loop is not None else 0,
                             'avoidance': self.avoidance,
                             'velocity_source': self.velocity_source,
+                            'feedback_valid': self.feedback_checked,
+                            'ready_criterion': 'pose_and_measured_stop',
                             'mocap_calibrated': bool(self.calibration),
                             'avoidance_scope': 'point' if self.task=='point' else 'assembly',
                             'avoidance_active': self.avoidance=='orca' and state=='running' and admission.stage=='assembling_orca' and (self.task=='point' or self.mission is not None and self.mission.stage!='following' or self.loop is not None and self.loop.stage=='assembling'),
-                            'admission_complete': self.loop.stage!='assembling' if self.loop is not None else self.completed,
-                            'state': state, 'ready': state in ('running', 'completed'),
+                            'admission_complete': admission_complete,
+                            'state': state, 'ready': state in ('running', 'completed') and admission_complete,
                             'enabled': state == 'running', 'reason': reason,
                             'robots': details or [], 'target_reference': self.reference, 'formation': self.formation,
                             'vrpn_server': rospy.get_param('/vrpn_client_node/server', ''),
                             'vrpn_port': rospy.get_param('/vrpn_client_node/port', 0)}
         if self.mission is not None:
-            data.update(control_mode=self.follow_options['mode'], ready=state in ('running','completed') and self.mission.stage in ('ready','following','settling','completed'), admission_complete=self.mission.stage in ('ready','following','settling','completed'), common_progress=self.mission.progress, formation_error=self.mission.formation_error, leader_scale=self.mission.leader_scale)
+            data.update(control_mode=self.follow_options['mode'], ready=state in ('running','completed') and self.mission.stage in ('ready','following','settling','completed'), admission_complete=self.startup and self.mission.stage in ('ready','following','settling','completed'), admission_skipped=not self.startup, common_progress=self.mission.progress, formation_error=self.mission.formation_error,
+                        leader_request=self.mission.leader_request if state=='running' and self.mission.stage=='following' else None,
+                        command_state=state if state!='running' else self.teleop_state if self.follow_options['mode']=='manual' else 'path_controller')
             if self.last_enabled != (state=='running'):
                 rospy.set_param('~enabled', state=='running');self.last_enabled=(state=='running')
         value = json.dumps(data, sort_keys=True)
@@ -295,9 +362,9 @@ class PointStabilization:
         if self.mission is not None and state=='running' and stage=='following' and phase!=self.last_phase:
             if self.last_phase is None or self.last_phase[1]!='following':
                 if self.follow_options['mode']=='manual':
-                    rospy.loginfo('%d台车入位完成，可以遥控头车 %s；请在遥控窗口操作。',len(self.robots),self.robots[0]['name'])
+                    rospy.loginfo('%d台车'+('入位完成' if self.startup else '按startup=false跳过入位')+'，可以遥控头车 %s；请在遥控窗口操作。',len(self.robots),self.robots[0]['name'])
                 else:
-                    rospy.loginfo('%d台车入位完成，开始自动领航与编队跟随。',len(self.robots))
+                    rospy.loginfo('%d台车'+('入位完成' if self.startup else '按startup=false跳过入位')+'，开始自动领航与编队跟随。',len(self.robots))
             elif self.last_phase[0]=='waiting':
                 rospy.loginfo('反馈已恢复，继续%s。','遥控与编队跟随' if self.follow_options['mode']=='manual' else '自动领航与编队跟随')
         # Publish transitions immediately; cap numeric-only updates at 5 Hz.
@@ -328,6 +395,7 @@ class PointStabilization:
         dt = self.control_interval()
         commands = self.loop.step(poses,self.control,dt,measured,
                                   self.orca if self.avoidance=='orca' else None)
+        self.observe_commands(self.loop.trace, measured)
         if self.goals != self.loop.goals:
             self.goals = list(self.loop.goals);self.publish_goals()
         self.completed = self.loop.completed
@@ -338,7 +406,7 @@ class PointStabilization:
             details.append({'name':robot['name'],'frame':robot['frame'],'goal':goal,'phase':phase,
                             'position_error':math.hypot(goal[0]-pose[0],goal[1]-pose[1]),
                             'yaw_error':math.atan2(math.sin(goal[2]-pose[2]),math.cos(goal[2]-pose[2])),
-                            'path_error':error,'command':[v,w]})
+                            'path_error':error,**self.command_details(len(details),(v,w,phase))})
         self.final_details = details
         self.status('completed' if self.completed else 'waiting' if self.loop.admission.blocked else 'running',
                     'waiting for feasible avoidance velocity' if self.loop.admission.blocked else 'coordinated '+self.task+': '+self.loop.stage,details)
@@ -353,10 +421,14 @@ class PointStabilization:
         with self.feedback_lock:
             request = self.teleop_command
         teleop = request[1:] if request is not None and time.monotonic()-request[0]<=self.command_timeout else (0.,0.)
-        if self.follow_options['mode']=='manual' and (abs(teleop[0])>self.control['max_linear'] or abs(teleop[1])>self.control['max_angular']):
-            rospy.logwarn_throttle(2.,'遥控请求超过上限：请求v=%.3f m/s、w=%.3f rad/s；允许|v|<=%.3f、|w|<=%.3f。编队协调还可能进一步减速。',
-                                   teleop[0],teleop[1],self.control['max_linear'],self.control['max_angular'])
+        self.teleop_state = ('not_following' if self.mission.stage!='following' else
+                             'no_request' if request is None else
+                             'command_timeout' if time.monotonic()-request[0]>self.command_timeout else 'forwarded')
         commands = self.mission.step(poses,measured,self.control,self.orca,self.control_interval(),teleop)
+        trace=self.mission.admission.trace
+        if commands[0][2].startswith('leader_'):
+            trace={'raw':self.mission.raw_commands,'processing':['leader_follower']}
+        self.observe_commands(trace, measured)
         if not self.startup_published:
             self.goals = list(self.mission.startup_goals)
             self.publish_goals()
@@ -375,19 +447,21 @@ class PointStabilization:
             details.append({'name':robot['name'],'frame':robot['frame'],'goal':goal,'phase':phase,
                             'position_error':math.hypot(goal[0]-pose[0],goal[1]-pose[1]),
                             'yaw_error':math.atan2(math.sin(goal[2]-pose[2]),math.cos(goal[2]-pose[2])),
-                            'command':[v,w]})
+                            **self.command_details(len(details),(v,w,phase))})
         self.final_details = details
         self.status('completed' if self.completed else 'waiting' if self.mission.admission.blocked else 'running',
                     'waiting for feasible avoidance velocity' if self.mission.admission.blocked else 'leader follower: '+self.mission.stage,details)
 
     def step(self):
+        self.feedback_checked = False
         try:
             if self.avoidance_fault:
                 self.stop()
                 self.status('fault', self.avoidance_fault, self.final_details)
                 return
             poses = self.poses()  # Validate the entire group before publishing any motion.
-            measured = self.measured_velocities(poses) if self.avoidance == 'orca' else None
+            measured = self.measured_velocities(poses)
+            self.feedback_checked = True
             self.feedback_live = True
             if self.mission is not None:
                 self.step_mission(poses,measured)
@@ -403,17 +477,16 @@ class PointStabilization:
                 self.status('completed', 'all target poses reached; restart launch for another run', self.final_details)
                 return
             control = self.control
-            preferred = self.point_control.commands(poses, self.goals, control)
-            if self.avoidance == 'orca':
-                results = self.admission.step(poses,self.goals,control,self.control_interval(),measured,self.orca)
+            dt = self.control_interval()
+            results = self.admission.step(poses,self.goals,control,dt,measured,self.orca if self.avoidance=='orca' else None)
+            if self.avoidance=='orca':
                 error = -self.admission.progress
                 if self.best_error is None or error < self.best_error-0.005:
                     self.best_error, self.progress_time = error, time.monotonic()
                 if time.monotonic()-self.progress_time > self.stall_timeout:
                     raise OrcaBlocked('ORCA progress timeout; inspect geometry and restart')
-            else:
-                results = preferred
-            self.completed = self.admission.ready if self.avoidance=='orca' else all(phase == 'arrived' for _, _, phase in results)
+            self.observe_commands(self.admission.trace, measured)
+            self.completed = self.admission.ready
             details = []
             for robot, pose, goal, (v, w, phase), output in zip(
                     self.robots, poses, self.goals, results, self.outputs):
@@ -422,7 +495,8 @@ class PointStabilization:
                 output.publish(cmd)
                 details.append({'name': robot['name'], 'frame': robot['frame'], 'goal': goal,
                                 'phase': phase, 'position_error': math.hypot(goal[0]-pose[0], goal[1]-pose[1]),
-                                'yaw_error': math.atan2(math.sin(goal[2]-pose[2]), math.cos(goal[2]-pose[2]))})
+                                'yaw_error': math.atan2(math.sin(goal[2]-pose[2]), math.cos(goal[2]-pose[2])),
+                                **self.command_details(len(details),(v,w,phase))})
             self.final_details = details
             self.status('completed' if self.completed else 'waiting' if self.avoidance=='orca' and self.admission.blocked else 'running',
                         'all target poses reached' if self.completed else 'waiting for feasible avoidance velocity' if self.avoidance=='orca' and self.admission.blocked else 'tracking frozen target poses', details)

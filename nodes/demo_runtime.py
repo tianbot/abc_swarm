@@ -28,13 +28,12 @@ class DemoRuntime:
         self.fixed = rospy.get_param('~fixed_frame', 'world')
         self.frames = rospy.get_param('~robot_frames')
         self.topics = rospy.get_param('~feedback_topics', [])
-        self.timeout = float(rospy.get_param('~feedback_timeout', 0.5))
+        self.tf_timeout = float(rospy.get_param('~tf_timeout', 0.5))
+        self.odom_timeout = float(rospy.get_param('~odom_timeout', 0.5))
         self.future_tolerance = float(rospy.get_param('~odom_future_tolerance', 0.1))
         self.command_timeout = float(rospy.get_param('~command_timeout', 0.3))
-        self.max_linear = float(rospy.get_param('~max_linear', 0.15))
-        self.max_angular = float(rospy.get_param('~max_angular', 0.6))
         if not self.frames or any(not math.isfinite(v) or v <= 0 for v in
-                (self.timeout, self.future_tolerance, self.command_timeout, self.max_linear, self.max_angular)):
+                (self.tf_timeout, self.odom_timeout, self.future_tolerance, self.command_timeout)):
             raise ValueError('Robot frames and positive finite limits are required')
         self.listener = tf.TransformListener()
         self.feedback = {}
@@ -55,7 +54,12 @@ class DemoRuntime:
         else:
             self.subscribers.append(rospy.Subscriber('/abc_swarm_path/status', String,
                                                      self.path_cb, queue_size=1))
-        self.services = [rospy.Service('~reset', Trigger, self.reset)]
+        self.services = [rospy.Service('~reset', Trigger, self.reset)] if self.mode=='path' else []
+        self.config_pub=rospy.Publisher('~effective_config',String,queue_size=1,latch=True)
+        self.config_pub.publish(String(data=json.dumps(dict(node_type='manual_relay' if self.mode=='manual' else 'path_runtime',
+            frames=self.frames,feedback_topics=self.topics,tf_timeout=self.tf_timeout,odom_timeout=self.odom_timeout,
+            odom_future_tolerance=self.future_tolerance,command_timeout=self.command_timeout,
+            manual_passthrough=True),sort_keys=True)))
         rospy.on_shutdown(self.shutdown)
 
     def odom_cb(self, msg, topic):
@@ -80,7 +84,7 @@ class DemoRuntime:
             try:
                 stamp = self.listener.getLatestCommonTime(self.fixed, frame)
                 age = (now - stamp).to_sec()
-                if stamp == rospy.Time(0) or not 0 <= age <= self.timeout:
+                if stamp == rospy.Time(0) or not 0 <= age <= self.tf_timeout:
                     return False, 'stale pose: ' + frame
                 trans, rot = self.listener.lookupTransform(self.fixed, frame, stamp)
                 if not all(math.isfinite(v) for v in (*trans, *rot)):
@@ -93,7 +97,7 @@ class DemoRuntime:
                 return False, 'waiting for odometry: ' + topic
             stamp, received, v, w = sample
             issue = odometry_error(stamp.to_sec(), now.to_sec(), time.monotonic() - received,
-                                   v, w, self.timeout, self.future_tolerance)
+                                   v, w, self.tf_timeout, self.odom_timeout, self.future_tolerance)
             if issue:
                 return False, topic + ': ' + issue
         if self.mode == 'path' and not self.path_status.startswith(
@@ -134,12 +138,16 @@ class DemoRuntime:
             if not self.active or not was_active:
                 self.command = None  # Do not replay input across a feedback interruption.
             rospy.set_param(self.enabled_param, self.active)
+            command_state = 'path_controller' if self.mode == 'path' else 'feedback_unavailable'
             if self.publisher is not None:
                 cmd = Twist()
+                if self.active:
+                    command_state = 'no_request' if self.command is None else 'command_timeout'
                 if (self.active and self.command is not None
                         and time.monotonic() - self.command[0] <= self.command_timeout):
-                    cmd.linear.x = max(-self.max_linear, min(self.max_linear, self.command[1]))
-                    cmd.angular.z = max(-self.max_angular, min(self.max_angular, self.command[2]))
+                    cmd.linear.x = self.command[1]
+                    cmd.angular.z = self.command[2]
+                    command_state = 'forwarded'
                 self.publisher.publish(cmd)
             state = 'running' if self.active else 'waiting'
             if self.mode == 'path' and self.path_status.startswith('completed'):
@@ -148,9 +156,15 @@ class DemoRuntime:
                 state, reason = 'fault', self.path_status
             elif self.fault:
                 state, reason = 'fault', self.fault
-            status = json.dumps({'schema_version': 2, 'state': state, 'reason': reason,
+            if state != 'running':
+                command_state = state
+            status = json.dumps({'schema_version': 3, 'node_type': 'manual_relay' if self.mode=='manual' else 'path_runtime',
+                                 'services': ['reset'] if self.mode=='path' else [], 'state': state, 'reason': reason,
                                  'enabled': self.active, 'ready': ready and not (self.mode == 'path' and self.fault),
                                  'mode': self.mode,
+                                 'command_state': command_state,
+                                 'input_command': list(self.command[1:]) if self.command is not None else None,
+                                 'output_command': [cmd.linear.x, cmd.angular.z] if self.publisher is not None else None,
                                  'vrpn_server': rospy.get_param('/vrpn_client_node/server', ''),
                                  'vrpn_port': rospy.get_param('/vrpn_client_node/port', 0)},
                                 sort_keys=True)

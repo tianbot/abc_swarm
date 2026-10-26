@@ -8,6 +8,3 @@ front_distance: 0.04
 time_horizon: 3.0
 right_bias: 0.01
 velocity_buffer: 0.002
-odom_timeout: 0.5
-odom_future_tolerance: 0.1
-stall_timeout: 30.0

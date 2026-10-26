@@ -1,39 +1,45 @@
 <launch>
+  <!-- 反馈与跟随参数各自加载；命令行非空值才覆盖配置。 -->
+  <arg name="feedback_config" default="$(find abc_swarm)/config/feedback.yaml"/>
+  <arg name="follow_config" default="$(find abc_swarm)/config/leader_follower.yaml"/>
+  <!-- 一条跟随边：指定前车、后车、前车车体系下的偏移以及控制参数。 -->
   <arg name="leader_name" />
   <arg name="follower_name" />
   <arg name="leader_frame" default="$(arg leader_name)" />
   <arg name="follower_frame" default="$(arg follower_name)" />
   <arg name="offset_x" default="-0.5" />
   <arg name="offset_y" default="0.0" />
-  <arg name="front_distance" default="0.1" />
-  <arg name="k_x" default="0.5" />
-  <arg name="k_y" default="0.5" />
-  <arg name="max_linear" default="0.15" />
-  <arg name="max_angular" default="0.6" />
-  <arg name="tf_timeout" default="0.5" />
-  <arg name="odom_timeout" default="0.5" />
-  <arg name="odom_future_tolerance" default="0.1" />
+  <arg name="front_distance" default="" />
+  <arg name="k_x" default="" />
+  <arg name="k_y" default="" />
+  <arg name="max_linear" default="" />
+  <arg name="max_angular" default="" />
+  <arg name="tf_timeout" default="" />
+  <arg name="odom_timeout" default="" />
+  <arg name="odom_future_tolerance" default="" />
 
-  <node pkg="tf2_ros" type="static_transform_publisher"
-        name="$(arg follower_name)_lf_target"
-        args="$(arg offset_x) $(arg offset_y) 0 0 0 0 $(arg leader_frame) abc_swarm_lf/$(arg follower_name)/target" />
-
+  <!-- 相对目标TF：可直接在RViz查看前车坐标下的目标偏移。 -->
+  <node pkg="tf2_ros" type="static_transform_publisher" name="$(arg follower_name)_lf_target"
+        args="$(arg offset_x) $(arg offset_y) 0 0 0 0 $(arg leader_frame) abc_swarm_lf/$(arg follower_name)/target"/>
+  <!-- 跟随算法：输入相对 TF 和前车实测 odom，计算并限幅后发布后车 cmd_vel；受共享就绪标志控制。 -->
   <node pkg="abc_swarm" type="leader_follower_tracker.py"
-        name="$(arg follower_name)_leader_follower" output="screen" required="true">
+        name="$(arg follower_name)_leader_follower" output="screen" required="true" clear_params="true">
+    <rosparam command="load" file="$(arg feedback_config)"/>
+    <rosparam command="load" file="$(arg follow_config)"/>
     <param name="leader_frame" value="$(arg leader_frame)" />
     <param name="follower_frame" value="$(arg follower_frame)" />
     <param name="leader_odom_topic" value="/$(arg leader_name)/odom" />
     <param name="cmd_topic" value="/$(arg follower_name)/cmd_vel" />
     <param name="offset_x" value="$(arg offset_x)" />
     <param name="offset_y" value="$(arg offset_y)" />
-    <param name="front_distance" value="$(arg front_distance)" />
-    <param name="k_x" value="$(arg k_x)" />
-    <param name="k_y" value="$(arg k_y)" />
-    <param name="max_linear" value="$(arg max_linear)" />
-    <param name="max_angular" value="$(arg max_angular)" />
-    <param name="tf_timeout" value="$(arg tf_timeout)" />
-    <param name="odom_timeout" value="$(arg odom_timeout)" />
-    <param name="odom_future_tolerance" value="$(arg odom_future_tolerance)" />
+    <param if="$(eval arg('front_distance') != '')" name="front_distance" value="$(arg front_distance)" />
+    <param if="$(eval arg('k_x') != '')" name="k_x" value="$(arg k_x)" />
+    <param if="$(eval arg('k_y') != '')" name="k_y" value="$(arg k_y)" />
+    <param if="$(eval arg('max_linear') != '')" name="max_linear" value="$(arg max_linear)" />
+    <param if="$(eval arg('max_angular') != '')" name="max_angular" value="$(arg max_angular)" />
+    <param if="$(eval arg('tf_timeout') != '')" name="tf_timeout" value="$(arg tf_timeout)" />
+    <param if="$(eval arg('odom_timeout') != '')" name="odom_timeout" value="$(arg odom_timeout)" />
+    <param if="$(eval arg('odom_future_tolerance') != '')" name="odom_future_tolerance" value="$(arg odom_future_tolerance)" />
     <param name="enabled_param" value="/abc_swarm_demo/enabled" />
   </node>
 </launch>

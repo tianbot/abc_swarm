@@ -13,7 +13,7 @@
 | settling | auto路径结束后冻结最终队形，再收敛与稳定停车 | 按入队条件选择 | 丢弃 |
 | completed | 全组保持零速 | 关闭 | 丢弃 |
 
-状态state另外区分running/waiting/fault/completed。反馈缺失时保留冻结任务，输出零速；恢复后重新积累速度/稳定窗口。短暂无可行ORCA速度时整组停车等待重新测量，不放松半平面约束；包络重叠/目标冲突等几何错误直接fault，长期无进展也fault。退出或故障后重启任务，不增加人工启用service。
+状态state另外区分running/waiting/fault/completed。反馈缺失时保留冻结任务，输出零速；恢复后重新积累速度/稳定窗口。虚拟前置包络重叠时计算受限分离动作（recovery_active=true、参与车辆phase=recovering），恢复后继续原任务；短暂无可行ORCA速度时整组停车等待重新测量，不放松半平面约束；实际车体包络过近/目标冲突等几何错误直接fault，长期无进展也fault。退出或故障后重启任务，不增加人工启用service。
 
 默认完整流程由现有 `nodes/point_stabilization.py` 管理定位、标定、速度反馈和每车唯一cmd_vel。算法在 `src/abc_swarm/admission.py` 和 `formation_control.py`，复用原ORCA、点镇定、leader–follower控制律与Pure Pursuit。不再同时启动旧跟随节点、头车路径节点或demo_runtime发布最终速度。startup=false保留旧式入口，便于对照；原视频48个资源不变。
 
@@ -42,7 +42,7 @@ following阶段使用原跟随控制律和实测前车速度。当外侧后车�
 | /abc_swarm_demo/status | schema_version=2，阶段变化立即发，数值更新约5Hz |
 | status.control_mode / stage / admission_stage | 任务模式、整体阶段、入队子阶段 |
 | status.ready / admission_complete | 是否已经到齐、是否完成过启动入队 |
-| status.avoidance_active / formation_error / leader_scale | 是否正在执行ORCA、跟随误差、头车减速比例 |
+| status.avoidance_active / recovery_active / formation_error / leader_scale | 是否执行ORCA、是否分离恢复、跟随误差、头车减速比例 |
 | status.robots | 每车名称、原始刚体、当前目标、位置/航向误差、命令和阶段 |
 | /abc_swarm_demo/startup_goals | 一次冻结的启动PoseArray，latched，顺序对应robots |
 | /abc_swarm_demo/goals / control_poses | 当前阶段目标与校准后的水平控制位姿 |

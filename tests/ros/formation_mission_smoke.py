@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Private 11438 ROS-clock models: no hardware, no VRPN, no odom publishers."""
 import json
+import argparse
 import math
 import os
 from pathlib import Path
@@ -12,6 +13,12 @@ import time
 
 
 def main():
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--case',choices=['triangle_manual','triangle_auto','snake_manual','snake_auto'])
+    parser.add_argument('--overlap-start',action='store_true',help='Use the measured three-robot virtual-overlap snapshot')
+    selection=parser.parse_args()
+    if selection.overlap_start and selection.case!='triangle_manual':
+        parser.error('--overlap-start requires --case triangle_manual')
     folder=Path(tempfile.mkdtemp(prefix='abc_swarm_mission_ros_'))
     os.environ.update(ROS_MASTER_URI='http://127.0.0.1:11438',ROS_IP='127.0.0.1',
                       ROS_HOME=str(folder/'home'),ROS_LOG_DIR=str(folder/'logs'))
@@ -96,7 +103,10 @@ def main():
 
         for shape in ['triangle','snake']:
             for mode in ['manual','auto']:
+                if selection.case and selection.case!=shape+'_'+mode:continue
                 poses=[(0,0,0),(-.8,.6,.5),(-.7,-.7,-.3)] if shape=='triangle' else [(0,0,0),(-.8,.1,.4),(-1.4,-.05,-.3)]
+                if selection.overlap_start:
+                    poses=[(.86667,.45197,.02185),(.45627,.19000,2.31835),(.52334,.46542,-2.97020)]
                 states.clear();starts.clear();targets.clear();visited.clear();minimum=100;peak=0
                 for rows in commands.values():rows.clear()
                 pump(.5,move=False)
@@ -117,6 +127,8 @@ def main():
                     assert states[-1]['state']!='fault',(states[-1],poses)
                 assert states[-1]['stage']=='following',states[-1]
                 assert 'fine_positioning' in visited and 'ready' in visited,visited
+                if selection.overlap_start:
+                    assert any(s.get('recovery_active') for s in states),'overlap recovery not reported'
                 assert [(x.position.x,x.position.y) for x in starts[-1].poses]==frozen
                 publishers=dict(rosgraph.Master(rospy.get_name()).getSystemState()[0])
                 for n in names:assert publishers['/'+n+'/cmd_vel']==['/abc_swarm_demo'],publishers
@@ -138,7 +150,7 @@ def main():
                     pump(1.);zeros()
                     assert 'settling' in visited,visited
                     assert all(r['position_error']<=.04 and abs(r['yaw_error'])<=.08 for r in states[-1]['robots']),states[-1]
-                assert minimum>.3,minimum
+                assert minimum>(.17 if selection.overlap_start else .3),minimum
                 assert peak<=.15+1e-8,peak
                 stop(p);pump(.2,move=False)
                 assert all(commands[n][-1][1:]==(0.,0.) for n in names),commands

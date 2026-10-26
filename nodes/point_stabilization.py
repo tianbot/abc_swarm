@@ -263,6 +263,7 @@ class PointStabilization:
         admission = self.mission.admission if self.mission is not None else self.loop.admission if self.loop is not None else self.admission
         stage = self.mission.stage if self.mission is not None else self.loop.stage if self.loop is not None else admission.stage if self.avoidance=='orca' and state=='running' else state
         data = {'schema_version': 2, 'mode': 'leader_follower' if self.mission is not None else 'point_stabilization' if self.task=='point' else 'coordinated_tracking',
+                            'recovery_active': state=='running' and admission.recovering,
                             'task': self.task, 'stage': stage, 'admission_stage': admission.stage,
                             'common_progress': self.loop.common_progress if self.loop is not None else 0.0,
                             'progress_spread': self.loop.progress_spread if self.loop is not None else 0.0,

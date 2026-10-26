@@ -30,8 +30,10 @@ class AdmissionController:
         self.point = PointPhaseTracker()
         self.signature = None
         self.blocked = False
+        self.recovering = False
 
     def pause(self):
+        self.recovering = False
         self.handoff_hold = self.settle_hold = 0.
         self.ready = False
         if self.stage == 'ready':
@@ -54,6 +56,7 @@ class AdmissionController:
 
     def step(self, poses, goals, control, dt=.05, velocities=None, orca=None):
         self.blocked = False
+        self.recovering = False
         if not poses or len(poses) != len(goals):
             raise ValueError('Admission needs one goal per robot')
         if not math.isfinite(dt) or not 0 < dt <= .2:
@@ -94,8 +97,10 @@ class AdmissionController:
                 return [(0., 0., 'handoff_barrier')]*len(poses)
             preferred = self.point.commands(poses, goals, control)
             try:
-                return orca_velocities(poses, goals, velocities, control,
-                                       preferred_commands=preferred, **orca)
+                commands = orca_velocities(poses, goals, velocities, control,
+                                          preferred_commands=preferred, **orca)
+                self.recovering = any(c[2]=='recovering' for c in commands)
+                return commands
             except OrcaInfeasible:
                 self.blocked = True
                 self.settle_hold = 0.

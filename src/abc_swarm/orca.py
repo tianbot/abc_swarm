@@ -83,11 +83,20 @@ def project_velocity(preferred, constraints, radius):
 
 
 def pair_plane(position,velocity,other_position,other_velocity,combined_radius,horizon):
-    """RVO2 agent-agent ORCA half-plane, equal reciprocal responsibility."""
+    """RVO2 pair plane; virtual overlaps use gradual radial separation."""
     p=sub(other_position,position);v=sub(velocity,other_velocity)
     dist2=dot(p,p);r2=combined_radius*combined_radius
     if dist2<=r2+EPS:
-        raise OrcaBlocked('effective envelopes overlap; separate robots and restart')
+        distance=math.sqrt(dist2)
+        if distance<EPS:
+            raise OrcaBlocked('coincident effective centers; inspect robot feedback')
+        # Recover a *virtual* envelope overlap gradually, rather than demand
+        # separation in one timestep as RVO2 does for colliding agent disks.
+        # The paired planes require outward relative speed >= penetration / T.
+        # Keep equal responsibility and solve inside the original actuator bounds.
+        normal=mul(p,-1/distance)
+        return normal,(dot(normal,mul(add(velocity,other_velocity),.5))
+                       +.5*(combined_radius-distance)/horizon)
     w=sub(v,mul(p,1/horizon));w2=dot(w,w);wp=dot(w,p)
     if wp<0 and wp*wp>r2*w2:
         length=math.sqrt(w2);unit=mul(w,1/length)
@@ -150,6 +159,8 @@ def orca_velocities(poses,goals,velocities,control,robot_radius=0.075,safety_mar
     target_centers=[front_point(g,front_distance) for g in goals]
     for i in range(len(poses)):
         for j in range(i):
+            if math.hypot(*sub(poses[i][:2],poses[j][:2]))<=2*(robot_radius+safety_margin):
+                raise OrcaBlocked('physical body envelopes overlap; separate robots and restart')
             if math.hypot(*sub(target_centers[i],target_centers[j]))<=2*radius+2*velocity_buffer*time_horizon:
                 raise OrcaBlocked('target effective envelopes overlap; change target poses')
     result=[];max_v=control['max_linear'];max_w=control['max_angular']
@@ -169,5 +180,8 @@ def orca_velocities(poses,goals,velocities,control,robot_radius=0.075,safety_mar
         safe=project_velocity(preferred,planes,math.hypot(max_v,front_distance*max_w))
         if safe is None:raise OrcaInfeasible('no feasible ORCA velocity within differential-drive limits')
         body=(dot(safe,e),dot(safe,side)/front_distance)
-        result.append((*body,'avoiding' if phase=='arrived' and math.hypot(*safe)>1e-6 else phase))
+        recovering=any(math.hypot(*sub(centers[i],c))<=2*radius+EPS
+                       for j,c in enumerate(centers) if j!=i)
+        result.append((*body,'recovering' if recovering else
+                       'avoiding' if phase=='arrived' and math.hypot(*safe)>1e-6 else phase))
     return result

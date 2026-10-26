@@ -97,7 +97,9 @@ rostopic echo /abc_swarm_demo/status
 | waiting | 任一反馈缺失/过期，或ORCA速度交集暂时为空，全组输出零；条件恢复后继续原冻结目标 |
 | running | 正在ORCA入位，或受几何监控的纯点镇定 |
 | completed | 三台位置和最终航向均到达，持续停车，不自动开始第二轮 |
-| fault | 初始有效包络重叠、目标冲突或长期无进展；整组停车并锁定，检查后重启 launch |
+| fault | 实际车体包络过近、目标冲突或长期无进展；整组停车并锁定，检查后重启 launch |
+
+虚拟前置圆包络重叠时不再直接锁定fault：参与车辆通过径向分离约束，按现有time_horizon逐步拉开，同时继续满足差速v/omega上限。分离速度不可行时全组零输出等待重算，不放松约束；长期无进展仍fault。实际控制中心距离不大于2×(robot_radius+safety_margin)时仍锁定停车（当前默认17cm）。status新增recovery_active，各参与车辆phase为recovering；恢复后继续原冻结目标，不重新分配目标，也不增加service。
 
 反馈中断时间不计入进展超时。ORCA 是局部避让，不能保证所有拥挤/对称配置都能到达目标；fault 是未完成，不能当成避障成功。不要用重启反复强推几何不可行的任务。
 
@@ -130,6 +132,8 @@ roslaunch --nodes /tmp/customer-orca-demo/experiment.launch start_driver:=false 
 两两 ORCA 半平面参考 [RVO2 Agent.cc 固定提交](https://github.com/snape/RVO2/blob/75822bba14462c2e872ca96423825017ecd24764/src/Agent.cc)，Python 实现在 `src/abc_swarm/orca.py`，保留 Apache-2.0 归属，许可证和参考文件哈希在 `licenses/orca/`。没有引入 C++ 编译依赖；仅实现本轮需要的参与车辆两两约束，不包含 RVO2 的静态障碍部分。
 
 差速适配参考 [ORCA-DD](https://gamma-web.iacs.umd.edu/ORCA-DD/) 的有效圆心和半径思想。前置点速度满足 u=v·heading+d·omega·left；本实现把车体 v/omega 上限变成半平面，直接求与 ORCA 半平面的交集，再还原车体命令。不会在求解后随意裁剪速度并继续假设约束成立；交集为空则整组零输出并等待下一次测量重试；不放松约束，长期无进展仍锁定故障。
+
+重叠恢复属于本仓库的差速工程适配：标准RVO2对重叠圆使用单步时间尺度的分离分支；此处针对仍未侵入实际车体包络的虚拟圆重叠，采用径向分离半平面和现有预测时域，避免要求一周期完成分离。目标包络冲突仍是配置错误，不进入恢复。这不是新增的全局路线规划。
 
 这是工程首版，不声称逐项复现论文全部假设或证明。尚未辨识执行延迟、打滑、刹停距离、轮速组合限幅和动捕误差；离散周期、执行器对命令的裁剪也影响真实效果。计算模型中的几何余量不替代实车验收。当前没有静态障碍感知、全局路径规划、自动目标分配或对所有配置的可达性保证。
 

@@ -2,7 +2,7 @@
 import math
 import random
 import unittest
-from abc_swarm.orca import (OrcaBlocked,orca_velocities,project_velocity,front_point,front_velocity,dot)
+from abc_swarm.orca import (OrcaBlocked,OrcaInfeasible,orca_velocities,project_velocity,front_point,front_velocity,dot)
 from abc_swarm.point_control import angle
 
 CONTROL=dict(max_linear=.15,max_angular=.5,position_tolerance=.04,yaw_tolerance=.08,k_distance=.9,k_heading=2.)
@@ -93,11 +93,70 @@ class OrcaTests(unittest.TestCase):
                 if mission.stage=='following':break
             else:self.fail('compact Mini field layout did not reach following')
             self.assertGreater(minimum,.17)  # 15cm body + 1cm margin per vehicle.
-        # Function defaults must match the Mini geometry too, including rejecting overlap.
+        # A virtual overlap now recovers; a physical body envelope overlap still stops.
         goals=[(0,0,0),(.5,0,0)]
         orca_velocities([(0,0,0),(.26,0,0)],goals,[(0,0)]*2,CONTROL)
-        with self.assertRaises(OrcaBlocked):
-            orca_velocities([(0,0,0),(.24,0,0)],goals,[(0,0)]*2,CONTROL)
+        commands=orca_velocities([(0,0,0),(.24,0,0)],goals,[(0,0)]*2,CONTROL)
+        self.assertTrue(all(c[2]=='recovering' for c in commands))
+        with self.assertRaisesRegex(OrcaBlocked,'physical body'):
+            orca_velocities([(0,0,0),(.16,0,0)],goals,[(0,0)]*2,CONTROL)
+
+    def test_overlap_recovery_separates_even_with_closing_measured_velocities(self):
+        for measured in [[(0,0),(0,0)],[(.1,0),(-.1,0)]]:
+            poses=[(0,0,0),(.24,0,0)];goals=[(-.5,0,0),(.74,0,0)]
+            result=orca_velocities(poses,goals,measured,CONTROL)
+            self.assertTrue(all(c[2]=='recovering' for c in result))
+            # Both participants together satisfy the radial separation constraint.
+            relative_outward=result[1][0]-result[0][0]
+            self.assertGreaterEqual(relative_outward,(.25-.24)/3+2*.002-1e-8)
+            self.assertTrue(all(abs(v)<=.15 and abs(w)<=.5 for v,w,_ in result))
+        poses=[(0,0,0),(.24,0,0)];measured=[(0,0)]*2
+        for _ in range(100):
+            result=orca_velocities(poses,goals,measured,CONTROL)
+            poses=[integrate(p,c[:2],.05) for p,c in zip(poses,result)]
+            measured=[c[:2] for c in result]
+            self.assertGreater(math.dist(poses[0][:2],poses[1][:2]),.17)
+            if all(c[2]!='recovering' for c in result):break
+        else:self.fail('virtual overlap did not clear')
+
+    def test_infeasible_overlap_waits_without_relaxing_actuator_constraints(self):
+        from abc_swarm.admission import AdmissionController
+        poses=[(0,0,0),(0,.18,0),(0,.36,0)]
+        goals=[(-1,0,0),(0,1,0),(1,0,0)]
+        geometry=dict(robot_radius=.075,safety_margin=.01,front_distance=.04,
+                      time_horizon=3.,right_bias=.01,velocity_buffer=.002)
+        with self.assertRaises(OrcaInfeasible):
+            orca_velocities(poses,goals,[(0,0)]*3,CONTROL,**geometry)
+        admission=AdmissionController()
+        commands=admission.step(poses,goals,CONTROL,velocities=[(0,0)]*3,orca=geometry)
+        self.assertTrue(admission.blocked)
+        self.assertTrue(all(c==(0.,0.,'avoidance_wait') for c in commands))
+
+    def test_three_robot_fault_snapshot_recovers_then_reaches_following(self):
+        from abc_swarm.formation_control import LeaderFollowerMission
+        names=['r0','r1','r2']
+        options=dict(mode='manual',edges=[dict(leader='r0',follower='r1',x=-.5,y=.5),
+                                        dict(leader='r0',follower='r2',x=-.5,y=-.5)],
+                     shape='circle',radius=1.,width=2.,height=2.,laps=1,clockwise=False,
+                     front_distance=.1,k_x=.5,k_y=.5,lookahead=.25,max_error=.5,tracking_window=.15)
+        geometry=dict(robot_radius=.075,safety_margin=.01,front_distance=.04,
+                      time_horizon=3.,right_bias=.01,velocity_buffer=.002)
+        # Snapshot of the actual stop: bodies separated, front-point disks overlap.
+        initial=[(.86667,.45197,.02185),(.45627,.19000,2.31835),(.52334,.46542,-2.97020)]
+        for dt in (.02,.05):
+            mission=LeaderFollowerMission(names,options)
+            poses=list(initial);measured=[(0,0)]*3;saw_recovery=False
+            for _ in range(round(60/dt)):
+                commands=mission.step(poses,measured,CONTROL,geometry,dt)
+                saw_recovery=saw_recovery or mission.admission.recovering
+                self.assertTrue(all(abs(v)<=.15+1e-8 and abs(w)<=.5+1e-8 for v,w,_ in commands))
+                poses=[integrate(p,c[:2],dt) for p,c in zip(poses,commands)]
+                measured=[c[:2] for c in commands]
+                self.assertTrue(all(math.dist(p[:2],q[:2])>.17
+                                    for i,p in enumerate(poses) for q in poses[:i]))
+                if mission.stage=='following':break
+            else:self.fail('three-robot overlap did not recover to following')
+            self.assertTrue(saw_recovery)
 
     def test_invalid_geometry_feedback_and_conflicting_targets_stop(self):
         poses=[(-1,0,0),(1,0,0)];goals=[(1,0,0),(-1,0,0)];velocities=[(0,0)]*2

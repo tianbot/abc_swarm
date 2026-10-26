@@ -39,6 +39,13 @@ def identifier(value, where):
             where + ': use a flat ROS name, letters/digits/underscore, starting with a letter')
 
 
+def orca_settings(value):
+    fields(value,'robot_radius safety_margin front_distance time_horizon right_bias velocity_buffer odom_timeout odom_future_tolerance stall_timeout','orca')
+    for key,v in value.items():
+        number(v,'orca.'+key,positive=key not in ('safety_margin','right_bias','velocity_buffer'))
+        require(v>=0,'orca.'+key+': cannot be negative')
+
+
 def validate(spec):
     hint = CATALOG['experiments'].get(spec.get('experiment'), {}) if isinstance(spec, dict) and isinstance(spec.get('experiment'), str) else {}
     point = hint.get('point', False)
@@ -46,7 +53,8 @@ def validate(spec):
     orca = hint.get('orca', False) or bool(coordinated and spec.get('orca') is not None)
     fields(spec, 'contract_version name localization fixed_frame vrpn robots experiment path startup'
            + (' trajectory orca' if coordinated else (' targets' if point else ' spacing') + (' orca' if orca else ''))
-           + (' mocap_control' if isinstance(spec,dict) and 'mocap_control' in spec else ''), 'experiment')
+           + (' mocap_control' if isinstance(spec,dict) and 'mocap_control' in spec else '')
+           + (' admission' if isinstance(spec,dict) and 'admission' in spec else ''), 'experiment')
     require(type(spec['contract_version']) is int and spec['contract_version'] == 2, 'contract_version: expected 2 (automatic startup; review v1 input before migrating)')
     identifier(spec['name'], 'name')
     for key in ('localization', 'fixed_frame'):
@@ -72,8 +80,25 @@ def validate(spec):
                 number(val, where + '.initial_pose')
     for key in ('name', 'rigid_body'):
         require(len({r[key] for r in spec['robots']}) == len(spec['robots']), 'robots: duplicate ' + key)
+    if 'admission' in spec:
+        require(capability.get('startup_admission',False),'admission: unsupported for this experiment')
+        a=spec['admission']
+        require(isinstance(a,dict) and type(a.get('enabled')) is bool,'admission.enabled: boolean required')
+        fields(a,'enabled settings orca' if a['enabled'] else 'enabled','admission')
+        if a['enabled']:
+            fields(a['settings'],'handoff_distance clearance position_margin handoff_time settle_time progress_timeout','admission.settings')
+            for key,v in a['settings'].items():number(v,'admission.'+key,positive=True)
+            orca_settings(a['orca'])
+            d=a['orca']['front_distance'];spacing=spec['spacing']
+            number(spacing,'spacing',positive=True)
+            local=([(0,0,0),(-spacing,spacing,0),(-spacing,-spacing,0)] if capability['formation']=='triangle'
+                   else [(0,0,0),(-spacing,0,0),(-2*spacing,0,0)])
+            reserve=2*(a['orca']['robot_radius']+a['orca']['safety_margin']+d)+2*a['orca']['velocity_buffer']*a['orca']['time_horizon']
+            require(all(math.hypot(p[0]-q[0],p[1]-q[1])>reserve for i,p in enumerate(local) for q in local[:i]),
+                    'admission: target effective envelopes overlap')
     if 'mocap_control' in spec:
         require(capability.get('mocap_control',False), 'mocap_control: unsupported for this experiment')
+        require(spec.get('admission',{}).get('enabled',True), 'mocap_control requires admission enabled for follower demos')
         control=spec['mocap_control']
         fields(control,'velocity_source position_tolerance calibration','mocap_control')
         require(control['velocity_source'] in ('odom','mocap'), 'mocap_control.velocity_source: odom or mocap')
@@ -88,6 +113,12 @@ def validate(spec):
                 require(isinstance(setting['marker_offset'],list) and len(setting['marker_offset'])==2,
                         'calibration.marker_offset: [forward_m,left_m] required')
                 for value in setting['marker_offset']:number(value,'calibration.marker_offset')
+        if spec.get('admission',{}).get('enabled'):
+            a=spec['admission'];o=a['orca'];tol=control['position_tolerance']
+            require(a['settings']['handoff_distance']>=tol,'admission: handoff distance must cover final tolerance')
+            target_distance=spec['spacing']*(math.sqrt(2) if capability['formation']=='triangle' else 1)
+            reserve=2*(o['robot_radius']+o['safety_margin']+tol+a['settings']['position_margin'])+a['settings']['clearance']
+            require(target_distance>reserve,'admission: fine positioning capture regions cannot fit formation')
     fields(spec['vrpn'], 'server port', 'vrpn')
     try:
         ipaddress.IPv4Address(spec['vrpn']['server'])
@@ -179,6 +210,8 @@ def render(spec):
     args = {'vrpn_server_ip': spec['vrpn']['server'], 'vrpn_port': spec['vrpn']['port']}
     if capability.get('mode'):
         args['mode']=capability['mode']
+    if capability.get('startup_admission'):
+        args['startup']=spec.get('admission',{}).get('enabled',True)
     if not capability.get('point') and not capability.get('coordinated'):
         args['spacing'] = spec['spacing']
     for key in spec['startup']:
@@ -189,6 +222,8 @@ def render(spec):
         args['rigid_body_' + str(i)] = robot['rigid_body']
     if capability['path']:
         args.update(spec['path'])
+        if capability.get('startup_admission'):
+            args['max_linear']=args.pop('speed')
     if capability.get('coordinated'):
         args.update({key:value for key,value in spec['trajectory'].items() if key!='origin'})
         args.update(dict(zip(('origin_x','origin_y','origin_yaw'),spec['trajectory']['origin'])))
@@ -210,6 +245,9 @@ def render(spec):
     if 'mocap_control' in spec:
         for key,value in [('position_tolerance',spec['mocap_control']['position_tolerance']),
                           ('mocap_calibration',spec['mocap_control']['calibration'] or {})]:
+            ET.SubElement(root,'rosparam',param='/abc_swarm_demo/'+key).text=json.dumps(value)
+    if spec.get('admission',{}).get('enabled'):
+        for key,value in [('admission',spec['admission']['settings']),('orca',spec['admission']['orca'])]:
             ET.SubElement(root,'rosparam',param='/abc_swarm_demo/'+key).text=json.dumps(value)
     # Python 3.8 (Noetic) has no ET.indent.
     return minidom.parseString(ET.tostring(root, encoding='utf-8')).toprettyxml(indent='  ')
@@ -255,6 +293,23 @@ def report(spec):
               '', '## 验收记录', '', '- 离线生成检查：通过。', '- ROS 解析：待现场执行。',
               '- 动捕、驱动、反馈和停止功能：未测。', '- 实际实验效果：未测。',
               '- 填写日期、仓库提交、现场差异及结果，不能把生成通过记为实车通过。', '']
+    if capability.get('startup_admission'):
+        if not spec.get('admission',{}).get('enabled',True):
+            lines += ['', '显式startup=false：跳过ORCA/精定位入队，使用原始TF及底盘odom直接跟随。', '']
+            return '\n'.join(lines)
+        lines += ['', '## 自动入队与跟随交接', '',
+                  '默认冻结01实测初始位姿及编队目标，ORCA入队 → 受保护的纯点镇定 → 全体位置/朝向/实测速度稳定 → 跟随。',
+                  '遥控请求在入队期间被忽略；manual到齐后接收键盘/GUI新请求，auto到齐后头车沿预设路径运行。',
+                  '默认速度反馈来自动捕控制中心位姿，支持显式逐车标定。原始动捕TF不修改；身体半径/标记架范围必须现场核对。',
+                  '目标区域不能安全分离时保留ORCA；精定位越界会重新避让。它不提供静态障碍或跟随段全程ORCA。',
+                  'admission未填写时使用包内admission.yaml及orca.yaml；没有隐含人工启用service。',
+                  '显式入队配置：'+json.dumps(spec.get('admission','包内默认配置'),ensure_ascii=False), '']
+        lines = [line.replace('不设置 TF、不移动到起点','起点记录不覆盖实测TF；实际启动会自动入队')
+                 .replace('起点未知或与建议不一致时，先人工摆位并核对实时 TF。','起点未知时先核对实时TF及入队通道。')
+                 .replace('启动/重置','启动')
+                 .replace('路径完成或故障后，重新启动 launch 可开始新一轮；可选 reset 会重建路径并自动运行。',
+                          '路径完成或故障后，退出并重新启动launch，捕获新的起点；不增加手动启用步骤。') for line in lines]
+        return '\n'.join(lines)+mocap_control_report(spec)
     return '\n'.join(lines)
 
 
@@ -333,6 +388,8 @@ def bundle(spec):
     if validate(spec).get('point'):
         paths.extend([HERE.parent / 'config/point_stabilization.yaml',
                       HERE.parent / 'config/point_control.cfg'])
+    if validate(spec).get('startup_admission') or validate(spec).get('point') or validate(spec).get('coordinated'):
+        paths.extend([HERE.parent/'config/admission.yaml',HERE.parent/'config/point_stabilization.yaml',HERE.parent/'config/orca.yaml'])
     if validate(spec).get('orca'):
         paths.extend([HERE.parent / 'config/orca.yaml', HERE.parent / 'licenses/orca/UPSTREAM.json',
                       HERE.parent / 'launch/mocap/demo_mocap_three_mini_point_stabilization.launch'])

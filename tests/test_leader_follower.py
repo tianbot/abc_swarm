@@ -50,7 +50,7 @@ class LeaderFollowerTests(unittest.TestCase):
             config = roslaunch.config.ROSLaunchConfig()
             roslaunch.xmlloader.XmlLoader().load(str(ROOT / 'launch/mocap' /
                 ('demo_mocap_three_mini_leader_follower_'+formation+'.launch')), config,
-                verbose=False, argv=['start_driver:=false','start_vrpn:=false','start_teleop:=false'])
+                verbose=False, argv=['startup:=false','start_driver:=false','start_vrpn:=false','start_teleop:=false'])
             prefix = '/tianbot_mini_03_leader_follower/'
             self.assertEqual(config.params[prefix+'leader_frame'].value, leader)
             self.assertEqual(config.params[prefix+'leader_odom_topic'].value, '/'+leader+'/odom')

@@ -33,6 +33,24 @@ def scenario(experiment):
 
 
 class AIHarnessTests(unittest.TestCase):
+    def test_follower_admission_is_explicit_validated_and_can_opt_out(self):
+        settings=dict(handoff_distance=.15,clearance=.02,position_margin=.005,handoff_time=.3,settle_time=.5,progress_timeout=45.)
+        orca=json.loads((ROOT/'ai/orca.example.json').read_text())['orca']
+        for experiment in ['manual_triangle','manual_snake','path_triangle','path_snake']:
+            spec=scenario(experiment);spec['admission']={'enabled':True,'settings':settings,'orca':orca}
+            root=ET.fromstring(harness.render(spec))
+            self.assertEqual(root.find('include/arg[@name="startup"]').get('value'),'true')
+            self.assertIsNotNone(root.find('rosparam[@param="/abc_swarm_demo/admission"]'))
+            for change in [lambda s:s['admission'].update(enabled='true'),
+                           lambda s:s['admission']['settings'].update(handoff_distance=0),
+                           lambda s:s['admission']['orca'].update(robot_radius=float('nan'))]:
+                bad=copy.deepcopy(spec);change(bad)
+                with self.assertRaises(ValueError):harness.validate(bad)
+            spec['admission']={'enabled':False}
+            self.assertEqual(ET.fromstring(harness.render(spec)).find('include/arg[@name="startup"]').get('value'),'false')
+            spec['mocap_control']={'velocity_source':'mocap','position_tolerance':.04,'calibration':None}
+            with self.assertRaises(ValueError):harness.validate(spec)
+
     def test_mocap_control_extension_is_explicit_and_rejects_bad_calibration(self):
         for experiment in ['point_stabilization','point_stabilization_orca','coordinated_circle','coordinated_triangle']:
             spec=scenario(experiment)
@@ -52,7 +70,7 @@ class AIHarnessTests(unittest.TestCase):
                            lambda s:s['mocap_control']['calibration'][s['robots'][0]['name']].update(marker_offset=[0,float('nan')])]:
                 bad=copy.deepcopy(spec);change(bad)
                 with self.assertRaises(ValueError):harness.validate(bad)
-        unsupported=scenario('manual_triangle');unsupported['mocap_control']=spec['mocap_control']
+        unsupported=scenario('path_single');unsupported['mocap_control']=spec['mocap_control']
         with self.assertRaises(ValueError):harness.validate(unsupported)
 
     def test_all_supported_experiments_use_existing_entrypoints_without_arming(self):

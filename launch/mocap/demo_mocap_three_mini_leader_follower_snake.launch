@@ -1,5 +1,18 @@
 <?xml version="1.0" ?>
 <launch>
+  <arg name="use_sim_time" default="false"/>
+  <arg name="startup" default="true"/>
+  <arg name="control_config" default="$(find abc_swarm)/config/point_stabilization.yaml"/>
+  <arg name="orca_config" default="$(find abc_swarm)/config/orca.yaml"/>
+  <arg name="admission_config" default="$(find abc_swarm)/config/admission.yaml"/>
+  <arg name="velocity_source" default="mocap"/>
+  <arg name="command_timeout" default="0.3"/>
+  <arg name="tracking_window" default="0.15"/>
+  <arg name="lookahead" default="0.25"/>
+  <arg name="max_error" default="0.5"/>
+  <arg name="shape" default="circle"/>
+  <arg name="width" default="2.5"/>
+  <arg name="height" default="2.0"/>
   <arg name="mode" default="manual"/>
   <arg name="resolved_mode" value="$(eval {'manual': 'manual', 'auto': 'auto'}[arg('mode')])"/>
   <arg name="radius" default="1.0"/>
@@ -14,6 +27,7 @@
   <arg name="start_vrpn" default="true"/>
   <arg name="start_driver" default="true"/>
   <arg name="spacing" default="0.5"/>
+  <arg name="backward_spacing" value="$(eval -float(arg('spacing')))"/>
   <arg name="front_distance" default="0.1"/>
   <arg name="k_x" default="0.5"/>
   <arg name="k_y" default="0.5"/>
@@ -34,9 +48,10 @@
     <arg name="vrpn_server_ip" value="$(arg vrpn_server_ip)"/>
     <arg name="vrpn_port" value="$(arg vrpn_port)"/>
     <arg name="start_driver" value="$(arg start_driver)"/>
+    <arg name="use_sim_time" value="$(arg use_sim_time)"/>
     <arg name="start_vrpn" value="$(arg start_vrpn)"/>
   </include>
-  <include file="$(find abc_swarm)/launch/common/three_mini_leader_follower.launch.xml">
+  <include unless="$(arg startup)" file="$(find abc_swarm)/launch/common/three_mini_leader_follower.launch.xml">
     <arg name="formation" value="snake"/>
     <arg name="spacing" value="$(arg spacing)"/>
     <arg name="front_distance" value="$(arg front_distance)"/>
@@ -54,9 +69,11 @@
     <arg name="robot_name_3" value="$(arg robot_name_3)"/>
     <arg name="rigid_body_3" value="$(arg rigid_body_3)"/>
   </include>
-  <include if="$(eval arg('resolved_mode') == 'auto')" file="$(find abc_swarm)/launch/common/leader_path_tracker.launch.xml">
+  <include if="$(eval arg('resolved_mode') == 'auto' and not arg('startup'))" file="$(find abc_swarm)/launch/common/leader_path_tracker.launch.xml">
     <arg name="formation" value="snake"/>
-    <arg name="shape" value="circle"/>
+    <arg name="shape" value="$(arg shape)"/>
+    <arg name="width" value="$(arg width)"/>
+    <arg name="height" value="$(arg height)"/>
     <arg name="radius" value="$(arg radius)"/>
     <arg name="speed" value="$(arg max_linear)"/>
     <arg name="laps" value="$(arg laps)"/>
@@ -72,7 +89,43 @@
     <arg name="robot_name_3" value="$(arg robot_name_3)"/>
     <arg name="rigid_body_3" value="$(arg rigid_body_3)"/>
   </include>
-  <node pkg="abc_swarm" type="demo_runtime.py" name="abc_swarm_demo" output="screen" required="true" clear_params="false">
+  <node if="$(arg startup)" pkg="abc_swarm" type="point_stabilization.py" name="abc_swarm_demo" output="screen" required="true" clear_params="true">
+    <rosparam command="load" file="$(arg control_config)"/>
+    <rosparam command="load" file="$(arg orca_config)" param="orca"/>
+    <rosparam command="load" file="$(arg admission_config)" param="admission"/>
+    <param name="task" value="leader_follower"/>
+    <param name="avoidance" value="orca"/>
+    <param name="velocity_source" value="$(arg velocity_source)"/>
+    <param name="max_linear" value="$(arg max_linear)" type="double"/>
+    <param name="max_angular" value="$(arg max_angular)" type="double"/>
+    <param name="tf_timeout" value="$(arg tf_timeout)" type="double"/>
+    <param name="command_timeout" value="$(arg command_timeout)" type="double"/>
+    <param name="formation" value="snake"/>
+    <rosparam param="robots" subst_value="true">
+      - {name: "$(arg robot_name_1)", frame: "$(arg rigid_body_1)"}
+      - {name: "$(arg robot_name_2)", frame: "$(arg rigid_body_2)"}
+      - {name: "$(arg robot_name_3)", frame: "$(arg rigid_body_3)"}
+    </rosparam>
+    <rosparam param="follow" subst_value="true">
+      mode: "$(arg resolved_mode)"
+      shape: "$(arg shape)"
+      radius: $(arg radius)
+      width: $(arg width)
+      height: $(arg height)
+      laps: $(arg laps)
+      clockwise: $(arg clockwise)
+      front_distance: $(arg front_distance)
+      k_x: $(arg k_x)
+      k_y: $(arg k_y)
+      tracking_window: $(arg tracking_window)
+      lookahead: $(arg lookahead)
+      max_error: $(arg max_error)
+      edges:
+        - {leader: "$(arg robot_name_1)", follower: "$(arg robot_name_2)", x: $(arg backward_spacing), y: 0.0}
+        - {leader: "$(arg robot_name_2)", follower: "$(arg robot_name_3)", x: $(arg backward_spacing), y: 0.0}
+    </rosparam>
+  </node>
+  <node unless="$(arg startup)" pkg="abc_swarm" type="demo_runtime.py" name="abc_swarm_demo" output="screen" required="true" clear_params="false">
     <param name="mode" value="$(eval 'path' if arg('resolved_mode') == 'auto' else 'manual')"/>
     <param name="max_linear" value="$(arg max_linear)"/>
     <param name="odom_future_tolerance" value="$(arg odom_future_tolerance)"/>
@@ -88,5 +141,9 @@
     <param name="repeat_rate" value="20.0"/>
     <param name="key_timeout" value="0.3"/>
   </node>
-  <node if="$(arg use_rviz)" pkg="rviz" type="rviz" name="demo_rviz" args="-d $(find abc_swarm)/rviz/path_following.rviz"/>
+  <node if="$(arg use_rviz)" pkg="rviz" type="rviz" name="demo_rviz" args="$(eval '-d '+find('abc_swarm')+('/rviz/coordinated_tracking.rviz' if arg('startup') else '/rviz/path_following.rviz'))">
+    <remap from="/abc_swarm_demo/paths/tianbot_mini_01" to="/abc_swarm_demo/paths/$(arg robot_name_1)"/>
+    <remap from="/abc_swarm_demo/paths/tianbot_mini_02" to="/abc_swarm_demo/paths/$(arg robot_name_2)"/>
+    <remap from="/abc_swarm_demo/paths/tianbot_mini_03" to="/abc_swarm_demo/paths/$(arg robot_name_3)"/>
+  </node>
 </launch>

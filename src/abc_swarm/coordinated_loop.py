@@ -8,6 +8,7 @@ from .point_control import angle, PointPhaseTracker, validate_pose, world_goals
 from .preset_paths import preset_path
 from .pure_pursuit import PurePursuit
 from .orca import orca_velocities
+from .admission import AdmissionController
 
 
 class LoopFault(ValueError):
@@ -68,7 +69,7 @@ def straight_velocity(pose,start,end,speed,max_angular,lookahead,tolerance,max_e
 class CoordinatedLoop:
     def __init__(self,shape,diameter=2.0,side_length=2.0,clockwise=False,laps=1,
                  speed=.15,origin=(0,0,0),lookahead=.20,phase_window=.10,
-                 settle_time=.5,max_error=.25,progress_timeout=30.0):
+                 settle_time=.5,max_error=.25,progress_timeout=30.0,admission=None):
         self.starts,self.paths=loop_geometry(shape,diameter,side_length,clockwise,origin)
         if type(laps) is not int or laps<0:raise ValueError('laps must be nonnegative integer')
         for value in (speed,lookahead,phase_window,settle_time,max_error,progress_timeout):
@@ -88,6 +89,10 @@ class CoordinatedLoop:
         self.rounds_completed=0;self.common_progress=0.0;self.progress_spread=0.0
         self.errors=[0.0]*3
         self.point_control=PointPhaseTracker()
+        self.admission_settings=admission
+        self.admission=AdmissionController(admission)
+        if admission is None:
+            self.admission.settings['settle_time']=settle_time
         self.hold=0.0;self.idle=0.0;self.metric=None;self.metric_key=None
 
     def _hold(self,ready,dt):
@@ -96,6 +101,10 @@ class CoordinatedLoop:
 
     def _change(self,stage):
         self.stage=stage;self.hold=0;self.metric=None;self.metric_key=None;self.idle=0
+        if stage=='finishing':
+            self.admission=AdmissionController(self.admission_settings)
+            if self.admission_settings is None:
+                self.admission.settings['settle_time']=self.settle_time
 
     def _stall(self,metric,dt):
         key=(self.stage,self.rounds_completed)
@@ -126,17 +135,11 @@ class CoordinatedLoop:
         if self.completed:return [(0,0,'completed')]*3
         if self.stage in ('assembling','finishing'):
             self.goals=list(self.starts)
-            preferred=self.point_control.commands(poses,self.goals,control)
-            if self.stage=='assembling' and assembly_orca is not None:
-                if velocities is None:raise ValueError('Assembly ORCA needs measured velocities')
-                commands=orca_velocities(poses,self.goals,velocities,control,
-                                         preferred_commands=preferred,**assembly_orca)
-            else:commands=preferred
-            ready=all(phase=='arrived' for _,_,phase in commands)
-            if velocities is not None:ready=ready and all(abs(v)<.02 and abs(w)<.05 for v,w in velocities)
+            commands=self.admission.step(poses,self.goals,control,dt,velocities,
+                                         assembly_orca if self.stage=='assembling' else None)
             error=sum(math.hypot(p[0]-g[0],p[1]-g[1])+.08*abs(angle(g[2]-p[2])) for p,g in zip(poses,self.goals))
             self._stall(-error,dt)
-            if self._hold(ready,dt):
+            if self.admission.ready:
                 if self.stage=='finishing':self.completed=True;self._change('completed')
                 elif self.shape=='circle':
                     self.trackers=[PurePursuit(path,laps=self.laps,speed=min(self.speed,control['max_linear']),lookahead=self.lookahead,

@@ -4,7 +4,8 @@
   <arg name="vrpn_port" default=""/>
   <arg name="start_driver" default="true"/>
   <arg name="start_vrpn" default="true"/>
-  <param name="/use_sim_time" value="false" type="bool"/>
+  <arg name="use_sim_time" default="false"/>
+  <param name="/use_sim_time" value="$(arg use_sim_time)" type="bool"/>
   <node if="$(arg start_driver)" pkg="rosserial_server" type="socket_node"
         name="tianbot_manager" output="screen" required="true"/>
   <node if="$(arg start_vrpn)" pkg="vrpn_client_ros" type="vrpn_client_node"

@@ -8,6 +8,7 @@
   <arg name="use_rviz" default="true"/>
   <arg name="control_config" default="$(find abc_swarm)/config/point_stabilization.yaml"/>
   <arg name="tracking_config" default="$(find abc_swarm)/config/coordinated_tracking.yaml"/>
+  <arg name="admission_config" default="$(find abc_swarm)/config/admission.yaml"/>
   <arg name="orca_config" default="$(find abc_swarm)/config/orca.yaml"/>
   <arg name="avoidance" default="none"/>
   <arg name="velocity_source" default="odom"/>
@@ -38,6 +39,7 @@
     <param name="task" value="circle"/>
     <param name="formation" value="config"/>
     <param name="avoidance" value="$(arg avoidance)"/>
+    <rosparam command="load" file="$(arg admission_config)" param="admission"/>
     <param name="velocity_source" value="$(arg velocity_source)"/>
     <param name="max_linear" value="$(arg speed)" type="double"/>
     <rosparam if="$(eval arg('avoidance') == 'orca')" command="load" file="$(arg orca_config)" param="orca"/>

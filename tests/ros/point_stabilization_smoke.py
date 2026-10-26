@@ -128,8 +128,13 @@ def main():
         snake_expected=world_goals([[0,0,0],[-0.4,0,0],[-0.8,0,0]],'initial_leader',poses[0])
         states.clear();goals.clear()
         p=start(args+['formation:=snake','spacing:=0.4'],'snake_preset')
-        pump(3,move=False)
+        deadline=time.monotonic()+10
+        while time.monotonic()<deadline:
+            pump(.1,move=False)
+            assert p.poll() is None,'snake node exited; see '+str(folder)
+            if states and goals and states[-1]['state']=='running':break
         assert p.poll() is None,'snake node exited; see '+str(folder)
+        assert states and goals,'snake startup feedback not ready; see '+str(folder)
         assert states[-1]['formation']=='snake' and states[-1]['state']=='running',states[-1]
         for pose,goal in zip(goals[-1].poses,snake_expected):
             assert abs(pose.position.x-goal[0])<1e-6 and abs(pose.position.y-goal[1])<1e-6
@@ -140,8 +145,13 @@ def main():
         config=folder/'world.yaml';config.write_text(yaml.safe_dump(data))
         states.clear();goals.clear()
         p=start(args+['goal_config:='+str(config)],'world')
-        pump(3,move=False)
+        deadline=time.monotonic()+10
+        while time.monotonic()<deadline:
+            pump(.1,move=False)
+            assert p.poll() is None,'world node exited; see '+str(folder)
+            if states and goals and states[-1]['state']=='running':break
         assert p.poll() is None,'required node exited; see '+str(folder)
+        assert states and goals,'world startup feedback not ready; see '+str(folder)
         assert states[-1]['state']=='running',states[-1]
         assert abs(goals[-1].poses[0].position.x-data['target_poses'][0][0])<1e-6
         assert any(v>0 or abs(w)>0 for rr in rows.values() for t,v,w in rr if t>time.monotonic()-0.3)

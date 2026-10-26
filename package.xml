@@ -92,6 +92,7 @@
   <exec_depend>multirobot_map_merge</exec_depend>
   <test_depend>python3-nose</test_depend>
   <test_depend>python3-rospkg</test_depend>
+  <test_depend>rosgraph_msgs</test_depend>
 
   <!-- The export tag contains other, unspecified, tags -->
   <export>

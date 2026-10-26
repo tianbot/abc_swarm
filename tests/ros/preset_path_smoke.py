@@ -105,7 +105,7 @@ def main():
                           'robot_name_1:=path_test_01', 'robot_name_2:=path_test_02',
                           'robot_name_3:=path_test_03', 'radius:=0.4',
                           'start_driver:=false', 'start_vrpn:=false', 'use_rviz:=false']
-                         +(['mode:=auto','start_teleop:=true'] if via_mode else []),formation+('_auto_mode' if via_mode else ''))
+                         +(['mode:=auto','startup:=false','start_teleop:=true'] if via_mode else []),formation+('_auto_mode' if via_mode else ''))
 
         process = launch('single')
         pump(3)
@@ -195,7 +195,7 @@ def main():
                              ('demo_mocap_three_mini_leader_follower_' + formation + '.launch')),
                              'robot_name_1:=path_test_01', 'robot_name_2:=path_test_02',
                              'robot_name_3:=path_test_03', 'start_driver:=false',
-                             'start_vrpn:=false', 'start_teleop:=false', 'use_rviz:=false'], 'manual_' + formation)
+                             'start_vrpn:=false', 'startup:=false', 'start_teleop:=false', 'use_rviz:=false'], 'manual_' + formation)
             pump(3)
             assert process.poll() is None, 'required ROS node exited; inspect logs in ' + str(folder)
             assert runtime_states[-1]['state'] == 'running', runtime_states[-1]

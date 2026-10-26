@@ -1,0 +1,78 @@
+{
+  "contract_version": 2,
+  "name": "formation_admission",
+  "localization": "mocap_vrpn",
+  "fixed_frame": "world",
+  "vrpn": {
+    "server": "192.168.2.101",
+    "port": 3883
+  },
+  "robots": [
+    {
+      "name": "tianbot_mini_01",
+      "model": "tianbot_mini",
+      "rigid_body": "tianbot_mini_01",
+      "initial_pose": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "tianbot_mini_02",
+      "model": "tianbot_mini",
+      "rigid_body": "tianbot_mini_02",
+      "initial_pose": [
+        -0.5,
+        0.5,
+        0.0
+      ]
+    },
+    {
+      "name": "tianbot_mini_03",
+      "model": "tianbot_mini",
+      "rigid_body": "tianbot_mini_03",
+      "initial_pose": [
+        -0.5,
+        -0.5,
+        0.0
+      ]
+    }
+  ],
+  "experiment": "manual_triangle",
+  "spacing": 0.5,
+  "path": null,
+  "startup": {
+    "start_driver": true,
+    "start_vrpn": true,
+    "use_rviz": true,
+    "start_teleop": true
+  },
+  "mocap_control": {
+    "velocity_source": "mocap",
+    "position_tolerance": 0.04,
+    "calibration": null
+  },
+  "admission": {
+    "enabled": true,
+    "settings": {
+      "handoff_distance": 0.15,
+      "clearance": 0.02,
+      "position_margin": 0.005,
+      "handoff_time": 0.3,
+      "settle_time": 0.5,
+      "progress_timeout": 45.0
+    },
+    "orca": {
+      "robot_radius": 0.13,
+      "safety_margin": 0.02,
+      "front_distance": 0.08,
+      "time_horizon": 3.0,
+      "right_bias": 0.01,
+      "velocity_buffer": 0.002,
+      "odom_timeout": 0.5,
+      "odom_future_tolerance": 0.1,
+      "stall_timeout": 30.0
+    }
+  }
+}

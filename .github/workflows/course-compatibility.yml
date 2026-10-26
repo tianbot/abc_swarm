@@ -42,6 +42,11 @@ jobs:
           PYTHONPATH: src
         run: python3 -m unittest discover -s tests -p test_coordinated_loop.py -v
 
+      - name: Check admission and formation handoffs without ROS
+        env:
+          PYTHONPATH: src
+        run: python3 -m unittest discover -s tests -p test_formation_control.py -v
+
   noetic_build_tests:
     name: Noetic build and tests
     needs: course_compatibility
@@ -122,6 +127,8 @@ jobs:
           done
           python3 "$ai_dir/generate_launch.py" "$ai_dir/mocap-control.example.json" --output "$RUNNER_TEMP/customer-mocap-control"
           python3 "$ai_dir/generate_launch.py" "$RUNNER_TEMP/customer-mocap-control/experiment.json" --output "$RUNNER_TEMP/customer-mocap-control" --check
+          python3 "$ai_dir/generate_launch.py" "$ai_dir/formation-admission.example.json" --output "$RUNNER_TEMP/customer-formation-admission"
+          python3 "$ai_dir/generate_launch.py" "$RUNNER_TEMP/customer-formation-admission/experiment.json" --output "$RUNNER_TEMP/customer-formation-admission" --check
       - name: Run isolated synthetic ROS integration
         run: |
           source "$RUNNER_TEMP/abc_swarm_ws/install/setup.bash"
@@ -142,3 +149,8 @@ jobs:
           source "$RUNNER_TEMP/abc_swarm_ws/install/setup.bash"
           # Private loopback master 11436, synthetic TF/odom, driver/VRPN/UI off.
           python3 tests/ros/coordinated_loop_smoke.py
+      - name: Run isolated complete formation startup and follow missions
+        run: |
+          source "$RUNNER_TEMP/abc_swarm_ws/install/setup.bash"
+          # Private 11438 master and clock, calibrated synthetic TF, no odom/hardware/UI.
+          python3 tests/ros/formation_mission_smoke.py

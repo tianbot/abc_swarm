@@ -12,6 +12,16 @@ CONTROL=dict(max_linear=.15,max_angular=.5,position_tolerance=.04,yaw_tolerance=
 
 
 class CoordinatedLoopTests(unittest.TestCase):
+    def test_admission_and_corner_settle_times_have_separate_owners(self):
+        from abc_swarm.admission import DEFAULT_ADMISSION
+        settings=dict(DEFAULT_ADMISSION,settle_time=1.)
+        loop=CoordinatedLoop('triangle',settle_time=.3,admission=settings)
+        self.assertEqual(loop.admission.settings['settle_time'],1.)
+        self.assertEqual(loop.settle_time,.3)
+        loop._change('finishing')
+        self.assertEqual(loop.admission.settings['settle_time'],1.)
+        self.assertEqual(CoordinatedLoop('circle',settle_time=.3).admission.settings['settle_time'],.3)
+
     def test_geometry_size_direction_origin_and_three_equal_starts(self):
         for shape in ('circle','triangle'):
             for size in (1.5,2.):

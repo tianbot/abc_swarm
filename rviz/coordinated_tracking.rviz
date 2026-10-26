@@ -35,6 +35,10 @@ Visualization Manager:
       Name: Current stage goals
       Enabled: true
       Topic: /abc_swarm_demo/goals
+    - Class: rviz/PoseArray
+      Name: Calibrated control centers
+      Enabled: true
+      Topic: /abc_swarm_demo/control_poses
   Views:
     Current:
       Class: rviz/TopDownOrtho

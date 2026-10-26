@@ -71,6 +71,7 @@
     <arg name="vrpn_server_ip" value="$(arg vrpn_server_ip)"/>
     <arg name="vrpn_port" value="$(arg vrpn_port)"/>
     <arg name="start_driver" value="$(arg start_driver)"/>
+    <arg name="use_sim_time" value="$(arg use_sim_time)"/>
     <arg name="start_vrpn" value="$(arg start_vrpn)"/>
   </include>
   <group if="$(eval arg('formation') == 'single')">

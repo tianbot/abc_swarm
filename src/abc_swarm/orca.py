@@ -18,6 +18,10 @@ class OrcaBlocked(ValueError):
     """The configured envelopes or velocity constraints cannot safely be used."""
 
 
+class OrcaInfeasible(OrcaBlocked):
+    """No velocity currently satisfies all planes and actuator bounds."""
+
+
 def dot(a,b):
     return a[0]*b[0]+a[1]*b[1]
 
@@ -163,7 +167,7 @@ def orca_velocities(poses,goals,velocities,control,robot_radius=0.13,safety_marg
         if v>0 and any(math.hypot(*sub(centers[i],c))<2.0 for j,c in enumerate(centers) if j!=i):
             preferred=add(preferred,mul(side,-min(right_bias,0.2*v)))
         safe=project_velocity(preferred,planes,math.hypot(max_v,front_distance*max_w))
-        if safe is None:raise OrcaBlocked('no feasible ORCA velocity within differential-drive limits')
+        if safe is None:raise OrcaInfeasible('no feasible ORCA velocity within differential-drive limits')
         body=(dot(safe,e),dot(safe,side)/front_distance)
         result.append((*body,'avoiding' if phase=='arrived' and math.hypot(*safe)>1e-6 else phase))
     return result

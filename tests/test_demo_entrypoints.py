@@ -25,7 +25,7 @@ class DemoEntrypointTests(unittest.TestCase):
     def test_follower_mode_selects_one_head_controller_and_keeps_roles(self):
         for formation in ('triangle','snake'):
             path=ROOT/('launch/mocap/demo_mocap_three_mini_leader_follower_'+formation+'.launch')
-            common=['start_driver:=false','start_vrpn:=false','use_rviz:=false',
+            common=['startup:=false','start_driver:=false','start_vrpn:=false','use_rviz:=false',
                     'robot_name_1:=customer_01','robot_name_2:=customer_02','robot_name_3:=customer_03',
                     'rigid_body_1:=body_01','rigid_body_2:=body_02','rigid_body_3:=body_03']
             manual=load(path,common+['mode:=manual'])
@@ -81,19 +81,31 @@ class DemoEntrypointTests(unittest.TestCase):
                 path.write_text(harness['render'](spec))
                 config = load(path)
                 self.assertFalse(config.params['/abc_swarm_demo/enabled'].value)
-                self.assertEqual(config.params['/abc_swarm_demo/robot_frames'].value,
-                                 [r['rigid_body'] for r in spec['robots']])
                 self.assertEqual(config.params['/vrpn_client_node/server'].value, spec['vrpn']['server'])
-                self.assertEqual(sum(n.type == 'leader_follower_tracker.py' for n in config.nodes),
-                                 cap['robots'] - 1)
-                if cap['path']:
-                    self.assertEqual(config.params['/abc_swarm_path/cmd_topic'].value,
-                                     '/customer_car_0/cmd_vel')
-                if cap['robots'] == 3:
-                    # Check actual follower TF mapping, not just generated XML syntax.
-                    expected = 'customer_body_1' if cap['formation'] == 'snake' else 'customer_body_0'
-                    self.assertEqual(config.params['/customer_car_2_leader_follower/leader_frame'].value,
-                                     expected)
+                if cap.get('startup_admission'):
+                    self.assertEqual(config.params['/abc_swarm_demo/robots'].value,
+                                     [{'name':r['name'],'frame':r['rigid_body']} for r in spec['robots']])
+                    self.assertEqual(sum(n.type=='point_stabilization.py' for n in config.nodes),1)
+                    self.assertFalse(any(n.type in ('leader_follower_tracker.py','preset_path_tracker.py','demo_runtime.py') for n in config.nodes))
+                    expected='customer_car_1' if cap['formation']=='snake' else 'customer_car_0'
+                    self.assertEqual(config.params['/abc_swarm_demo/follow/edges'].value[-1]['leader'],expected)
+                    self.assertEqual(config.params['/abc_swarm_demo/follow/mode'].value,cap['mode'])
+                    self.assertEqual(config.params['/abc_swarm_demo/max_linear'].value,
+                                     spec['path']['speed'] if cap['path'] else .15)
+                else:
+                    self.assertEqual(config.params['/abc_swarm_demo/robot_frames'].value,
+                                     [r['rigid_body'] for r in spec['robots']])
+                    self.assertEqual(config.params['/vrpn_client_node/server'].value, spec['vrpn']['server'])
+                    self.assertEqual(sum(n.type == 'leader_follower_tracker.py' for n in config.nodes),
+                                     cap['robots'] - 1)
+                    if cap['path']:
+                        self.assertEqual(config.params['/abc_swarm_path/cmd_topic'].value,
+                                         '/customer_car_0/cmd_vel')
+                    if cap['robots'] == 3:
+                        # Check actual follower TF mapping, not just generated XML syntax.
+                        expected = 'customer_body_1' if cap['formation'] == 'snake' else 'customer_body_0'
+                        self.assertEqual(config.params['/customer_car_2_leader_follower/leader_frame'].value,
+                                         expected)
                 config = load(path, ['start_driver:=false', 'start_vrpn:=false',
                                      'use_rviz:=false', 'start_teleop:=false'])
                 self.assertFalse(any(n.package in ('rosserial_server', 'vrpn_client_ros',
@@ -108,7 +120,7 @@ class DemoEntrypointTests(unittest.TestCase):
                 config = load(path)
                 self.assertEqual(sum(n.package == 'vrpn_client_ros' for n in config.nodes), 1)
                 self.assertEqual(sum(n.package == 'rosserial_server' for n in config.nodes), 1)
-                self.assertEqual(sum(n.type == 'demo_runtime.py' for n in config.nodes), 1)
+                self.assertEqual(sum(n.type in ('demo_runtime.py','point_stabilization.py') for n in config.nodes), 1)
                 self.assertFalse(config.params['/abc_swarm_demo/enabled'].value)
                 self.assertEqual(config.params['/vrpn_client_node/server'].value, profile['server'])
                 self.assertEqual(config.params['/vrpn_client_node/port'].value, profile['port'])
@@ -145,7 +157,7 @@ class DemoEntrypointTests(unittest.TestCase):
             self.assertFalse(any(n.package in ('vrpn_client_ros', 'rosserial_server',
                                                'teleop_twist_keyboard', 'rviz')
                                  for n in config.nodes))
-            self.assertEqual(sum(n.type == 'demo_runtime.py' for n in config.nodes), 1)
+            self.assertEqual(sum(n.type in ('demo_runtime.py','point_stabilization.py') for n in config.nodes), 1)
 
     def test_default_linear_speed_is_consistent_through_the_command_chain(self):
         for path in DEMOS:
@@ -160,7 +172,7 @@ class DemoEntrypointTests(unittest.TestCase):
                        if name.endswith(('_leader_follower/max_linear','_tracker/max_linear'))]
             self.assertTrue(all(value==0.15 for value in followers))
         config=load(ROOT/'launch/mocap/demo_mocap_three_mini_leader_follower_triangle.launch',
-                    ['max_linear:=0.12'])
+                    ['max_linear:=0.12','startup:=false'])
         self.assertEqual(config.params['/leader_teleop/speed'].value,0.12)
         self.assertEqual(config.params['/abc_swarm_demo/max_linear'].value,0.12)
         self.assertEqual(config.params['/tianbot_mini_02_leader_follower/max_linear'].value,0.12)

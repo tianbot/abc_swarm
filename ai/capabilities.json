@@ -10,14 +10,18 @@
       "formation": "triangle",
       "path": false,
       "launch": "demo_mocap_three_mini_leader_follower_triangle.launch",
-      "mode": "manual"
+      "mode": "manual",
+      "startup_admission": true,
+      "mocap_control": true
     },
     "manual_snake": {
       "robots": 3,
       "formation": "snake",
       "path": false,
       "launch": "demo_mocap_three_mini_leader_follower_snake.launch",
-      "mode": "manual"
+      "mode": "manual",
+      "startup_admission": true,
+      "mocap_control": true
     },
     "path_single": {
       "robots": 1,
@@ -29,13 +33,19 @@
       "robots": 3,
       "formation": "triangle",
       "path": true,
-      "launch": "demo_mocap_formation_leader_follower_path_tracking.launch"
+      "launch": "demo_mocap_three_mini_leader_follower_triangle.launch",
+      "startup_admission": true,
+      "mocap_control": true,
+      "mode": "auto"
     },
     "path_snake": {
       "robots": 3,
       "formation": "snake",
       "path": true,
-      "launch": "demo_mocap_snake_leader_follower_path_tracking.launch"
+      "launch": "demo_mocap_three_mini_leader_follower_snake.launch",
+      "startup_admission": true,
+      "mocap_control": true,
+      "mode": "auto"
     },
     "point_stabilization": {
       "robots": 3,

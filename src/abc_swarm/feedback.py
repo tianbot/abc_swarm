@@ -35,7 +35,10 @@ class MocapVelocityEstimator:
             dyaw = math.atan2(math.sin(last[1][2]-first[1][2]), math.cos(last[1][2]-first[1][2]))
             heading = first[1][2]+dyaw/2
             dx, dy = last[1][0]-first[1][0], last[1][1]-first[1][1]
-            result.append(((dx*math.cos(heading)+dy*math.sin(heading))/dt, dyaw/dt))
+            measured=((dx*math.cos(heading)+dy*math.sin(heading))/dt, dyaw/dt)
+            if not all(math.isfinite(x) for x in measured):
+                raise ValueError('Invalid measured mocap velocity')
+            result.append(measured)
         if any(v is None for v in result):
             raise ValueError('waiting for mocap velocity window')
         return result

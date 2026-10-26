@@ -50,6 +50,8 @@ roslaunch abc_swarm demo_mocap_three_mini_leader_follower_triangle.launch mode:=
 
 默认弹出键盘终端；先自动入队，状态到following后在里面操作01。02、03都直接跟随01，不依次跟随。先走缓慢直线，再做缓弯。
 
+启动demo的终端会打印“入位完成，可以遥控头车”，此时再操作键盘；该提示在demo终端，不在Xterm的按键帮助中。auto模式相应提示“入位完成，开始自动领航与编队跟随”。
+
 改为自动领航，01走圆，02、03继续分别跟01：
 
 ```bash

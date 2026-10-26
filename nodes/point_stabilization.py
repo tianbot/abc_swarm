@@ -292,6 +292,14 @@ class PointStabilization:
                 rospy.set_param('~enabled', state=='running');self.last_enabled=(state=='running')
         value = json.dumps(data, sort_keys=True)
         phase=(state,stage,admission.stage)
+        if self.mission is not None and state=='running' and stage=='following' and phase!=self.last_phase:
+            if self.last_phase is None or self.last_phase[1]!='following':
+                if self.follow_options['mode']=='manual':
+                    rospy.loginfo('%d台车入位完成，可以遥控头车 %s；请在遥控窗口操作。',len(self.robots),self.robots[0]['name'])
+                else:
+                    rospy.loginfo('%d台车入位完成，开始自动领航与编队跟随。',len(self.robots))
+            elif self.last_phase[0]=='waiting':
+                rospy.loginfo('反馈已恢复，继续%s。','遥控与编队跟随' if self.follow_options['mode']=='manual' else '自动领航与编队跟随')
         # Publish transitions immediately; cap numeric-only updates at 5 Hz.
         if value != self.last_status and (phase != self.last_phase or time.monotonic() - self.last_publish >= 0.2):
             self.status_pub.publish(String(data=value))

@@ -78,6 +78,14 @@ class AdmissionTests(unittest.TestCase):
 
 
 class FormationMissionTests(unittest.TestCase):
+    def test_manual_angular_increase_reaches_output_until_explicit_limit(self):
+        names,opt=options();m=LeaderFollowerMission(names,opt)
+        m.stage='following';m.startup_goals=list(m.local_goals)
+        control=dict(CONTROL,max_angular=3.14)
+        for request,expected in [(.6,.6),(.66,.66),(1.2,1.2),(3.14,3.14),(3.5,3.14)]:
+            commands=m.step(m.local_goals,[(0,0)]*3,control,ORCA,teleop=(0.,request))
+            self.assertAlmostEqual(commands[0][1],expected)
+
     def test_stopped_snake_corrects_front_point_equilibrium_and_resumes_immediately(self):
         names,opt=options('snake');m=LeaderFollowerMission(names,opt)
         m.stage='following';m.startup_goals=list(m.local_goals)

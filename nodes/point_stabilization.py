@@ -353,6 +353,9 @@ class PointStabilization:
         with self.feedback_lock:
             request = self.teleop_command
         teleop = request[1:] if request is not None and time.monotonic()-request[0]<=self.command_timeout else (0.,0.)
+        if self.follow_options['mode']=='manual' and (abs(teleop[0])>self.control['max_linear'] or abs(teleop[1])>self.control['max_angular']):
+            rospy.logwarn_throttle(2.,'遥控请求超过上限：请求v=%.3f m/s、w=%.3f rad/s；允许|v|<=%.3f、|w|<=%.3f。编队协调还可能进一步减速。',
+                                   teleop[0],teleop[1],self.control['max_linear'],self.control['max_angular'])
         commands = self.mission.step(poses,measured,self.control,self.orca,self.control_interval(),teleop)
         if not self.startup_published:
             self.goals = list(self.mission.startup_goals)

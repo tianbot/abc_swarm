@@ -32,7 +32,8 @@
   <arg name="k_x" default="0.5"/>
   <arg name="k_y" default="0.5"/>
   <arg name="max_linear" default="0.15"/>
-  <arg name="max_angular" default="0.6"/>
+  <arg name="max_angular" default="3.14"/>
+  <arg name="teleop_angular" default="0.6"/>
   <arg name="tf_timeout" default="0.5"/>
   <arg name="odom_timeout" default="0.5"/>
   <arg name="odom_future_tolerance" default="0.1"/>
@@ -137,7 +138,7 @@
   <node if="$(eval arg('resolved_mode') == 'manual' and arg('start_teleop'))" pkg="teleop_twist_keyboard" type="teleop_twist_keyboard.py" name="leader_teleop" output="screen" launch-prefix="$(arg teleop_terminal)">
     <remap from="cmd_vel" to="/abc_swarm_demo/teleop_cmd"/>
     <param name="speed" value="$(arg max_linear)"/>
-    <param name="turn" value="$(arg max_angular)"/>
+    <param name="turn" value="$(eval min(float(arg('teleop_angular')), float(arg('max_angular'))))"/>
     <param name="repeat_rate" value="20.0"/>
     <param name="key_timeout" value="0.3"/>
   </node>

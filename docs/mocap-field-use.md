@@ -66,6 +66,8 @@ roslaunch abc_swarm demo_mocap_three_mini_leader_follower_snake.launch mode:=man
 
 键盘遥控01，02跟01、03跟02。键盘操作：i前进，u/o左右缓弯，k停止头车请求；松开后请求超时也会停止。k之后后车仍可能收敛，整组结束必须在启动demo的roslaunch终端Ctrl+C。
 
+前车持续静止后，后车会收敛完整位置和朝向，phase为holding_*；头车的新运动请求会立即切回跟随。停止头车请求后，后车仍可能调整。参数与状态说明见[静止位姿保持](formation-workflow.md#前车停止后的完整位姿保持)。
+
 manual跟随没有指定圈数，不自动结束。两种模式默认使用动捕实测速度；也可显式选择velocity_source=odom，入队时需三台有效odom。
 
 蛇形自动领航：

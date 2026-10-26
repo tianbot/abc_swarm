@@ -78,6 +78,47 @@ class AdmissionTests(unittest.TestCase):
 
 
 class FormationMissionTests(unittest.TestCase):
+    def test_stopped_snake_corrects_front_point_equilibrium_and_resumes_immediately(self):
+        names,opt=options('snake');m=LeaderFollowerMission(names,opt)
+        m.stage='following';m.startup_goals=list(m.local_goals)
+        poses=[(0,0,0)]
+        # Old front-point law sees zero error even though vehicle headings differ.
+        for relative_yaw in (-.33,1.37):
+            lp=poses[-1];yaw=angle(lp[2]+relative_yaw);d=opt['front_distance']
+            poses.append((lp[0]-.4*math.cos(lp[2])-d*math.cos(yaw),
+                          lp[1]-.4*math.sin(lp[2])-d*math.sin(yaw),yaw))
+        geometry=dict(ORCA,robot_radius=.075,safety_margin=.01,front_distance=.04)
+        velocities=[(0,0)]*3;saw_hold=False
+        for _ in range(1200):
+            commands=m.step(poses,velocities,CONTROL,geometry)
+            saw_hold=saw_hold or any(c[2].startswith('holding_') for c in commands)
+            self.assertTrue(all(abs(v)<=.15+1e-8 and abs(w)<=.6+1e-8 for v,w,_ in commands))
+            poses=[integrate(p,c) for p,c in zip(poses,commands)];velocities=[c[:2] for c in commands]
+            self.assertTrue(all(math.hypot(p[0]-q[0],p[1]-q[1])>.19 for i,p in enumerate(poses) for q in poses[:i]))
+            if all(c[2]=='holding_arrived' for c in commands[1:]):break
+        else:self.fail('stopped snake did not converge to complete poses')
+        self.assertTrue(saw_hold)
+        for p,g in zip(poses[1:],m.goals[1:]):
+            self.assertLessEqual(math.hypot(p[0]-g[0],p[1]-g[1]),.04)
+            self.assertLessEqual(abs(angle(p[2]-g[2])),.08)
+        commands=m.step(poses,velocities,CONTROL,geometry,teleop=(.1,.1))
+        self.assertTrue(all(c[2]=='following' for c in commands[1:]))
+        self.assertGreater(commands[0][0],0.)
+
+    def test_stationary_hold_freezes_anchor_releases_on_drift_and_resets_on_pause(self):
+        names,opt=options('snake',count=5);opt['edges'].reverse()
+        m=LeaderFollowerMission(names,opt);m.stage='following';m.startup_goals=list(m.local_goals)
+        poses=list(m.local_goals);velocities=[(0,0)]*len(names)
+        for _ in range(12):commands=m.step(poses,velocities,CONTROL,ORCA)
+        self.assertTrue(all(c[2]=='holding_arrived' for c in commands[1:]))
+        goal=m.goals[1]
+        poses[0]=(.005,0,0);m.step(poses,velocities,CONTROL,ORCA)
+        self.assertEqual(m.goals[1],goal)
+        poses[0]=(.05,0,0);commands=m.step(poses,velocities,CONTROL,ORCA)
+        self.assertEqual(commands[1][2],'following')
+        m.pause();self.assertFalse(m.hold_anchors)
+        self.assertTrue(all(t==0 for t in m.hold_times))
+
     def test_manual_and_auto_admit_precisely_then_follow_and_auto_completes(self):
         for shape in ['triangle','snake']:
             for mode in ['manual','auto']:

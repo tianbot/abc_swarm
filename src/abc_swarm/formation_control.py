@@ -4,14 +4,14 @@ import math
 from .admission import AdmissionController
 from .leader_follower_control import tracking_velocity
 from .orca import OrcaBlocked
-from .point_control import angle, validate_pose, world_goals
+from .point_control import PointPhaseTracker, angle, validate_pose, world_goals
 from .preset_paths import preset_path
 from .pure_pursuit import PurePursuit
 
 
 class LeaderFollowerMission:
     """A rooted vehicle graph, independent of ROS and device-specific topics."""
-    def __init__(self, names, options, admission=None, planning=True):
+    def __init__(self, names, options, admission=None, planning=True, stationary_hold=None):
         required = {'mode','edges','shape','radius','width','height','laps','clockwise','front_distance',
                     'k_x','k_y','lookahead','max_error','tracking_window'}
         if not isinstance(options, dict) or set(options) != required:
@@ -44,6 +44,21 @@ class LeaderFollowerMission:
         if len({e[1] for e in self.edges}) != len(names)-1:
             raise ValueError('Duplicate follower role')
         self.local_goals = self._formation((0., 0., 0.))  # Validate graph connectivity/cycles.
+        depth = {0:0}
+        while len(depth)<len(names):
+            for leader,follower,_,_ in self.edges:
+                if leader in depth:depth[follower]=depth[leader]+1
+        self.edges.sort(key=lambda e:depth[e[1]])
+        if stationary_hold is not None and not isinstance(stationary_hold,dict):
+            raise ValueError('stationary_hold must be a parameter dictionary')
+        self.hold_settings = (dict(settle_time=.4,linear_threshold=.01,angular_threshold=.05)
+                              if stationary_hold is None else dict(stationary_hold))
+        if set(self.hold_settings)!={'settle_time','linear_threshold','angular_threshold'} or any(
+                type(v) not in (int,float) or not math.isfinite(v) or v<=0 for v in self.hold_settings.values()):
+            raise ValueError('stationary_hold requires positive settle_time/linear_threshold/angular_threshold')
+        self.hold_times = [0.]*len(names)
+        self.hold_anchors = {}
+        self.hold_trackers = {}
         self.goals = None
         self.startup_goals = None
         self.admission_settings = admission
@@ -91,6 +106,9 @@ class LeaderFollowerMission:
         self.idle = 0.
 
     def pause(self):
+        self.hold_times = [0.]*len(self.names)
+        self.hold_anchors.clear()
+        self.hold_trackers.clear()
         self.admission.pause()
         self.ready_hold = 0.
         if self.stage == 'ready':
@@ -165,11 +183,37 @@ class LeaderFollowerMission:
             head = (max(-control['max_linear'],min(control['max_linear'],teleop[0])),
                     max(-control['max_angular'],min(control['max_angular'],teleop[1])))
         commands = [None]*len(poses)
+        commands[0] = (*head,'leader_'+self.options['mode'])
         self.goals = [tuple(p) for p in poses]
         errors=[]
         for leader,follower,x,y in self.edges:
             lp,fp = poses[leader],poses[follower]
             self.goals[follower]=world_goals([(x,y,0.)],'initial_leader',lp)[0]
+            # Root intent and parent command release holds immediately; measured
+            # stop alone would misclassify startup delay or a slow correction.
+            stopped = (all(abs(v)<1e-4 for v in head)
+                       and all(abs(v)<1e-4 for v in commands[leader][:2])
+                       and abs(velocities[leader][0])<self.hold_settings['linear_threshold']
+                       and abs(velocities[leader][1])<self.hold_settings['angular_threshold'])
+            anchor = self.hold_anchors.get(follower)
+            if anchor is not None and (math.hypot(lp[0]-anchor[0],lp[1]-anchor[1])>control['position_tolerance']
+                                       or abs(angle(lp[2]-anchor[2]))>control['yaw_tolerance']):
+                stopped = False
+            self.hold_times[follower] = self.hold_times[follower]+dt if stopped else 0.
+            if not stopped:
+                self.hold_anchors.pop(follower,None)
+                self.hold_trackers.pop(follower,None)
+            if self.hold_times[follower]>=self.hold_settings['settle_time']:
+                if follower not in self.hold_anchors:
+                    self.hold_anchors[follower] = tuple(lp)
+                    self.hold_trackers[follower] = PointPhaseTracker()
+                goal = world_goals([(x,y,0.)],'initial_leader',self.hold_anchors[follower])[0]
+                self.goals[follower] = goal
+                v,w,phase = self.hold_trackers[follower].commands([fp],[goal],control)[0]
+                commands[follower] = (v,w,'holding_'+phase)
+                errors.append(max(math.hypot(goal[0]-fp[0],goal[1]-fp[1]),
+                                  self.options['front_distance']*abs(angle(goal[2]-fp[2]))))
+                continue
             dx,dy = fp[0]-lp[0],fp[1]-lp[1]
             c,s = math.cos(lp[2]),math.sin(lp[2])
             relative = (c*dx+s*dy,-s*dx+c*dy,angle(fp[2]-lp[2]))

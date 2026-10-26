@@ -47,6 +47,8 @@ class AIHarnessTests(unittest.TestCase):
         orca=json.loads((ROOT/'ai/orca.example.json').read_text())['orca']
         for experiment in ['manual_triangle','manual_snake','path_triangle','path_snake']:
             spec=scenario(experiment);spec['admission']={'enabled':True,'settings':settings,'orca':orca}
+            self.assertTrue(harness.CATALOG['experiments'][experiment]['stationary_pose_hold'])
+            self.assertIn('完整目标位置和朝向',harness.report(spec))
             root=ET.fromstring(harness.render(spec))
             self.assertEqual(root.find('include/arg[@name="startup"]').get('value'),'true')
             self.assertIsNotNone(root.find('rosparam[@param="/abc_swarm_demo/admission"]'))

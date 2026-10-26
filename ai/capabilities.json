@@ -13,7 +13,8 @@
       "mode": "manual",
       "startup_admission": true,
       "mocap_control": true,
-      "admission_planning": true
+      "admission_planning": true,
+      "stationary_pose_hold": true
     },
     "manual_snake": {
       "robots": 3,
@@ -23,7 +24,8 @@
       "mode": "manual",
       "startup_admission": true,
       "mocap_control": true,
-      "admission_planning": true
+      "admission_planning": true,
+      "stationary_pose_hold": true
     },
     "path_single": {
       "robots": 1,
@@ -39,7 +41,8 @@
       "startup_admission": true,
       "mocap_control": true,
       "mode": "auto",
-      "admission_planning": true
+      "admission_planning": true,
+      "stationary_pose_hold": true
     },
     "path_snake": {
       "robots": 3,
@@ -49,7 +52,8 @@
       "startup_admission": true,
       "mocap_control": true,
       "mode": "auto",
-      "admission_planning": true
+      "admission_planning": true,
+      "stationary_pose_hold": true
     },
     "point_stabilization": {
       "robots": 3,

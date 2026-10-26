@@ -16,9 +16,12 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--case',choices=['triangle_manual','triangle_auto','snake_manual','snake_auto'])
     parser.add_argument('--overlap-start',action='store_true',help='Use the measured three-robot virtual-overlap snapshot')
+    parser.add_argument('--stationary-offset',action='store_true',help='Inject a stopped snake front-point equilibrium with wrong headings')
     selection=parser.parse_args()
     if selection.overlap_start and selection.case!='triangle_manual':
         parser.error('--overlap-start requires --case triangle_manual')
+    if selection.stationary_offset and selection.case!='snake_manual':
+        parser.error('--stationary-offset requires --case snake_manual')
     folder=Path(tempfile.mkdtemp(prefix='abc_swarm_mission_ros_'))
     os.environ.update(ROS_MASTER_URI='http://127.0.0.1:11438',ROS_IP='127.0.0.1',
                       ROS_HOME=str(folder/'home'),ROS_LOG_DIR=str(folder/'logs'))
@@ -134,6 +137,20 @@ def main():
                 publishers=dict(rosgraph.Master(rospy.get_name()).getSystemState()[0])
                 for n in names:assert publishers['/'+n+'/cmd_vel']==['/abc_swarm_demo'],publishers
                 assert not any(topic.endswith('/odom') for topic in publishers),publishers
+                if selection.stationary_offset:
+                    for i,delta in [(1,-.33),(2,1.37)]:
+                        x,y,yaw=poses[i-1];heading=angle(yaw+delta)
+                        poses[i]=(x-.4*math.cos(yaw)-.1*math.cos(heading),
+                                  y-.4*math.sin(yaw)-.1*math.sin(heading),heading)
+                    wall=time.monotonic()+25
+                    while time.monotonic()<wall:
+                        pump(.2)
+                        assert states[-1]['state']!='fault',states[-1]
+                        if len(states[-1]['robots'])==3 and all(
+                                r['phase']=='holding_arrived' and r['position_error']<=.04 and abs(r['yaw_error'])<=.08
+                                for r in states[-1]['robots'][1:]):break
+                    else:raise AssertionError(('stationary snake pose hold failed',states[-1],poses))
+                    print('stationary snake: full pose correction PASS',flush=True)
                 if mode=='manual':
                     pump(1.)
                     assert abs(commands[names[0]][-1][1])<1e-8,commands[names[0]][-1]

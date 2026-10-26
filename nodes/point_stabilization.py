@@ -77,7 +77,8 @@ class PointStabilization:
         self.formation = rospy.get_param('~formation', 'config')
         if self.task == 'leader_follower':
             self.follow_options = rospy.get_param('~follow')
-            self.mission = LeaderFollowerMission([r['name'] for r in self.robots], self.follow_options, self.admission_settings, self.planning)
+            self.mission = LeaderFollowerMission([r['name'] for r in self.robots], self.follow_options, self.admission_settings,
+                                                self.planning,rospy.get_param('~stationary_hold',None))
             self.targets = self.mission.local_goals
             self.reference = 'initial_leader'
         elif self.task in ('circle','triangle'):

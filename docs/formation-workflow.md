@@ -43,6 +43,16 @@
 
 following阶段使用原跟随控制律和实测前车速度。当外侧后车需要更高速度时，头车按最大前置控制点误差缩放v/omega，以保留转弯曲率；tracking_window控制减速窗口，误差达到窗口时头车暂停等待。manual也遵守这个队形协调上限。它仍是编队跟随，不是三车120°同圆。
 
+## 前车停止后的完整位姿保持
+
+移动时继续使用原前置点leader–follower控制律。前车的实测速度连续0.4秒低于0.01m/s及0.05rad/s，且头车请求和前车指令均为零时，后车切换到完整位姿点镇定，补齐位置与朝向。蛇形按01→02→03逐车稳定，三角形两后车分别看01；仍按各自实际前车分配目标，不改跟随拓扑。
+
+进入保持时冻结前车位姿，避免动捕小抖动反复改变目标。前车实测运动、非零指令、头车新运动请求，或前车偏离冻结位姿超过位置/航向容差时，解除保持；反馈中断清空保持窗口，恢复后重新判断。新请求不需等静止窗口即可切回跟随。
+
+控制参数stationary_hold在control_config中配置（默认config/point_stabilization.yaml）：settle_time、linear_threshold、angular_threshold；缺省使用上述值。保持仍使用现有位置/航向容差与k_distance/k_heading增益，不另复制设备PID。status.robots[].phase显示holding_approaching、holding_aligning、holding_orienting或holding_arrived；静止保持时formation_error也计入轴心位置误差和按前置距离折算的航向误差，不再只看前置点。
+
+保持仍处于following阶段，没有增加全程ORCA；实际车体间距检查保留。头车零请求后后车可能继续入位/对齐，全组结束仍用Ctrl+C。此功能不能校正错误的刚体朝向/原点或底盘执行问题，实车效果需现场确认。
+
 ## GUI 复用接口
 
 | 接口 | 含义 |

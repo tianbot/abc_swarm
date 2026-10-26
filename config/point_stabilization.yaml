@@ -15,5 +15,12 @@ yaw_tolerance: 0.08
 k_distance: 0.9
 k_heading: 2.0
 
+# Leader-follower only: measured parent stop + zero command must persist.
+# Position/yaw tolerances and gains above also govern stationary pose holding.
+stationary_hold:
+  settle_time: 0.4
+  linear_threshold: 0.01
+  angular_threshold: 0.05
+
 # Candidate gains from tests/point_gain_sweep.py; hardware acceptance still required.
 # Runtime gains can be adjusted through /abc_swarm_demo dynamic_reconfigure.

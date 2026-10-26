@@ -59,6 +59,7 @@ class FormationEntrypointTests(unittest.TestCase):
         cfg=load(path,['robot_name_2:=client_02','rigid_body_2:=body_02'])
         params=node_params(cfg)
         self.assertEqual(params['~robots'][1],{'name':'client_02','frame':'body_02'})
+        self.assertEqual(params['~stationary_hold']['settle_time'],.4)
         self.assertEqual(params['~follow']['edges'][0]['follower'],'client_02')
 
     def test_invalid_mission_configuration_fails_before_publishers(self):
@@ -69,6 +70,7 @@ class FormationEntrypointTests(unittest.TestCase):
                        lambda p:p['~follow'].update(edges=[]),
                        lambda p:p['~follow']['edges'][0].update(leader='missing'),
                        lambda p:p['~admission'].update(settle_time=-1),
+                       lambda p:p['~stationary_hold'].update(settle_time=-1),
                        lambda p:p.update({'~velocity_source':'cmd_vel'}),
                        lambda p:p.update({'~avoidance':'none'})]:
             p=copy.deepcopy(base);change(p)

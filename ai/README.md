@@ -71,7 +71,11 @@ python3 ai/generate_launch.py /tmp/customer-demo/experiment.json --output /tmp/c
 - `startup` 的四个字段均为真正的布尔值。start_driver/start_vrpn 为 true 表示本实验启动，为 false 表示复用现场已有后台。两者不表示运动开关；没有反馈不能 ready。use_rviz 控制界面，start_teleop 仅手动实验可为 true。自动实验禁止键盘并发控制。
 - 不提供手动 enabled 启动选项、无限圈数、任意文件/节点/命令扩展。业务需要新能力时走下述维护流程。
 
-三角/蛇形leader–follower的launch现在支持mode=manual/auto。AI仍用manual_triangle/manual_snake生成明确的mode=manual；自动领航继续使用已支持的path_triangle/path_snake及完整path字段，复用同一头车路径节点。没有新增JSON顶层mode字段，也没有改动原自动路径入口对圆形/圆角矩形的支持。
+三角/蛇形leader–follower支持mode=manual/auto，默认先ORCA入队、精定位、全体稳定到齐再跟随。AI用manual_triangle/manual_snake生成mode=manual，path_triangle/path_snake生成mode=auto并映射完整path（圆/圆角矩形）；两类都使用统一任务节点和startup=true，保留原有实验JSON字段。原独立自动路径launch名称仍保留。没有新增JSON顶层mode字段。
+
+可选admission对象仅适用于以上四种跟随实验。启用时恰有enabled=true、settings、orca；settings字段与config/admission.yaml一致，orca字段与现有ORCA对象一致。停用时只允许`{"enabled": false}`，显式选择startup=false直接跟随，此时不接受mocap_control，避免把旧节点未消费的标定写进交付。完整例子见ai/formation-admission.example.json，生成后仍执行只读--check和Noetic解析。
+
+旧实验单语法继续有效，但这四类更新后默认会自动入队；需重新生成交付并告知客户启动后自动运动。要保留旧式直接跟随，明确填写admission.enabled=false。显式配置会检查数值、目标包络和可用精定位区域，不通过放宽白名单接受不支持的设备数量。
 
 ## 维护者如何扩展
 
@@ -81,7 +85,7 @@ python3 ai/generate_launch.py /tmp/customer-demo/experiment.json --output /tmp/c
 
 ## 可选动捕控制配置
 
-契约2兼容新增可选 `mocap_control`，仅用于点镇定/ORCA点镇定/三车协调圆或三角。旧实验单不需要迁移。完整例子见 `ai/mocap-control.example.json`。
+契约2兼容新增可选 `mocap_control`，用于点镇定/ORCA点镇定/三车协调圆或三角，以及启用入队的三角/蛇形跟随。完整例子见 `ai/mocap-control.example.json`、`ai/formation-admission.example.json`。
 
 ```json
 "mocap_control": {

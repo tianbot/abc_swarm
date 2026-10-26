@@ -1,6 +1,18 @@
 # 三车动捕现场测试清单
 
-## 2026-10-26 跟随入口的 manual/auto 模式
+## 2026-10-26 完整入队与跟随流程（当前版本）
+
+三角形/蛇形leader–follower默认先ORCA入队，捕获区域与车体包络分离后转纯点镇定，全体位置、航向与实测速度稳定，再进入manual/auto跟随。auto完成路径后重新稳定队形并停车。两个旧launch名称保留，startup=false可对照上一节记录的直接跟随方式。四项操作见[现场使用](mocap-field-use.md)，阶段/参数/GUI接口见[完整流程](formation-workflow.md)。下方早期开发记录是历史快照，当前默认流程以本节为准。
+
+功能提交 `44e6216`。本轮99项catkin测试全部通过，Noetic独立构建、测试、安装完成。安装后四种完整任务组合在私有master 11438及合成时钟下通过：三角manual/auto、蛇形manual/auto，覆盖ORCA→精定位→ready→following，auto额外覆盖settling/completed；检查提前遥控丢弃、超时、TF中断停车及恢复、不回放旧请求、冻结目标、每车唯一输出者、完成与退出零输出。仅发布带已知标记偏移/02航向偏差的合成TF，不发布odom，不启动硬件/VRPN/UI。最终日志 `/tmp/abc_swarm_admission_installed_mission_final.log`，详细目录 `/tmp/abc_swarm_mission_ros_h5u6mvta`。记录中的最小间距来自模型采样，不是实车结果。
+
+安装后旧路径/直接跟随回归、独立点镇定、ORCA及五个协调路径用例通过。日志分别为 `/tmp/abc_swarm_admission_installed_legacy.log`、`/tmp/abc_swarm_admission_installed_point_retry.log`、`/tmp/abc_swarm_admission_installed_orca.log`、`/tmp/abc_swarm_admission_installed_loops.log`。点镇定测试修正了固定3秒启动等待导致的空状态读取，改为有上限的状态到齐等待，控制验收条件未放宽。构建/测试/安装日志为 `/tmp/abc_swarm_admission_build.log`、`/tmp/abc_swarm_admission_tests_final.log`、`/tmp/abc_swarm_admission_install_final.log`。
+
+AI能力表/生成器及正反例同步更新：四个跟随能力默认完整入队，支持显式admission配置或enabled=false对照旧方式；旧配置重新生成时也会采用新默认，须告知自动入队行为。九种能力的交付生成、只读--check与安装后的Noetic解析均通过，并核对两种队形×两种模式的现场标定展开。CI新增核心流程及安装后完整任务回归，尚未运行远端CI。课程检查器、基线和例外未改，原48个资源兼容检查通过。
+
+本轮未启动实车、Gazebo，未推送、未发布网站；完整入队流程仍待现场验收。内部跟随图有五角色回归，但公开launch/AI白名单仍为三台Mini，没有据此扩展客户交付数量或承诺全程避障。
+
+## 2026-10-26 跟随入口的 manual/auto 模式（早期记录）
 
 两个 leader-follower demo 新增 mode=manual/auto，默认manual，拼写错误拒绝。manual启动键盘；auto复用preset_path_tracker作为唯一头车速度发布者，半径默认1m、一圈，后车跟随关系保持三角或逐车蛇形。共用头车片段为 `launch/common/leader_path_tracker.launch.xml`，原自动路径入口也复用它；没有新增Python节点。模式在启动时选择，退出后重启切换。
 

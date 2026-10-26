@@ -4,7 +4,9 @@
 
 ## 做什么、在哪一步工作
 
-每车仍去自己的目标位置，最后对齐目标朝向。点镇定给出期望运动，ORCA 根据三台车当前状态调整途中运动，控制器再输出差速底盘 v/omega。到位后整组停车，不自动切入跟随。
+每车仍去自己的目标位置，最后对齐目标朝向。点镇定给出期望运动，ORCA 根据三台车当前状态调整途中运动，控制器再输出差速底盘 v/omega。接近目标且捕获区域与车体包络可分离后，切换纯点镇定精确入位；越界或间距不足则恢复ORCA。完成仍检查原位置/航向容差及实测停车，不扩大最终容差。独立点镇定到位后整组停车，不自动切入跟随。
+
+两个leader–follower入口现在默认复用这套入队，再自动交给manual/auto跟随；完整阶段和GUI接口见[编队启动流程](formation-workflow.md)。
 
 普通点镇定默认 avoidance=none，行为保持原样。ORCA 复用同一个 nodes/point_stabilization.py；新增入口只是明确选择避障模式，没有复制整套节点。
 
@@ -76,6 +78,8 @@ roslaunch abc_swarm demo_mocap_three_mini_orca_point_stabilization.launch format
 
 点镇定会先到最终位置容差的一半范围，再稳定调整朝向；位置小幅变化时保留转向阶段，超过两倍容差则重新靠近。只有位置与航向都进入原定容差才报告 arrived/completed，避免阈值附近反复切换，未扩大最终完成容差。
 
+切换与稳定窗口由 `config/admission.yaml` 配置，可通过 `admission_config` 替换；各参数归属见[完整流程](formation-workflow.md#参数归属)。
+
 几何/时域参数重启后生效；已有点镇定的 k_distance/k_heading 动态调参继续可用，修改增益不会改变目标或重新启动 completed 的任务。
 
 ## 观察和停止
@@ -84,14 +88,14 @@ roslaunch abc_swarm demo_mocap_three_mini_orca_point_stabilization.launch format
 rostopic echo /abc_swarm_demo/status
 ```
 
-模式仍为 point_stabilization，新增 avoidance=orca。robots 保留每车目标、误差及阶段；arrived 附近若仍需避让，阶段可能为 avoiding。
+模式仍为 point_stabilization，新增 avoidance=orca。robots 保留每车目标、误差及阶段；admission_stage区分assembling_orca、fine_positioning、ready。avoidance_active只在实际ORCA阶段为true。
 
 | state | 行为 |
 | --- | --- |
-| waiting | 任一 TF 或 odom 缺失/过期，全组输出零；恢复后继续原冻结目标 |
-| running | 正在点镇定及车车避让 |
+| waiting | 任一反馈缺失/过期，或ORCA速度交集暂时为空，全组输出零；条件恢复后继续原冻结目标 |
+| running | 正在ORCA入位，或受几何监控的纯点镇定 |
 | completed | 三台位置和最终航向均到达，持续停车，不自动开始第二轮 |
-| fault | 初始有效包络重叠、目标冲突、无可行速度或长期无进展；整组停车并锁定，检查后重启 launch |
+| fault | 初始有效包络重叠、目标冲突或长期无进展；整组停车并锁定，检查后重启 launch |
 
 反馈中断时间不计入进展超时。ORCA 是局部避让，不能保证所有拥挤/对称配置都能到达目标；fault 是未完成，不能当成避障成功。不要用重启反复强推几何不可行的任务。
 
@@ -123,7 +127,7 @@ roslaunch --nodes /tmp/customer-orca-demo/experiment.launch start_driver:=false 
 
 两两 ORCA 半平面参考 [RVO2 Agent.cc 固定提交](https://github.com/snape/RVO2/blob/75822bba14462c2e872ca96423825017ecd24764/src/Agent.cc)，Python 实现在 `src/abc_swarm/orca.py`，保留 Apache-2.0 归属，许可证和参考文件哈希在 `licenses/orca/`。没有引入 C++ 编译依赖；仅实现本轮需要的参与车辆两两约束，不包含 RVO2 的静态障碍部分。
 
-差速适配参考 [ORCA-DD](https://gamma-web.iacs.umd.edu/ORCA-DD/) 的有效圆心和半径思想。前置点速度满足 u=v·heading+d·omega·left；本实现把车体 v/omega 上限变成半平面，直接求与 ORCA 半平面的交集，再还原车体命令。不会在求解后随意裁剪速度并继续假设约束成立；交集为空就停机。
+差速适配参考 [ORCA-DD](https://gamma-web.iacs.umd.edu/ORCA-DD/) 的有效圆心和半径思想。前置点速度满足 u=v·heading+d·omega·left；本实现把车体 v/omega 上限变成半平面，直接求与 ORCA 半平面的交集，再还原车体命令。不会在求解后随意裁剪速度并继续假设约束成立；交集为空则整组零输出并等待下一次测量重试；不放松约束，长期无进展仍锁定故障。
 
 这是工程首版，不声称逐项复现论文全部假设或证明。尚未辨识执行延迟、打滑、刹停距离、轮速组合限幅和动捕误差；离散周期、执行器对命令的裁剪也影响真实效果。计算模型中的几何余量不替代实车验收。当前没有静态障碍感知、全局路径规划、自动目标分配或对所有配置的可达性保证。
 

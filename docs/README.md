@@ -7,6 +7,7 @@
 当前用户指南：
 
 - **[三台 Mini 四项现场实验：跟随、圆形、三角路径与标定](mocap-field-use.md)**
+- [完整入队流程、精定位切换和GUI接口](formation-workflow.md)
 
 - [三车动捕同圆绕行与正三角形逐边运动](coordinated-tracking.md)
 

@@ -45,7 +45,8 @@ def validate(spec):
     coordinated = hint.get('coordinated')
     orca = hint.get('orca', False) or bool(coordinated and spec.get('orca') is not None)
     fields(spec, 'contract_version name localization fixed_frame vrpn robots experiment path startup'
-           + (' trajectory orca' if coordinated else (' targets' if point else ' spacing') + (' orca' if orca else '')), 'experiment')
+           + (' trajectory orca' if coordinated else (' targets' if point else ' spacing') + (' orca' if orca else ''))
+           + (' mocap_control' if isinstance(spec,dict) and 'mocap_control' in spec else ''), 'experiment')
     require(type(spec['contract_version']) is int and spec['contract_version'] == 2, 'contract_version: expected 2 (automatic startup; review v1 input before migrating)')
     identifier(spec['name'], 'name')
     for key in ('localization', 'fixed_frame'):
@@ -71,6 +72,22 @@ def validate(spec):
                 number(val, where + '.initial_pose')
     for key in ('name', 'rigid_body'):
         require(len({r[key] for r in spec['robots']}) == len(spec['robots']), 'robots: duplicate ' + key)
+    if 'mocap_control' in spec:
+        require(capability.get('mocap_control',False), 'mocap_control: unsupported for this experiment')
+        control=spec['mocap_control']
+        fields(control,'velocity_source position_tolerance calibration','mocap_control')
+        require(control['velocity_source'] in ('odom','mocap'), 'mocap_control.velocity_source: odom or mocap')
+        number(control['position_tolerance'],'mocap_control.position_tolerance',positive=True)
+        require(.02<=control['position_tolerance']<=.15, 'mocap_control.position_tolerance: 0.02..0.15 m')
+        calibration=control['calibration']
+        if calibration is not None:
+            fields(calibration,' '.join(r['name'] for r in spec['robots']),'mocap_control.calibration')
+            for name,setting in calibration.items():
+                fields(setting,'yaw_offset marker_offset','calibration.'+name)
+                number(setting['yaw_offset'],'calibration.yaw_offset')
+                require(isinstance(setting['marker_offset'],list) and len(setting['marker_offset'])==2,
+                        'calibration.marker_offset: [forward_m,left_m] required')
+                for value in setting['marker_offset']:number(value,'calibration.marker_offset')
     fields(spec['vrpn'], 'server port', 'vrpn')
     try:
         ipaddress.IPv4Address(spec['vrpn']['server'])
@@ -174,6 +191,8 @@ def render(spec):
         args.update({key:value for key,value in spec['trajectory'].items() if key!='origin'})
         args.update(dict(zip(('origin_x','origin_y','origin_yaw'),spec['trajectory']['origin'])))
         args['avoidance'] = 'orca' if spec['orca'] is not None else 'none'
+    if 'mocap_control' in spec:
+        args['velocity_source']=spec['mocap_control']['velocity_source']
 
     for key, value in args.items():
         ET.SubElement(include, 'arg', name=key, value=text_value(value))
@@ -186,6 +205,10 @@ def render(spec):
             ET.SubElement(root, 'rosparam', param='/abc_swarm_demo/' + key).text = json.dumps(value)
     if capability.get('orca') or (capability.get('coordinated') and spec['orca'] is not None):
         ET.SubElement(root, 'rosparam', param='/abc_swarm_demo/orca').text = json.dumps(spec['orca'])
+    if 'mocap_control' in spec:
+        for key,value in [('position_tolerance',spec['mocap_control']['position_tolerance']),
+                          ('mocap_calibration',spec['mocap_control']['calibration'] or {})]:
+            ET.SubElement(root,'rosparam',param='/abc_swarm_demo/'+key).text=json.dumps(value)
     # Python 3.8 (Noetic) has no ET.indent.
     return minidom.parseString(ET.tostring(root, encoding='utf-8')).toprettyxml(indent='  ')
 
@@ -193,9 +216,9 @@ def render(spec):
 def report(spec):
     capability = validate(spec)
     if capability.get('coordinated'):
-        return loop_report(spec)
+        return loop_report(spec)+mocap_control_report(spec)
     if capability.get('point'):
-        return point_report(spec)
+        return point_report(spec)+mocap_control_report(spec)
     lines = ['# 客户实验运行单', '', '实验：`{}`；入口：`{}`。'.format(spec['experiment'], capability['launch']),
              '设备顺序即角色：01 项为头车；triangle 的 02/03 跟头车，snake 为逐车跟前车。',
              '坐标单位 m/rad，均为 world 下轴心参考点；以下是人工摆位记录，不设置 TF、不移动到起点。', '',
@@ -233,12 +256,24 @@ def report(spec):
     return '\n'.join(lines)
 
 
+def mocap_control_report(spec):
+    if 'mocap_control' not in spec:return ''
+    c=spec['mocap_control']
+    return ('\n\n## 动捕控制反馈与标定\n\n速度来源：`{}`；最终位置容差：{} m。\n\n'
+            'mocap 使用控制中心位姿约0.2秒窗口估计实测速度，不依赖底盘 odom；动捕失效仍全组停车。'
+            '标定从原始平面 yaw 加 yaw_offset，再扣除车辆前/左坐标中的轴心到标记原点偏移；原始 TF 不修改。'
+            'null 表示刚体已对齐控制中心，使用原始位姿。不能复制其他客户的标定值。\n\n'
+            '```json\n{}\n```\n').format(c['velocity_source'],c['position_tolerance'],
+                                          json.dumps(c['calibration'],ensure_ascii=False,indent=2))
+
+
 def point_report(spec):
     avoidance = CATALOG['experiments'][spec['experiment']].get('orca', False)
+    feedback = '有效动捕及动捕估计速度' if spec.get('mocap_control',{}).get('velocity_source')=='mocap' else '有效动捕与底盘 odom'
     lines = ['# 三车点镇定运行单' + ('（ORCA 车车避让）' if avoidance else ''), '',
              '目标参考系：`' + spec['targets']['reference'] + '`。world 为绝对目标；initial_leader 在全部定位有效时按首车实测位姿冻结目标。',
              '初始位姿仅供记录，控制目标来自 targets；没有头车领航和后车跟随角色，按设备数组顺序一对一分配。',
-             ('启动后自动运行，ORCA 仅避让本实验三车；需要三车有效 odom 与 TF，可能短距离倒车。没有静态障碍感知或自动切入编队。' if avoidance else '启动后自动运行，各车先到目标位置再调整最终航向；没有 ORCA、路径避障或自动切入编队。'), '',
+             ('启动后自动运行，ORCA 仅避让本实验三车；需要三车'+feedback+'，可能短距离倒车。没有静态障碍感知或自动切入编队。' if avoidance else '启动后自动运行，各车先到目标位置再调整最终航向；没有 ORCA、路径避障或自动切入编队。'), '',
              '| 设备 | 刚体 | 初始位姿记录 | 控制目标 [m,m,rad] |', '| --- | --- | --- | --- |']
     for robot, goal in zip(spec['robots'], spec['targets']['poses']):
         lines.append('| {} | {} | {} | {} |'.format(robot['name'], robot['rigid_body'], robot['initial_pose'], goal))
@@ -249,7 +284,7 @@ def point_report(spec):
               '```bash', 'roslaunch ./experiment.launch', '```', '',
               '```bash', 'rostopic echo /abc_swarm_demo/status', '```', '',
               'state=completed 表示三车位置和航向均到达，之后持续停车；退出用 Ctrl+C 并确认实际静止。',
-              ('任意 TF/odom 失效时全组停车，恢复后继续冻结目标；包络重叠、无可行速度或进展超时会 fault 停车，需检查并重启。' if avoidance else '任意所需位姿缺失/过期时全组停车；恢复定位后继续原冻结目标，不重建起点。'),
+              ('任意必需反馈失效时全组停车，恢复后继续冻结目标；包络重叠、无可行速度或进展超时会 fault 停车，需检查并重启。' if avoidance else '任意所需位姿缺失/过期时全组停车；恢复定位后继续原冻结目标，不重建起点。'),
               '无启用 service。新一轮需重启 launch；不要同时运行跟随/路径节点或其他 cmd_vel 发布者。',
               '', '离线生成检查通过；ROS 解析、驱动/动捕及实车到位/停车仍须现场记录，不代表已验收。', '']
     return '\n'.join(lines)
@@ -258,12 +293,13 @@ def point_report(spec):
 def loop_report(spec):
     shape=CATALOG['experiments'][spec['experiment']]['coordinated']
     task=spec['trajectory']
+    feedback = '动捕估计实测速度' if spec.get('mocap_control',{}).get('velocity_source')=='mocap' else '有效底盘 odom'
     lines=['# 三车动捕协调路径运行单', '',
            ('任务：同一个圆，三车相隔约120°、同向绕行。' if shape=='circle' else '任务：正三角形三个顶点，每轮各走一条直边，到齐停车并原地转向后一起走下一边。'),
            '参数：'+json.dumps(task,ensure_ascii=False),
            'reference=initial_leader 时，按01启动实际位姿冻结第一起点及切线/第一条边；world 时 origin 是这一参考位姿，不能当成圆心。',
            '流程：全体点镇定到起点/朝向并稳定 → 协调路径跟踪 → 指定圈数完成停车，没有人工启用 service。',
-           ('起点点镇定启用 ORCA，需三车有效 odom；路径段保持几何跟踪，不提供全程 ORCA 避障。' if spec['orca'] is not None else '起点点镇定未启用 ORCA；请准备互不冲突的摆位通道。路径段没有障碍感知。'), '',
+           ('起点点镇定启用 ORCA，需三车'+feedback+'；路径段保持几何跟踪，不提供全程 ORCA 避障。' if spec['orca'] is not None else '起点点镇定未启用 ORCA；请准备互不冲突的摆位通道。路径段没有障碍感知。'), '',
            '| 设备 | 动捕刚体 | 初始位姿记录 |','| --- | --- | --- |']
     for robot in spec['robots']:
         lines.append('| {} | {} | {} |'.format(robot['name'],robot['rigid_body'],robot['initial_pose']))
@@ -296,7 +332,8 @@ def bundle(spec):
         paths.extend([HERE.parent / 'config/point_stabilization.yaml',
                       HERE.parent / 'config/point_control.cfg'])
     if validate(spec).get('orca'):
-        paths.extend([HERE.parent / 'config/orca.yaml', HERE.parent / 'licenses/orca/UPSTREAM.json'])
+        paths.extend([HERE.parent / 'config/orca.yaml', HERE.parent / 'licenses/orca/UPSTREAM.json',
+                      HERE.parent / 'launch/mocap/demo_mocap_three_mini_point_stabilization.launch'])
     if validate(spec).get('coordinated'):
         paths.extend([HERE.parent / 'config/coordinated_tracking.yaml',HERE.parent / 'config/point_stabilization.yaml',
                       HERE.parent / 'config/orca.yaml',HERE.parent / 'config/point_control.cfg'])

@@ -18,6 +18,22 @@ def load(path,args=None):
 
 
 class CoordinatedEntrypointTests(unittest.TestCase):
+    def test_ai_mocap_feedback_and_calibration_expand_without_extra_nodes(self):
+        harness=runpy.run_path(str(ROOT/'ai/generate_launch.py'))
+        for experiment in ['point_stabilization','point_stabilization_orca','coordinated_circle','coordinated_triangle']:
+            example=('coordinated-'+experiment.split('_')[1]+'.example.json' if experiment.startswith('coordinated')
+                     else 'orca.example.json' if experiment.endswith('_orca') else 'point-stabilization.example.json')
+            spec=json.loads((ROOT/'ai'/example).read_text())
+            spec['mocap_control']={'velocity_source':'mocap','position_tolerance':.08,
+                                  'calibration':{r['name']:{'yaw_offset':.3,'marker_offset':[.03,.01]} for r in spec['robots']}}
+            with tempfile.TemporaryDirectory() as folder:
+                path=Path(folder)/'demo.launch';path.write_text(harness['render'](spec))
+                config=load(path,['start_driver:=false','start_vrpn:=false','use_rviz:=false'])
+                self.assertEqual(len(config.nodes),1)
+                self.assertEqual(config.params['/abc_swarm_demo/velocity_source'].value,'mocap')
+                self.assertEqual(config.params['/abc_swarm_demo/position_tolerance'].value,.08)
+                self.assertEqual(config.params['/abc_swarm_demo/mocap_calibration/tianbot_mini_02/yaw_offset'].value,.3)
+
     def test_both_demos_have_one_owner_default_size_speed_and_optional_backend(self):
         for shape in ('circle','triangle'):
             p=ROOT/('launch/mocap/demo_mocap_three_mini_'+shape+'_tracking.launch')
@@ -68,7 +84,7 @@ class CoordinatedEntrypointTests(unittest.TestCase):
                              if key.startswith('/abc_swarm_demo/coordinated/')}
         for change in [lambda p:p['~coordinated'].update(diameter=1),lambda p:p['~coordinated'].update(laps=True),
                        lambda p:p['~coordinated'].update(reference='bad'),lambda p:p['~coordinated'].update(speed=.2),
-                       lambda p:p['~robots'].pop()]:
+                       lambda p:p['~robots'].pop(),lambda p:p.update({'~mocap_calibration':{'unknown':{}}})]:
             params=copy.deepcopy(base);change(params)
             with patch('rospy.get_param',side_effect=lambda key,default=None:params.get(key,default)),patch('rospy.Publisher') as publisher:
                 with self.assertRaises(ValueError):module['PointStabilization']()

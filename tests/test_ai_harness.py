@@ -33,6 +33,28 @@ def scenario(experiment):
 
 
 class AIHarnessTests(unittest.TestCase):
+    def test_mocap_control_extension_is_explicit_and_rejects_bad_calibration(self):
+        for experiment in ['point_stabilization','point_stabilization_orca','coordinated_circle','coordinated_triangle']:
+            spec=scenario(experiment)
+            spec['mocap_control']={'velocity_source':'mocap','position_tolerance':.08,
+                                  'calibration':{r['name']:{'yaw_offset':.2,'marker_offset':[.03,.01]} for r in spec['robots']}}
+            root=ET.fromstring(harness.render(spec))
+            self.assertEqual(root.find('include/arg[@name="velocity_source"]').get('value'),'mocap')
+            self.assertIn('0.08',root.find('rosparam[@param="/abc_swarm_demo/position_tolerance"]').text)
+            self.assertIn('marker_offset',harness.report(spec))
+            if experiment=='point_stabilization_orca':
+                hashes=json.loads(harness.bundle(spec)['composition.sha256.json'])
+                self.assertIn('launch/mocap/demo_mocap_three_mini_point_stabilization.launch',hashes)
+            for change in [lambda s:s['mocap_control'].update(velocity_source='cmd_vel'),
+                           lambda s:s['mocap_control'].update(position_tolerance=.5),
+                           lambda s:s['mocap_control']['calibration'].pop(s['robots'][0]['name']),
+                           lambda s:s['mocap_control']['calibration'][s['robots'][0]['name']].update(yaw_offset=True),
+                           lambda s:s['mocap_control']['calibration'][s['robots'][0]['name']].update(marker_offset=[0,float('nan')])]:
+                bad=copy.deepcopy(spec);change(bad)
+                with self.assertRaises(ValueError):harness.validate(bad)
+        unsupported=scenario('manual_triangle');unsupported['mocap_control']=spec['mocap_control']
+        with self.assertRaises(ValueError):harness.validate(unsupported)
+
     def test_all_supported_experiments_use_existing_entrypoints_without_arming(self):
         for experiment, cap in harness.CATALOG['experiments'].items():
             with self.subTest(experiment=experiment):

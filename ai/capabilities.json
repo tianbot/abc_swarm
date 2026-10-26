@@ -40,7 +40,8 @@
       "formation": "targets",
       "path": false,
       "point": true,
-      "launch": "demo_mocap_three_mini_point_stabilization.launch"
+      "launch": "demo_mocap_three_mini_point_stabilization.launch",
+      "mocap_control": true
     },
     "point_stabilization_orca": {
       "robots": 3,
@@ -48,21 +49,24 @@
       "path": false,
       "point": true,
       "orca": true,
-      "launch": "demo_mocap_three_mini_orca_point_stabilization.launch"
+      "launch": "demo_mocap_three_mini_orca_point_stabilization.launch",
+      "mocap_control": true
     },
     "coordinated_circle": {
       "robots": 3,
       "formation": "coordinated",
       "path": false,
       "coordinated": "circle",
-      "launch": "demo_mocap_three_mini_circle_tracking.launch"
+      "launch": "demo_mocap_three_mini_circle_tracking.launch",
+      "mocap_control": true
     },
     "coordinated_triangle": {
       "robots": 3,
       "formation": "coordinated",
       "path": false,
       "coordinated": "triangle",
-      "launch": "demo_mocap_three_mini_triangle_tracking.launch"
+      "launch": "demo_mocap_three_mini_triangle_tracking.launch",
+      "mocap_control": true
     }
   }
 }

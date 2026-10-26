@@ -120,6 +120,8 @@ jobs:
             python3 "$ai_dir/generate_launch.py" "$ai_dir/coordinated-$loop_shape.example.json" --output "$RUNNER_TEMP/customer-$loop_shape-demo"
             python3 "$ai_dir/generate_launch.py" "$RUNNER_TEMP/customer-$loop_shape-demo/experiment.json" --output "$RUNNER_TEMP/customer-$loop_shape-demo" --check
           done
+          python3 "$ai_dir/generate_launch.py" "$ai_dir/mocap-control.example.json" --output "$RUNNER_TEMP/customer-mocap-control"
+          python3 "$ai_dir/generate_launch.py" "$RUNNER_TEMP/customer-mocap-control/experiment.json" --output "$RUNNER_TEMP/customer-mocap-control" --check
       - name: Run isolated synthetic ROS integration
         run: |
           source "$RUNNER_TEMP/abc_swarm_ws/install/setup.bash"

@@ -58,7 +58,7 @@ python3 ai/generate_launch.py /tmp/customer-demo/experiment.json --output /tmp/c
 | path_triangle | 3 | 预设路径 | 三角形 |
 | path_snake | 3 | 预设路径 | 逐车跟随 |
 | point_stabilization | 3 | 各自位置与最终航向 | 独立目标，无跟随拓扑 |
-| point_stabilization_orca | 3 | 同上，途中车车避让 | 仅 mocap，需三车实际 odom |
+| point_stabilization_orca | 3 | 同上，途中车车避让 | 底盘odom，或显式选择动捕估计实测速度 |
 | coordinated_circle | 3 | 自动起点点镇定后同圆跟踪 | 约120°间隔，等待最慢车 |
 | coordinated_triangle | 3 | 自动起点点镇定后逐边跟踪 | 正三角形，顶点到齐再原地转向 |
 
@@ -75,7 +75,23 @@ python3 ai/generate_launch.py /tmp/customer-demo/experiment.json --output /tmp/c
 
 先完成设备/算法及公开 launch，再登记能力，不把未实现项写成 supported。新增设备须证明运动学、输入输出、参考点和停机行为；新增数量须验证编队拓扑、每车输出唯一、反馈链和统一停机。若不满足当前契约，应明确升级契约和迁移方式，保留既有客户输入。
 
-同步修改生成器验证/参数映射，添加成功与拒绝用例，并在有 Noetic 的测试中解析生成文件、核对每车角色及启停默认值。没有硬件结果就保持“实车未测”。本轮没有增加 ROS 节点，也没有修改已有控制算法。
+同步修改生成器验证/参数映射，添加成功与拒绝用例，并在有 Noetic 的测试中解析生成文件、核对每车角色及启停默认值。没有硬件结果就保持“实车未测”。生成器本身不启动 ROS，也不发送速度。
+
+## 可选动捕控制配置
+
+契约2兼容新增可选 `mocap_control`，仅用于点镇定/ORCA点镇定/三车协调圆或三角。旧实验单不需要迁移。完整例子见 `ai/mocap-control.example.json`。
+
+```json
+"mocap_control": {
+  "velocity_source": "mocap",
+  "position_tolerance": 0.08,
+  "calibration": null
+}
+```
+
+velocity_source 只能为 odom 或 mocap；最终位置容差范围0.02～0.15m。calibration=null 表示动捕刚体已经对齐控制中心；需要补偿时，按全部机器人 ROS 名称提供对象，每台恰有 yaw_offset（弧度）和 marker_offset（车辆前/左坐标中的轴心到标记原点偏移，两个米数）。不能猜测现场标定，也不支持任意配置文件路径。命名不一致、缺车、未知字段或非有限数值会拒绝。
+
+生成器把速度来源交给已有 launch 参数，将位置容差及标定数据写入固定的 `/abc_swarm_demo` 参数，不创建额外节点或静态 TF。mocap 模式从实时控制位姿估计速度，动捕失效仍停车。它解决底盘 odom 依赖，不代表驱动连接可以断开；标定和实际运动效果仍需现场核对。
 
 ```bash
 python3 -m unittest discover -s tests -p test_ai_harness.py -v

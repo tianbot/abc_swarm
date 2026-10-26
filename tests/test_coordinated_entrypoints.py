@@ -58,7 +58,7 @@ class CoordinatedEntrypointTests(unittest.TestCase):
             self.assertEqual(config.params['/abc_swarm_demo/max_linear'].value,.12)
             self.assertEqual(config.params['/abc_swarm_demo/coordinated/origin'].value,[1.2,2.1,.4])
             self.assertEqual(config.params['/abc_swarm_demo/robots'].value[1],{'name':'customer_02','frame':'body_02'})
-            self.assertEqual(config.params['/abc_swarm_demo/orca/robot_radius'].value,.13)
+            self.assertEqual(config.params['/abc_swarm_demo/orca/robot_radius'].value,.075)
 
     def test_ai_tasks_resolve_geometry_and_optional_assembly_orca(self):
         harness=runpy.run_path(str(ROOT/'ai/generate_launch.py'))

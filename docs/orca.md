@@ -58,9 +58,9 @@ roslaunch abc_swarm demo_mocap_three_mini_orca_point_stabilization.launch format
 
 | 参数 | 默认 | 含义 |
 | --- | --- | --- |
-| robot_radius | 0.13 m | 以动捕控制参考点为中心、覆盖实际车体的半径候选 |
-| safety_margin | 0.02 m | 每车额外包络余量 |
-| front_distance | 0.08 m | 差速前置控制点距离 |
+| robot_radius | 0.075 m | 以动捕控制参考点为中心、覆盖实际车体的半径候选 |
+| safety_margin | 0.01 m | 每车额外包络余量 |
+| front_distance | 0.04 m | 差速前置控制点距离 |
 | time_horizon | 3.0 s | 两两速度障碍预测时域 |
 | right_bias | 0.01 m/s | 小幅靠右的期望速度偏置，用于打破对向对称；不放松约束 |
 | velocity_buffer | 0.002 m/s | 将避碰半平面稍向内收紧，给离散更新留数值余量；不是实测误差保证 |
@@ -68,9 +68,11 @@ roslaunch abc_swarm demo_mocap_three_mini_orca_point_stabilization.launch format
 | odom_future_tolerance | 0.1 s | 允许 rosserial 轻微未来时间戳 |
 | stall_timeout | 30 s | 总目标误差长期无改进时停车报错 |
 
-0.13 m 的候选依据当前 Mini 包中的 `config/base/costmap_common_params.yaml`：footprint 的最远角约 sqrt(0.105²+0.06²)=0.121 m，再取保守外包圆。**这不是对客户实车的测量**；动捕标记架、载荷、参考点偏移都可能需要增大半径。源码依据所用 Mini 快照和实际安装需现场核对。
+2026-10-26 操作者确认Mini车体可用直径15cm圆包络，默认车体半径改为7.5cm。旧值13cm来自导航footprint，明显大于本次设备实物；不再用它代表本实验Mini。半径以差速轴心/控制中心为参考，仍须覆盖标记架、载荷和参考点偏移，不能将车体半径调到实际尺寸以下来绕过检查。
 
-前置点有效半径为 R=robot_radius+front_distance+safety_margin，默认 0.23 m；有效圆心在每台车前方 0.08 m。起点、终点的有效包络需要足够间距，不能仅按底盘外观判断。默认同向蛇形间距 0.5 m 可容纳这一配置；不同朝向会改变有效圆心位置。
+前置点有效半径 R=robot_radius+front_distance+safety_margin，当前为0.125m；有效圆心在每车前方4cm，两个有效圆心距离需超过25cm。这个门槛来自差速外包圆，不表示车体直径25cm；不同车头朝向下也不等于实际轴心间距门槛。目标检查额外保留2×velocity_buffer×time_horizon，默认1.2cm。精定位捕获区和入队交接仍检查自身条件，不因包络缩小而跳过。
+
+前置距离从8cm减为4cm，降低虚拟外包圆的膨胀；它也决定可实现的横向前置点速度，不能只为压缩空间而无限减小。3cm在当前交叉入队模型出现停滞，4cm通过该模型；这不是实车调参验收。当前几何配置与延迟配置、AI示例同步，运行中的节点不会自动热加载这些更改。
 
 所有三台需要 world→rigid_body_N 的有效 TF。`velocity_source:=odom` 保持原默认，使用对应 `/robot_name_N/odom` 的实际 linear.x/angular.z；`velocity_source:=mocap` 使用控制中心位姿约0.2秒窗口估计实测速度，约0.08秒样本积累后开始，不依赖底盘 odom。反馈缺失或时钟/时间窗失效时全组停车，恢复后继续。ORCA 使用实测速度，不把 cmd_vel 当作反馈；车辆仍需连接底盘驱动才能接收命令。原无避障点镇定仍不要求 odom。最大车体直线速度指令为 ±0.15 m/s，角速度默认 ±0.5 rad/s，接近目标、转弯和避让时会更低。
 

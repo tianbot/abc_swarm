@@ -115,8 +115,8 @@ def front_velocity(yaw,body_velocity,distance):
     return v*c-distance*w*s,v*s+distance*w*c
 
 
-def orca_velocities(poses,goals,velocities,control,robot_radius=0.13,safety_margin=0.02,
-                    front_distance=0.08,time_horizon=3.0,right_bias=0.01,velocity_buffer=0.002,
+def orca_velocities(poses,goals,velocities,control,robot_radius=0.075,safety_margin=0.01,
+                    front_distance=0.04,time_horizon=3.0,right_bias=0.01,velocity_buffer=0.002,
                     preferred_commands=None):
     """Return body (v,w,phase) for the whole group, or raise before any output.
 

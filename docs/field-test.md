@@ -1,6 +1,16 @@
 # 三车动捕现场测试清单
 
-## 2026-10-26 完整入队与跟随流程（当前版本）
+## 2026-10-26 Mini紧凑包络修正（当前几何配置）
+
+操作者确认Mini车体直径最多约15cm，默认ORCA车体半径从13cm改为7.5cm，每车余量从2cm改为1cm，差速前置距离从8cm改为4cm。有效圆心间距门槛从46cm降到25cm，目标检查仍额外保留默认1.2cm速度缓冲；没有降低实际车体尺寸、移除约束或自动解除已锁定故障。`orca.yaml`、延迟配置、函数默认值和三个AI示例同步。运行进程不热加载，更改后需退出demo并重新启动；本轮未修改现场参数或启动实车。
+
+新增回归使用本次只读采集的三车初始位姿（原有效间距约44～47cm），验证三角形交叉入队、两种积分步长下进入following和车体间距/输出限幅。3cm前置距离在该任务出现无进展故障，4cm通过。原大包络的对向、交叉、三车换位及30cm车体间距断言保留为显式几何配置；合成ROS中车体间距断言按每轮实际radius+margin计算，覆盖新默认17cm物理包络，而不是沿用旧30cm阈值。
+
+100项catkin测试通过，安装完成；三份修改后的AI示例安装后生成、只读检查和Noetic参数展开通过。构建测试及安装日志 `/tmp/abc_swarm_mini_geometry_tests.log`、`/tmp/abc_swarm_mini_geometry_install.log`。安装后私有ROS完整四组合通过，日志 `/tmp/abc_swarm_mini_geometry_mission.log`（详细 `/tmp/abc_swarm_mission_ros_n6dhbhii`）；独立ORCA对向/交叉/三车换位、反馈缺失停车恢复、故障锁定和退出通过，日志 `/tmp/abc_swarm_mini_geometry_orca.log`（详细 `/tmp/abc_swarm_orca_ros_wa4ohsyu`）。模型采样最小车体中心间距分别约0.248、0.236、0.622m，不能作为实车间距或避碰保证。
+
+原课程48资源兼容，检查器/基线/例外不变。紧凑几何实车效果尚待现场验收；未推送、未运行远端CI。
+
+## 2026-10-26 完整入队与跟随流程
 
 三角形/蛇形leader–follower默认先ORCA入队，捕获区域与车体包络分离后转纯点镇定，全体位置、航向与实测速度稳定，再进入manual/auto跟随。auto完成路径后重新稳定队形并停车。两个旧launch名称保留，startup=false可对照上一节记录的直接跟随方式。四项操作见[现场使用](mocap-field-use.md)，阶段/参数/GUI接口见[完整流程](formation-workflow.md)。下方早期开发记录是历史快照，当前默认流程以本节为准。
 

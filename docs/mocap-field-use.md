@@ -13,6 +13,8 @@ ROS1 Noetic；本页统一四个独立实验的准备、摆位、启动和停止
 
 四项现在都可通过control_config使用同一份逐车标定；leader–follower默认先自动入队，速度反馈来自动捕。`startup:=false`才使用旧式直接跟随及底盘odom，不使用本流程的标定。若已在动捕软件修正刚体方向/原点，须更新或清空现场YAML中的旧补偿，避免重复校正。
 
+默认ORCA按直径15cm的Mini配置：车体半径7.5cm、每车余量1cm、前置距离4cm，有效圆心间距门槛25cm；不是实际车体直径。起始包络仍不能重叠，参数和参考点解释见[ORCA说明](orca.md)。
+
 两个跟随实验的完整顺序为ORCA入队 → 受几何监控的纯点镇定 → 全体稳定到齐 → following。入队期间键盘请求丢弃，到following后重新操作；不需要启用service。切换条件、配置和GUI接口见[完整流程](formation-workflow.md)。
 
 ## 准备一次后台

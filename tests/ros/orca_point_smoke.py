@@ -59,6 +59,7 @@ def main():
                  rospy.Subscriber('/abc_swarm_demo/goals',PoseArray,lambda m:goal_msgs.append(m))]
         odom={i:rospy.Publisher('/orca_test_%02d/odom'%i,Odometry,queue_size=1) for i in rows}
         broadcaster=tf.TransformBroadcaster();poses={};minimum=100.0
+        body_clearance=2*(default_orca['robot_radius']+default_orca['safety_margin'])
 
         def pump(duration,move=True,missing_tf=None,missing_odom=None):
             nonlocal minimum
@@ -82,7 +83,7 @@ def main():
                         if j>=i:continue
                         distance=math.hypot(p[0]-q[0],p[1]-q[1]);minimum=min(minimum,distance)
                         if move:
-                            assert distance>.30,(poses,distance)
+                            assert distance>body_clearance,(poses,distance,body_clearance)
                 time.sleep(.025)
 
         def zeros():
@@ -91,13 +92,14 @@ def main():
                 assert recent and all(v==0 and w==0 for _,v,w in recent),(i,recent)
 
         def launch_case(name,initial,targets,orca_override=None):
-            nonlocal poses,minimum
+            nonlocal poses,minimum,body_clearance
             poses=dict(enumerate(initial));minimum=100
             states.clear();goal_msgs.clear()
             for rr in rows.values():rr.clear()
             config=dict(default_goals,target_reference='world',target_poses=targets)
             goal_file=folder/(name+'_goals.yaml');goal_file.write_text(yaml.safe_dump(config))
             settings=dict(default_orca,**(orca_override or {}))
+            body_clearance=2*(settings['robot_radius']+settings['safety_margin'])
             orca_file=folder/(name+'_orca.yaml');orca_file.write_text(yaml.safe_dump(settings))
             args=['roslaunch',str(launch),'start_driver:=false','start_vrpn:=false','use_rviz:=false',
                   'goal_config:='+str(goal_file),'orca_config:='+str(orca_file)]

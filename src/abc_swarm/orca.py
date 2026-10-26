@@ -112,7 +112,8 @@ def front_velocity(yaw,body_velocity,distance):
 
 
 def orca_velocities(poses,goals,velocities,control,robot_radius=0.13,safety_margin=0.02,
-                    front_distance=0.08,time_horizon=3.0,right_bias=0.01,velocity_buffer=0.002):
+                    front_distance=0.08,time_horizon=3.0,right_bias=0.01,velocity_buffer=0.002,
+                    preferred_commands=None):
     """Return body (v,w,phase) for the whole group, or raise before any output.
 
     |v| and |w| bounds are half-planes inside the solve; no post-solve clipping.
@@ -128,6 +129,12 @@ def orca_velocities(poses,goals,velocities,control,robot_radius=0.13,safety_marg
         if type(value) not in (int,float) or not math.isfinite(value) or value<0:
             raise ValueError('ORCA margin/bias must be finite and nonnegative')
     raw=[point_velocity(p,g,**control) for p,g in zip(poses,goals)]
+    if preferred_commands is not None:
+        if len(preferred_commands)!=len(poses) or any(
+                len(c)!=3 or not all(math.isfinite(x) for x in c[:2]) or not isinstance(c[2],str)
+                for c in preferred_commands):
+            raise ValueError('One finite preferred command is required per pose')
+        raw=preferred_commands
     for pose in poses:validate_pose(pose)
     if any(not isinstance(v,(list,tuple)) or len(v)!=2 or
            not all(type(x) in (int,float) and math.isfinite(x) for x in v) for v in velocities):

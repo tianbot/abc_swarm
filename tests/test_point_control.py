@@ -1,10 +1,58 @@
 #!/usr/bin/env python3
 import math
 import unittest
-from abc_swarm.point_control import angle, formation_targets, point_velocity, world_goals
+from abc_swarm.point_control import (PointPhaseTracker, angle, formation_targets, point_velocity,
+                                     world_goals, validate_mocap_calibration, mocap_control_pose)
 
 
 class PointControlTests(unittest.TestCase):
+    def test_calibration_recovers_control_center_during_rotation(self):
+        setting={'yaw_offset':1.9,'marker_offset':[.03,.01]}
+        validate_mocap_calibration({'robot':setting},['robot'])
+        for yaw in [-3.,-1.,0.,1.,3.]:
+            marker=(1+math.cos(yaw)*.03-math.sin(yaw)*.01,
+                    2+math.sin(yaw)*.03+math.cos(yaw)*.01,yaw-1.9)
+            pose=mocap_control_pose(marker,setting)
+            for a,b in zip(pose,(1,2,yaw)):self.assertAlmostEqual(a,b)
+        self.assertEqual(mocap_control_pose((1,2,3)),(1,2,3))
+
+    def test_bad_calibration_names_and_values_are_rejected(self):
+        for c in [None,{'other':{'yaw_offset':0,'marker_offset':[0,0]}},
+                  {'robot':{'yaw_offset':True,'marker_offset':[0,0]}},
+                  {'robot':{'yaw_offset':0,'marker_offset':[math.nan,0]}},
+                  {'robot':{'yaw_offset':0,'marker_offset':[0]}}]:
+            with self.assertRaises(ValueError):validate_mocap_calibration(c,['robot'])
+
+    def test_final_turn_survives_position_boundary_but_does_not_relax_arrival(self):
+        tracker = PointPhaseTracker()
+        control = dict(position_tolerance=.08, yaw_tolerance=.08)
+        goal = [(0, 0, 1.)]
+        self.assertEqual(tracker.commands([(.03, 0, 0)], goal, control)[0][2], 'orienting')
+        for distance in [.079, .081, .075, .10, .079]:
+            v, w, phase = tracker.commands([(distance, 0, 0)], goal, control)[0]
+            self.assertEqual(v, 0.)
+            self.assertGreater(w, 0.)
+            self.assertEqual(phase, 'orienting')
+        self.assertNotEqual(tracker.commands([(.10, 0, 1.)], goal, control)[0][2], 'arrived')
+        self.assertEqual(tracker.commands([(.07, 0, 1.)], goal, control)[0], (0., 0., 'arrived'))
+        self.assertNotEqual(tracker.commands([(.17, 0, 0)], goal, control)[0][2], 'orienting')
+        self.assertNotEqual(tracker.commands([(.03, 0, 0)], [(1, 0, 1)], control)[0][2], 'orienting')
+
+    def test_phase_controller_converges_with_rotating_mocap_reference_offset(self):
+        tracker = PointPhaseTracker()
+        # Marker origin is 3cm ahead of the axle: rotating moves its reported XY.
+        x, y, yaw = .35, -.1, 0.
+        goal = [(.0, .0, math.pi/2)]
+        control = dict(position_tolerance=.08, yaw_tolerance=.08)
+        for _ in range(5000):
+            pose = (x+.03*math.cos(yaw), y+.03*math.sin(yaw), yaw)
+            v, w, phase = tracker.commands([pose], goal, control)[0]
+            if phase == 'arrived':break
+            x += .05*v*math.cos(yaw);y += .05*v*math.sin(yaw);yaw = angle(yaw+.05*w)
+        self.assertEqual(phase, 'arrived')
+        self.assertLessEqual(math.hypot(pose[0], pose[1]), .08)
+        self.assertLessEqual(abs(angle(yaw-goal[0][2])), .08)
+
     def test_unicycle_reaches_position_and_final_yaw_from_different_sides(self):
         starts = [(0, 0, 0), (0, 0, math.pi), (1, 0, math.pi/2),
                   (-1, 1, -2), (0.3, -0.4, 2.9), (0.5, 0.5, 0),

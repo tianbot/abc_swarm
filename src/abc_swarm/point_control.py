@@ -16,6 +16,39 @@ def validate_pose(pose):
         raise ValueError('Expected finite [x_m, y_m, yaw_rad]')
 
 
+def validate_mocap_calibration(calibration, names):
+    """Explicit per-robot planar marker-to-axle calibration, empty means identity."""
+    if not isinstance(calibration, dict) or (calibration and set(calibration) != set(names)):
+        raise ValueError('mocap_calibration must map every configured robot name, or be empty')
+    for setting in calibration.values():
+        if not isinstance(setting, dict) or set(setting) != {'yaw_offset', 'marker_offset'}:
+            raise ValueError('Calibration requires yaw_offset and marker_offset')
+        offset = setting['marker_offset']
+        if not isinstance(offset, (list, tuple)) or len(offset) != 2:
+            raise ValueError('marker_offset must be [forward_m, left_m]')
+        if any(type(v) not in (int, float) or not math.isfinite(v)
+               for v in (setting['yaw_offset'], *offset)):
+            raise ValueError('Calibration must contain finite numeric values')
+    return calibration
+
+
+def mocap_control_pose(pose, calibration=None):
+    """Convert raw planar yaw/marker position into a horizontal axle pose.
+
+    marker_offset is measured in the corrected vehicle frame, from axle to
+    marker origin. Raw roll/pitch are deliberately not treated as vehicle axes.
+    """
+    validate_pose(pose)
+    if calibration is None:
+        return tuple(pose)
+    yaw = angle(pose[2] + calibration['yaw_offset'])
+    forward, left = calibration['marker_offset']
+    result = (pose[0]-math.cos(yaw)*forward+math.sin(yaw)*left,
+              pose[1]-math.sin(yaw)*forward-math.cos(yaw)*left, yaw)
+    validate_pose(result)
+    return result
+
+
 def world_goals(poses, reference, anchor):
     if reference not in ('world', 'initial_leader'):
         raise ValueError('target_reference must be world or initial_leader')
@@ -67,3 +100,45 @@ def point_velocity(pose, goal, max_linear=0.15, max_angular=0.5,
         return 0.0, angular, 'aligning'
     linear = min(max_linear, k_distance*distance)*max(0.0, math.cos(bearing))
     return linear, angular, 'approaching'
+
+
+class PointPhaseTracker:
+    """Keep final orientation stable across small position excursions.
+
+    Approach to half the accepted position tolerance before turning. Retain
+    that phase up to twice the tolerance, but only report arrival inside the
+    original position/yaw bounds. A changed goal resets the phase history.
+    """
+    def __init__(self):
+        self.signature = None
+        self.turning = []
+
+    def commands(self, poses, goals, control):
+        if len(poses) != len(goals):
+            raise ValueError('One goal is required for every pose')
+        # Validate the complete control contract before updating phase history.
+        for pose, goal in zip(poses, goals):
+            point_velocity(pose, goal, **control)
+        tolerance = control.get('position_tolerance', .04)
+        yaw_tolerance = control.get('yaw_tolerance', .08)
+        signature = (tuple(tuple(g) for g in goals), tolerance, yaw_tolerance)
+        if signature != self.signature:
+            self.signature = signature
+            self.turning = [False] * len(goals)
+        result = []
+        for i, (pose, goal) in enumerate(zip(poses, goals)):
+            distance = math.hypot(pose[0]-goal[0], pose[1]-goal[1])
+            heading = angle(goal[2]-pose[2])
+            yaw_ready = abs(heading) <= yaw_tolerance
+            if self.turning[i] and (distance > 2*tolerance or (yaw_ready and distance > tolerance)):
+                self.turning[i] = False
+            if not self.turning[i] and (distance <= .5*tolerance or (distance <= tolerance and yaw_ready)):
+                self.turning[i] = True
+            if self.turning[i]:
+                limit = control.get('max_angular', .5)
+                angular = max(-limit, min(limit, control.get('k_heading', 2.)*heading))
+                result.append((0., 0. if yaw_ready else angular,
+                               'arrived' if yaw_ready and distance <= tolerance else 'orienting'))
+            else:
+                result.append(point_velocity(pose, goal, **dict(control, position_tolerance=.5*tolerance)))
+        return result

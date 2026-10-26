@@ -4,7 +4,7 @@ All robots assemble at their own start pose. Circle followers share the slowest
 observed path progress. Triangle edges use a stop/turn barrier at every vertex.
 """
 import math
-from .point_control import angle, point_velocity, validate_pose, world_goals
+from .point_control import angle, PointPhaseTracker, validate_pose, world_goals
 from .preset_paths import preset_path
 from .pure_pursuit import PurePursuit
 from .orca import orca_velocities
@@ -87,6 +87,7 @@ class CoordinatedLoop:
         self.trackers=None
         self.rounds_completed=0;self.common_progress=0.0;self.progress_spread=0.0
         self.errors=[0.0]*3
+        self.point_control=PointPhaseTracker()
         self.hold=0.0;self.idle=0.0;self.metric=None;self.metric_key=None
 
     def _hold(self,ready,dt):
@@ -125,10 +126,12 @@ class CoordinatedLoop:
         if self.completed:return [(0,0,'completed')]*3
         if self.stage in ('assembling','finishing'):
             self.goals=list(self.starts)
+            preferred=self.point_control.commands(poses,self.goals,control)
             if self.stage=='assembling' and assembly_orca is not None:
                 if velocities is None:raise ValueError('Assembly ORCA needs measured velocities')
-                commands=orca_velocities(poses,self.goals,velocities,control,**assembly_orca)
-            else:commands=[point_velocity(p,g,**control) for p,g in zip(poses,self.goals)]
+                commands=orca_velocities(poses,self.goals,velocities,control,
+                                         preferred_commands=preferred,**assembly_orca)
+            else:commands=preferred
             ready=all(phase=='arrived' for _,_,phase in commands)
             if velocities is not None:ready=ready and all(abs(v)<.02 and abs(w)<.05 for v,w in velocities)
             error=sum(math.hypot(p[0]-g[0],p[1]-g[1])+.08*abs(angle(g[2]-p[2])) for p,g in zip(poses,self.goals))

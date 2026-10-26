@@ -21,6 +21,13 @@ def load(path,args=None):
 
 
 class OrcaEntrypointTests(unittest.TestCase):
+    def test_mocap_velocity_source_is_explicit_for_point_and_both_loops(self):
+        for path in [ORCA, POINT.parent/'demo_mocap_three_mini_circle_tracking.launch',
+                     POINT.parent/'demo_mocap_three_mini_triangle_tracking.launch']:
+            cfg=load(path,['velocity_source:=mocap','start_driver:=false','start_vrpn:=false','use_rviz:=false'])
+            self.assertEqual(cfg.params['/abc_swarm_demo/velocity_source'].value,'mocap')
+            self.assertEqual(load(path).params['/abc_swarm_demo/velocity_source'].value,'odom')
+
     def test_regular_point_stays_unmodified_and_orca_is_explicit(self):
         base=load(POINT)
         self.assertEqual(base.params['/abc_swarm_demo/avoidance'].value,'none')
@@ -64,6 +71,7 @@ class OrcaEntrypointTests(unittest.TestCase):
         base={'~robots':[{'name':'a','frame':'a_body'},{'name':'b','frame':'b_body'},{'name':'c','frame':'c_body'}],
               '~target_poses':[[0,0,0],[-.5,.5,0],[-.5,-.5,0]],'~avoidance':'orca','~orca':defaults}
         for change in [lambda p:p.update({'~avoidance':'unknown'}),
+                       lambda p:p.update({'~velocity_source':'unknown'}),
                        lambda p:p['~orca'].pop('robot_radius'),
                        lambda p:p['~orca'].update(robot_radius=-1),
                        lambda p:p['~orca'].update(front_distance=True),

@@ -20,7 +20,7 @@ def main():
     os.environ.update(ROS_MASTER_URI='http://127.0.0.1:11436',ROS_IP='127.0.0.1',
                       ROS_HOME=str(folder/'home'),ROS_LOG_DIR=str(folder/'logs'))
     os.environ.pop('ROS_HOSTNAME',None)
-    import rospy,rosgraph,rospkg,tf
+    import rospy,rosgraph,rospkg,tf,yaml
     from geometry_msgs.msg import Twist
     from nav_msgs.msg import Odometry,Path as RosPath
     from std_msgs.msg import String
@@ -78,10 +78,15 @@ def main():
                     if abs(w)<1e-9:poses[i]=(x+v*math.cos(yaw)*.075,y+v*math.sin(yaw)*.075,yaw)
                     else:poses[i]=(x+v/w*(math.sin(yaw+w*.075)-math.sin(yaw)),y-v/w*(math.cos(yaw+w*.075)-math.cos(yaw)),angle(yaw+w*.075))
                     x,y,yaw=poses[i]
-                    if i!=missing_tf:broadcaster.sendTransform((x,y,0),tf.transformations.quaternion_from_euler(0,0,yaw),stamp,'loops_test_%02d'%i,'world')
+                    marker_x,marker_y,marker_yaw=x,y,yaw
+                    if index==4:
+                        marker_x=x+.03*math.cos(yaw)-.01*math.sin(yaw)
+                        marker_y=y+.03*math.sin(yaw)+.01*math.cos(yaw)
+                        marker_yaw=yaw-.6
+                    if i!=missing_tf:broadcaster.sendTransform((marker_x,marker_y,0),tf.transformations.quaternion_from_euler(0,0,marker_yaw),stamp,'loops_test_%02d'%i,'world')
                     msg=Odometry();msg.header.stamp=stamp+rospy.Duration(.03)
                     msg.twist.twist.linear.x=v;msg.twist.twist.angular.z=w
-                    if i!=missing_odom:odom[i].publish(msg)
+                    if index!=4 and i!=missing_odom:odom[i].publish(msg)
                 for i,p in poses.items():
                     for j,q in poses.items():
                         if j<i:minimum=min(minimum,math.hypot(p[0]-q[0],p[1]-q[1]))
@@ -92,7 +97,7 @@ def main():
                 recent=[r for r in rows[i] if r[0]>time.monotonic()-.25]
                 assert recent and all(v==0 and w==0 for _,v,w in recent),(i,recent)
 
-        for index,(shape,size,cw) in enumerate([('circle',1.5,False),('triangle',2.,False),('circle',2.,True),('triangle',1.5,True)]):
+        for index,(shape,size,cw) in enumerate([('circle',1.5,False),('triangle',2.,False),('circle',2.,True),('triangle',1.5,True),('triangle',1.5,False)]):
             origin=(1,2,.3)
             expected,_=loop_geometry(shape,size,size,cw,origin)
             poses=dict(enumerate(expected));p=poses[2];poses[2]=(p[0]+.12,p[1]-.1,p[2]+.25)
@@ -104,6 +109,11 @@ def main():
                   'clockwise:='+str(cw).lower()]
             args += ['robot_name_%d:=loops_test_%02d'%(i+1,i) for i in rows]
             if index==0:args+=['avoidance:=orca']
+            if index==4:
+                control=yaml.safe_load((package/'config/point_stabilization.yaml').read_text())
+                control['mocap_calibration']={'loops_test_%02d'%i:{'yaw_offset':.6,'marker_offset':[.03,.01]} for i in rows}
+                profile=folder/'calibrated_control.yaml';profile.write_text(yaml.safe_dump(control))
+                args+=['avoidance:=orca','velocity_source:=mocap','control_config:='+str(profile)]
             process=start(args,shape+'_'+str(size))
             deadline=time.monotonic()+10
             while time.monotonic()<deadline:

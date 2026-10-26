@@ -8,6 +8,7 @@
   <arg name="use_rviz" default="false"/>
   <arg name="goal_config" default="$(find abc_swarm)/config/point_stabilization.yaml"/>
   <arg name="orca_config" default="$(find abc_swarm)/config/orca.yaml"/>
+  <arg name="velocity_source" default="odom"/>
   <arg name="formation" default="config"/>
   <arg name="spacing" default="0.5"/>
   <arg name="max_linear" default=""/>
@@ -19,6 +20,7 @@
   <arg name="rigid_body_3" default="$(arg robot_name_3)"/>
   <include file="$(find abc_swarm)/launch/mocap/demo_mocap_three_mini_point_stabilization.launch">
     <arg name="avoidance" value="orca"/>
+    <arg name="velocity_source" value="$(arg velocity_source)"/>
     <arg name="site_config" value="$(arg site_config)"/>
     <arg name="vrpn_server_ip" value="$(arg vrpn_server_ip)"/>
     <arg name="vrpn_port" value="$(arg vrpn_port)"/>

@@ -16,8 +16,10 @@ from abc_swarm.cfg import point_controlConfig
 
 from abc_swarm.coordinated_loop import CoordinatedLoop, LoopFault, loop_geometry
 from abc_swarm.orca import OrcaBlocked, orca_velocities
-from abc_swarm.feedback import odometry_error
-from abc_swarm.point_control import formation_targets, point_velocity, validate_pose, world_goals
+from abc_swarm.feedback import MocapVelocityEstimator, odometry_error
+from abc_swarm.point_control import (PointPhaseTracker, formation_targets, point_velocity,
+                                     validate_pose, world_goals, validate_mocap_calibration,
+                                     mocap_control_pose)
 
 
 class PointStabilization:
@@ -89,6 +91,13 @@ class PointStabilization:
         self.avoidance = rospy.get_param('~avoidance', 'none')
         if self.avoidance not in ('none', 'orca'):
             raise ValueError('avoidance must be none or orca')
+        self.velocity_source = rospy.get_param('~velocity_source', 'odom')
+        if self.velocity_source not in ('odom', 'mocap'):
+            raise ValueError('velocity_source must be odom or mocap')
+        self.calibration = validate_mocap_calibration(
+            rospy.get_param('~mocap_calibration', {}), [r['name'] for r in self.robots])
+        self.mocap_velocity = MocapVelocityEstimator(max_gap=max(.2, self.timeout))
+        self.pose_stamps = []
         self.orca = {}
         self.feedback = {}
         self.feedback_lock = threading.Lock()
@@ -120,17 +129,19 @@ class PointStabilization:
                         for r in self.robots]
         self.status_pub = rospy.Publisher('~status', String, queue_size=1, latch=True)
         self.goals_pub = rospy.Publisher('~goals', PoseArray, queue_size=1, latch=True)
+        self.control_poses_pub = rospy.Publisher('~control_poses', PoseArray, queue_size=1)
         self.path_outputs = [rospy.Publisher('~paths/'+r['name'], Path, queue_size=1, latch=True)
                              for r in self.robots] if self.task != 'point' else []
         self.goals = None
         self.completed = False
         self.final_details = []
+        self.point_control = PointPhaseTracker()
         self.last_status = None
         self.last_publish = 0
         rospy.on_shutdown(self.stop)
         self.tuning = Server(point_controlConfig, self.configure)
         self.odom_subscribers = []
-        if self.avoidance == 'orca':
+        if self.avoidance == 'orca' and self.velocity_source == 'odom':
             self.odom_subscribers = [rospy.Subscriber('/'+robot['name']+'/odom', Odometry,
                                      self.odom_cb, callback_args=robot['name'], queue_size=1)
                                      for robot in self.robots]
@@ -140,7 +151,9 @@ class PointStabilization:
             self.feedback[name] = (msg.header.stamp.to_sec(), time.monotonic(),
                                    msg.twist.twist.linear.x, msg.twist.twist.angular.z)
 
-    def measured_velocities(self):
+    def measured_velocities(self, poses):
+        if self.velocity_source == 'mocap':
+            return self.mocap_velocity.update(poses, self.pose_stamps)
         with self.feedback_lock:
             samples = dict(self.feedback)
         velocities = []
@@ -171,7 +184,7 @@ class PointStabilization:
             output.publish(Twist())
 
     def poses(self):
-        poses = []
+        poses, stamps = [], []
         for robot in self.robots:
             frame = robot['frame']
             stamp = self.listener.getLatestCommonTime(self.fixed, frame)
@@ -183,7 +196,17 @@ class PointStabilization:
                 raise ValueError('invalid pose: ' + frame)
             pose = (xyz[0], xyz[1], tf.transformations.euler_from_quaternion(q)[2])
             validate_pose(pose)
-            poses.append(pose)
+            poses.append(mocap_control_pose(pose, self.calibration.get(robot['name'])))
+            stamps.append(stamp.to_sec())
+        self.pose_stamps = stamps
+        msg = PoseArray()
+        msg.header.frame_id, msg.header.stamp = self.fixed, rospy.Time.from_sec(min(stamps))
+        for x, y, yaw in poses:
+            p = Pose();p.position.x, p.position.y = x, y
+            q = tf.transformations.quaternion_from_euler(0, 0, yaw)
+            p.orientation.x, p.orientation.y, p.orientation.z, p.orientation.w = q
+            msg.poses.append(p)
+        self.control_poses_pub.publish(msg)
         return poses
 
     def publish_goals(self):
@@ -204,6 +227,8 @@ class PointStabilization:
                             'progress_spread': self.loop.progress_spread if self.loop is not None else 0.0,
                             'edge_rounds_completed': self.loop.rounds_completed if self.loop is not None else 0,
                             'avoidance': self.avoidance,
+                            'velocity_source': self.velocity_source,
+                            'mocap_calibrated': bool(self.calibration),
                             'avoidance_scope': 'point' if self.task=='point' else 'assembly',
                             'avoidance_active': self.avoidance=='orca' and state=='running' and (self.task=='point' or (self.loop is not None and self.loop.stage=='assembling')),
                             'state': state, 'ready': state in ('running', 'completed'),
@@ -260,7 +285,7 @@ class PointStabilization:
                 self.status('fault', self.avoidance_fault)
                 return
             poses = self.poses()  # Validate the entire group before publishing any motion.
-            measured = self.measured_velocities() if self.avoidance == 'orca' else None
+            measured = self.measured_velocities(poses) if self.avoidance == 'orca' else None
             if self.task != 'point':
                 self.step_coordinated(poses,measured)
                 return
@@ -272,8 +297,10 @@ class PointStabilization:
                 self.status('completed', 'all target poses reached; restart launch for another run', self.final_details)
                 return
             control = self.control
+            preferred = self.point_control.commands(poses, self.goals, control)
             if self.avoidance == 'orca':
-                results = orca_velocities(poses, self.goals, measured, control, **self.orca)
+                results = orca_velocities(poses, self.goals, measured, control,
+                                          preferred_commands=preferred, **self.orca)
                 error = sum(math.hypot(g[0]-p[0],g[1]-p[1]) + self.orca['front_distance'] *
                             abs(math.atan2(math.sin(g[2]-p[2]),math.cos(g[2]-p[2])))
                             for p,g in zip(poses,self.goals))
@@ -282,8 +309,7 @@ class PointStabilization:
                 if time.monotonic()-self.progress_time > self.stall_timeout:
                     raise OrcaBlocked('ORCA progress timeout; inspect geometry and restart')
             else:
-                results = [point_velocity(pose, goal, **control)
-                           for pose, goal in zip(poses, self.goals)]
+                results = preferred
             self.completed = all(phase == 'arrived' for _, _, phase in results)
             details = []
             for robot, pose, goal, (v, w, phase), output in zip(

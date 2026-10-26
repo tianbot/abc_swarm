@@ -3,6 +3,7 @@ import math
 
 from .orca import OrcaBlocked, OrcaInfeasible, orca_velocities
 from .point_control import PointPhaseTracker, angle, validate_pose
+from .admission_planner import AdmissionPlanner
 
 
 DEFAULT_ADMISSION = dict(handoff_distance=.15, clearance=.02, position_margin=.005,
@@ -16,7 +17,9 @@ class AdmissionController:
     radii. Live position/clearance guards return to avoidance if that bound
     is exceeded. This is a sampled engineering guard, not a delay guarantee.
     """
-    def __init__(self, settings=None):
+    def __init__(self, settings=None, planning=True):
+        if type(planning) is not bool:
+            raise ValueError('planning must be boolean')
         self.settings = dict(DEFAULT_ADMISSION if settings is None else settings)
         if set(self.settings) != set(DEFAULT_ADMISSION):
             raise ValueError('admission fields must match config/admission.yaml')
@@ -31,8 +34,25 @@ class AdmissionController:
         self.signature = None
         self.blocked = False
         self.recovering = False
+        self.planner = AdmissionPlanner() if planning else None
+        self.precision_progress = 0.
+        self.best_pose_error = None
+
+    @property
+    def progress(self):
+        return (self.planner.progress if self.planner is not None else 0.)+self.precision_progress
+
+    def _observe_pose_progress(self, poses, goals):
+        error = sum(math.hypot(p[0]-g[0],p[1]-g[1])+.08*abs(angle(g[2]-p[2])) for p,g in zip(poses,goals))
+        if self.best_pose_error is None:
+            self.best_pose_error = error
+        elif error < self.best_pose_error-.001:
+            self.precision_progress += self.best_pose_error-error
+            self.best_pose_error = error
 
     def pause(self):
+        if self.planner is not None:
+            self.planner.pause()
         self.recovering = False
         self.handoff_hold = self.settle_hold = 0.
         self.ready = False
@@ -74,6 +94,8 @@ class AdmissionController:
             raise ValueError('ORCA admission requires measured velocities')
         if orca is not None and self.settings['handoff_distance'] < control['position_tolerance']:
             raise ValueError('handoff_distance must cover the final position tolerance')
+        if self.planner is None:
+            self._observe_pose_progress(poses, goals)
         if orca is None:
             self.stage = 'fine_positioning'
         elif self.stage in ('fine_positioning', 'ready'):
@@ -91,11 +113,15 @@ class AdmissionController:
             capture = self._regions(poses, goals, control, orca)
             self.handoff_hold = self.handoff_hold+dt if capture is not None else 0.
             if self.handoff_hold >= self.settings['handoff_time']:
+                if self.planner is not None:
+                    self.planner.pause()
+                    self.planner.state = 'positions_ready'
                 self.capture = capture
                 self.stage = 'fine_positioning'
                 self.point = PointPhaseTracker()
                 return [(0., 0., 'handoff_barrier')]*len(poses)
-            preferred = self.point.commands(poses, goals, control)
+            preferred = (self.planner.commands(poses, goals, control, orca, self.settings['clearance'])
+                         if self.planner is not None else self.point.commands(poses, goals, control))
             try:
                 commands = orca_velocities(poses, goals, velocities, control,
                                           preferred_commands=preferred, **orca)
@@ -106,6 +132,8 @@ class AdmissionController:
                 self.settle_hold = 0.
                 return [(0., 0., 'avoidance_wait')]*len(poses)
         commands = self.point.commands(poses, goals, control)
+        if self.planner is not None:
+            self._observe_pose_progress(poses, goals)
         ready = all(phase == 'arrived' for _, _, phase in commands)
         if velocities is not None:
             ready = ready and all(abs(v) < .02 and abs(w) < .05 for v, w in velocities)

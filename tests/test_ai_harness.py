@@ -33,6 +33,15 @@ def scenario(experiment):
 
 
 class AIHarnessTests(unittest.TestCase):
+    def test_admission_planning_is_declared_only_when_avoidance_is_enabled(self):
+        for experiment,enabled in [('manual_triangle',True),('point_stabilization_orca',True),
+                                   ('point_stabilization',False),('coordinated_circle',False)]:
+            spec=scenario(experiment)
+            self.assertEqual('/abc_swarm_demo/planning' in harness.render(spec),enabled)
+            self.assertEqual('入位规划已启用' in harness.report(spec),enabled)
+        spec=scenario('manual_triangle');spec['admission']={'enabled':False}
+        self.assertNotIn('/abc_swarm_demo/planning',harness.render(spec))
+
     def test_follower_admission_is_explicit_validated_and_can_opt_out(self):
         settings=dict(handoff_distance=.15,clearance=.02,position_margin=.005,handoff_time=.3,settle_time=.5,progress_timeout=45.)
         orca=json.loads((ROOT/'ai/orca.example.json').read_text())['orca']

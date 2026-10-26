@@ -12,7 +12,8 @@
       "launch": "demo_mocap_three_mini_leader_follower_triangle.launch",
       "mode": "manual",
       "startup_admission": true,
-      "mocap_control": true
+      "mocap_control": true,
+      "admission_planning": true
     },
     "manual_snake": {
       "robots": 3,
@@ -21,7 +22,8 @@
       "launch": "demo_mocap_three_mini_leader_follower_snake.launch",
       "mode": "manual",
       "startup_admission": true,
-      "mocap_control": true
+      "mocap_control": true,
+      "admission_planning": true
     },
     "path_single": {
       "robots": 1,
@@ -36,7 +38,8 @@
       "launch": "demo_mocap_three_mini_leader_follower_triangle.launch",
       "startup_admission": true,
       "mocap_control": true,
-      "mode": "auto"
+      "mode": "auto",
+      "admission_planning": true
     },
     "path_snake": {
       "robots": 3,
@@ -45,7 +48,8 @@
       "launch": "demo_mocap_three_mini_leader_follower_snake.launch",
       "startup_admission": true,
       "mocap_control": true,
-      "mode": "auto"
+      "mode": "auto",
+      "admission_planning": true
     },
     "point_stabilization": {
       "robots": 3,
@@ -62,7 +66,8 @@
       "point": true,
       "orca": true,
       "launch": "demo_mocap_three_mini_orca_point_stabilization.launch",
-      "mocap_control": true
+      "mocap_control": true,
+      "admission_planning": true
     },
     "coordinated_circle": {
       "robots": 3,
@@ -70,7 +75,8 @@
       "path": false,
       "coordinated": "circle",
       "launch": "demo_mocap_three_mini_circle_tracking.launch",
-      "mocap_control": true
+      "mocap_control": true,
+      "admission_planning": true
     },
     "coordinated_triangle": {
       "robots": 3,
@@ -78,7 +84,8 @@
       "path": false,
       "coordinated": "triangle",
       "launch": "demo_mocap_three_mini_triangle_tracking.launch",
-      "mocap_control": true
+      "mocap_control": true,
+      "admission_planning": true
     }
   }
 }

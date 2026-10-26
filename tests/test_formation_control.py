@@ -94,6 +94,7 @@ class FormationMissionTests(unittest.TestCase):
                                 self.assertEqual(m.goals[follower],world_goals([(x,y,0)],'initial_leader',poses[leader])[0])
                         if not visited or visited[-1]!=m.stage:visited.append(m.stage)
                         if m.stage=='ready':
+                            self.assertIsNone(m.admission.planner.active)
                             for p,g in zip(poses,m.goals):
                                 self.assertLessEqual(math.hypot(p[0]-g[0],p[1]-g[1]),CONTROL['position_tolerance'])
                                 self.assertLessEqual(abs(angle(p[2]-g[2])),CONTROL['yaw_tolerance'])

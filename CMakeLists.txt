@@ -24,6 +24,7 @@ install(FILES licenses/orca/LICENSE licenses/orca/UPSTREAM.json
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/licenses/orca)
 
 if(CATKIN_ENABLE_TESTING)
+  catkin_add_nosetests(tests/test_admission_planner.py)
   catkin_add_nosetests(tests/test_formation_control.py)
   catkin_add_nosetests(tests/test_formation_entrypoints.py)
   catkin_add_nosetests(tests/test_coordinated_loop.py)

@@ -127,6 +127,7 @@ def main():
                     assert states[-1]['state']!='fault',(states[-1],poses)
                 assert states[-1]['stage']=='following',states[-1]
                 assert 'fine_positioning' in visited and 'ready' in visited,visited
+                assert any(s.get('admission_planning',{}).get('active_robot') for s in states),'admission route not reported'
                 if selection.overlap_start:
                     assert any(s.get('recovery_active') for s in states),'overlap recovery not reported'
                 assert [(x.position.x,x.position.y) for x in starts[-1].poses]==frozen

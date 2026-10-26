@@ -89,6 +89,7 @@ class FormationEntrypointTests(unittest.TestCase):
                 self.assertEqual(len(cfg.nodes),1)
                 params=node_params(cfg)
                 self.assertEqual(params['~task'],'leader_follower')
+                self.assertTrue(params['~planning'])
                 self.assertEqual(params['~follow']['mode'],'manual' if experiment.startswith('manual') else 'auto')
                 self.assertEqual(params['~mocap_calibration']['tianbot_mini_02']['yaw_offset'],.2)
 

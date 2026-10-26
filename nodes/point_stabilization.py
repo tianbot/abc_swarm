@@ -67,14 +67,17 @@ class PointStabilization:
             if len({robot[key] for robot in self.robots}) != len(self.robots):
                 raise ValueError('Duplicate robot ' + key)
         self.admission_settings = rospy.get_param('~admission', None)
-        self.admission = AdmissionController(self.admission_settings)
+        self.planning = rospy.get_param('~planning', True)
+        if type(self.planning) is not bool:
+            raise ValueError('planning must be boolean')
+        self.admission = AdmissionController(self.admission_settings, self.planning)
         self.mission = None
         self.follow_options = None
         self.startup_published = False
         self.formation = rospy.get_param('~formation', 'config')
         if self.task == 'leader_follower':
             self.follow_options = rospy.get_param('~follow')
-            self.mission = LeaderFollowerMission([r['name'] for r in self.robots], self.follow_options, self.admission_settings)
+            self.mission = LeaderFollowerMission([r['name'] for r in self.robots], self.follow_options, self.admission_settings, self.planning)
             self.targets = self.mission.local_goals
             self.reference = 'initial_leader'
         elif self.task in ('circle','triangle'):
@@ -263,6 +266,9 @@ class PointStabilization:
         admission = self.mission.admission if self.mission is not None else self.loop.admission if self.loop is not None else self.admission
         stage = self.mission.stage if self.mission is not None else self.loop.stage if self.loop is not None else admission.stage if self.avoidance=='orca' and state=='running' else state
         data = {'schema_version': 2, 'mode': 'leader_follower' if self.mission is not None else 'point_stabilization' if self.task=='point' else 'coordinated_tracking',
+                            'admission_planning': {'state': admission.planner.state,
+                                'active_robot': self.robots[admission.planner.active]['name'] if admission.planner.active is not None else None,
+                                'waypoints': admission.planner.route} if self.avoidance=='orca' and admission.planner is not None else None,
                             'recovery_active': state=='running' and admission.recovering,
                             'task': self.task, 'stage': stage, 'admission_stage': admission.stage,
                             'common_progress': self.loop.common_progress if self.loop is not None else 0.0,
@@ -308,7 +314,7 @@ class PointStabilization:
     def step_coordinated(self,poses,measured):
         if self.loop is None:
             origin = poses[0] if self.loop_reference=='initial_leader' else self.loop_origin
-            self.loop = CoordinatedLoop(self.task,origin=origin,admission=self.admission_settings,**self.loop_options)
+            self.loop = CoordinatedLoop(self.task,origin=origin,admission=self.admission_settings,planning=self.planning,**self.loop_options)
             self.publish_paths()
         dt = self.control_interval()
         commands = self.loop.step(poses,self.control,dt,measured,
@@ -324,6 +330,7 @@ class PointStabilization:
                             'position_error':math.hypot(goal[0]-pose[0],goal[1]-pose[1]),
                             'yaw_error':math.atan2(math.sin(goal[2]-pose[2]),math.cos(goal[2]-pose[2])),
                             'path_error':error,'command':[v,w]})
+        self.final_details = details
         self.status('completed' if self.completed else 'waiting' if self.loop.admission.blocked else 'running',
                     'waiting for feasible avoidance velocity' if self.loop.admission.blocked else 'coordinated '+self.task+': '+self.loop.stage,details)
 
@@ -357,6 +364,7 @@ class PointStabilization:
                             'position_error':math.hypot(goal[0]-pose[0],goal[1]-pose[1]),
                             'yaw_error':math.atan2(math.sin(goal[2]-pose[2]),math.cos(goal[2]-pose[2])),
                             'command':[v,w]})
+        self.final_details = details
         self.status('completed' if self.completed else 'waiting' if self.mission.admission.blocked else 'running',
                     'waiting for feasible avoidance velocity' if self.mission.admission.blocked else 'leader follower: '+self.mission.stage,details)
 
@@ -364,7 +372,7 @@ class PointStabilization:
         try:
             if self.avoidance_fault:
                 self.stop()
-                self.status('fault', self.avoidance_fault)
+                self.status('fault', self.avoidance_fault, self.final_details)
                 return
             poses = self.poses()  # Validate the entire group before publishing any motion.
             measured = self.measured_velocities(poses) if self.avoidance == 'orca' else None
@@ -386,9 +394,7 @@ class PointStabilization:
             preferred = self.point_control.commands(poses, self.goals, control)
             if self.avoidance == 'orca':
                 results = self.admission.step(poses,self.goals,control,self.control_interval(),measured,self.orca)
-                error = sum(math.hypot(g[0]-p[0],g[1]-p[1]) + self.orca['front_distance'] *
-                            abs(math.atan2(math.sin(g[2]-p[2]),math.cos(g[2]-p[2])))
-                            for p,g in zip(poses,self.goals))
+                error = -self.admission.progress
                 if self.best_error is None or error < self.best_error-0.005:
                     self.best_error, self.progress_time = error, time.monotonic()
                 if time.monotonic()-self.progress_time > self.stall_timeout:
@@ -410,8 +416,9 @@ class PointStabilization:
                         'all target poses reached' if self.completed else 'waiting for feasible avoidance velocity' if self.avoidance=='orca' and self.admission.blocked else 'tracking frozen target poses', details)
         except (OrcaBlocked, LoopFault) as exc:
             self.avoidance_fault = str(exc)
+            self.final_details = [dict(r,command=[0.,0.],phase='fault') for r in self.final_details]
             self.stop()
-            self.status('fault', self.avoidance_fault)
+            self.status('fault', self.avoidance_fault, self.final_details)
         except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException, ValueError) as exc:
             self.last_step_time = None
             self.admission.pause()

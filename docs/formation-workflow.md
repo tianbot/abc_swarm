@@ -6,7 +6,7 @@
 
 | stage | 行为 | ORCA | 遥控请求 |
 | --- | --- | --- | --- |
-| assembling_orca | 按01初始实测控制位姿冻结所有启动目标，参与车辆互避入队 | 启用 | 丢弃 |
+| assembling_orca | 冻结启动目标，规划途经点与通行顺序，ORCA护航入队 | 启用 | 丢弃 |
 | fine_positioning | 到各自目标，调整最终航向 | 关闭，保留几何监控 | 丢弃 |
 | ready | 全体位置/航向/实测速度稳定后的零速交接 | 关闭 | 丢弃 |
 | following | manual转发新遥控；auto头车走路径；后车按原跟随边工作 | 不提供全程ORCA | 仅manual接收 |
@@ -16,6 +16,16 @@
 状态state另外区分running/waiting/fault/completed。反馈缺失时保留冻结任务，输出零速；恢复后重新积累速度/稳定窗口。虚拟前置包络重叠时计算受限分离动作（recovery_active=true、参与车辆phase=recovering），恢复后继续原任务；短暂无可行ORCA速度时整组停车等待重新测量，不放松半平面约束；实际车体包络过近/目标冲突等几何错误直接fault，长期无进展也fault。退出或故障后重启任务，不增加人工启用service。
 
 默认完整流程由现有 `nodes/point_stabilization.py` 管理定位、标定、速度反馈和每车唯一cmd_vel。算法在 `src/abc_swarm/admission.py` 和 `formation_control.py`，复用原ORCA、点镇定、leader–follower控制律与Pure Pursuit。不再同时启动旧跟随节点、头车路径节点或demo_runtime发布最终速度。startup=false保留旧式入口，便于对照；原视频48个资源不变。
+
+## 入位路线与通行顺序
+
+开启ORCA的入位默认启用规划：把其他登记车辆当作膨胀圆，构造可见性图并用Dijkstra寻找分段路线；一个时刻只给一台车非零期望运动，其余车辆让行。最终目标被别的车占用时，尝试先去临时停车点腾出位置。ORCA仍校正所有车辆速度，必要时让行车辆也可能移动；实际车体保护与输出限幅保留。目标及角色不变，规划不自动交换02/03分工。
+
+实现为平层 `src/abc_swarm/admission_planner.py`，不增加ROS节点或依赖。参考[PythonRobotics可见性图规划说明](https://atsushisakai.github.io/PythonRobotics/modules/5_path_planning/visibility_road_map_planner/visibility_road_map_planner.html)，采用独立的圆障碍几何实现，没有复制其绘图/依赖代码。几何来自orca_config，规划余量参考admission.clearance及最终位置容差；节点参数planning默认true，也可在control_config（独立点镇定为goal_config）中显式设false作无规划对照。
+
+无进展依据是实测位姿沿途经点的推进及精定位误差的改善，不能因正在绕行、暂时远离终点就误报失败；原地等待或反复重规划不算进展。反馈中断后保留最终目标、根据最新位姿重新规划。路线走完仍须检查最终位置、朝向和实测停车；fault保留最后一次误差快照，不能把路线完成当成到位。
+
+这是空场内登记车辆之间的入位规划，未建模墙壁、场地边界、人或未知障碍。临时停车点可能离当前车位约三倍规划包络半径，路线可能超出起终点包围区域，启动前须人工确认周围空场。它不是完整多机器人路径规划或任意目标必达保证，不修复刚体朝向/参考点、底盘跟踪、网络延迟或PID问题；跟随/协调运动阶段也没有增加全程避障。
 
 ## 何时退出 ORCA
 
@@ -39,6 +49,7 @@ following阶段使用原跟随控制律和实测前车速度。当外侧后车�
 | --- | --- |
 | launch mode=manual/auto | 启动时选择；切换先退出旧任务再启动 |
 | start_driver/start_vrpn/use_rviz/start_teleop | 后台与UI归属，可全部复用已有进程 |
+| status.admission_planning | state、active_robot和剩余world平面waypoints；未启用ORCA时为null |
 | /abc_swarm_demo/status | schema_version=2，阶段变化立即发，数值更新约5Hz |
 | status.control_mode / stage / admission_stage | 任务模式、整体阶段、入队子阶段 |
 | status.ready / admission_complete | 是否已经到齐、是否完成过启动入队 |

@@ -69,7 +69,7 @@ def straight_velocity(pose,start,end,speed,max_angular,lookahead,tolerance,max_e
 class CoordinatedLoop:
     def __init__(self,shape,diameter=2.0,side_length=2.0,clockwise=False,laps=1,
                  speed=.15,origin=(0,0,0),lookahead=.20,phase_window=.10,
-                 settle_time=.5,max_error=.25,progress_timeout=30.0,admission=None):
+                 settle_time=.5,max_error=.25,progress_timeout=30.0,admission=None,planning=True):
         self.starts,self.paths=loop_geometry(shape,diameter,side_length,clockwise,origin)
         if type(laps) is not int or laps<0:raise ValueError('laps must be nonnegative integer')
         for value in (speed,lookahead,phase_window,settle_time,max_error,progress_timeout):
@@ -90,7 +90,8 @@ class CoordinatedLoop:
         self.errors=[0.0]*3
         self.point_control=PointPhaseTracker()
         self.admission_settings=admission
-        self.admission=AdmissionController(admission)
+        self.planning=planning
+        self.admission=AdmissionController(admission,planning)
         if admission is None:
             self.admission.settings['settle_time']=settle_time
         self.hold=0.0;self.idle=0.0;self.metric=None;self.metric_key=None
@@ -102,7 +103,7 @@ class CoordinatedLoop:
     def _change(self,stage):
         self.stage=stage;self.hold=0;self.metric=None;self.metric_key=None;self.idle=0
         if stage=='finishing':
-            self.admission=AdmissionController(self.admission_settings)
+            self.admission=AdmissionController(self.admission_settings,self.planning)
             if self.admission_settings is None:
                 self.admission.settings['settle_time']=self.settle_time
 
@@ -137,8 +138,7 @@ class CoordinatedLoop:
             self.goals=list(self.starts)
             commands=self.admission.step(poses,self.goals,control,dt,velocities,
                                          assembly_orca if self.stage=='assembling' else None)
-            error=sum(math.hypot(p[0]-g[0],p[1]-g[1])+.08*abs(angle(g[2]-p[2])) for p,g in zip(poses,self.goals))
-            self._stall(-error,dt)
+            self._stall(self.admission.progress,dt)
             if self.admission.ready:
                 if self.stage=='finishing':self.completed=True;self._change('completed')
                 elif self.shape=='circle':

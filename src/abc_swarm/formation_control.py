@@ -11,7 +11,7 @@ from .pure_pursuit import PurePursuit
 
 class LeaderFollowerMission:
     """A rooted vehicle graph, independent of ROS and device-specific topics."""
-    def __init__(self, names, options, admission=None):
+    def __init__(self, names, options, admission=None, planning=True):
         required = {'mode','edges','shape','radius','width','height','laps','clockwise','front_distance',
                     'k_x','k_y','lookahead','max_error','tracking_window'}
         if not isinstance(options, dict) or set(options) != required:
@@ -47,7 +47,8 @@ class LeaderFollowerMission:
         self.goals = None
         self.startup_goals = None
         self.admission_settings = admission
-        self.admission = AdmissionController(admission)
+        self.planning = planning
+        self.admission = AdmissionController(admission, planning)
         self.stage = 'assembling_orca'
         self.completed = False
         self.path = None
@@ -131,8 +132,7 @@ class LeaderFollowerMission:
                                               goal_tolerance=control['position_tolerance'],max_error=self.options['max_error'])
                 return [(0., 0., 'follow_handoff')]*len(poses)
             commands = self.admission.step(poses,self.goals,control,dt,velocities,orca)
-            error = sum(math.hypot(p[0]-g[0],p[1]-g[1])+.08*abs(angle(g[2]-p[2])) for p,g in zip(poses,self.goals))
-            self._stall(-error,dt)
+            self._stall(self.admission.progress,dt)
             if self.admission.ready:
                 if settling:
                     self.completed = True
@@ -156,7 +156,7 @@ class LeaderFollowerMission:
             self._stall(self.progress,dt)
             if self.tracker.completed:
                 self.goals = self._formation(poses[0])
-                self.admission = AdmissionController(self.admission_settings)
+                self.admission = AdmissionController(self.admission_settings, self.planning)
                 self._change('settling')
                 return [(0., 0., 'finish_barrier')]*len(poses)
         else:

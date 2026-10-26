@@ -249,16 +249,31 @@ def render(spec):
     if spec.get('admission',{}).get('enabled'):
         for key,value in [('admission',spec['admission']['settings']),('orca',spec['admission']['orca'])]:
             ET.SubElement(root,'rosparam',param='/abc_swarm_demo/'+key).text=json.dumps(value)
+    if admission_planning_enabled(spec, capability):
+        ET.SubElement(root,'param',name='/abc_swarm_demo/planning',value='true',type='bool')
     # Python 3.8 (Noetic) has no ET.indent.
     return minidom.parseString(ET.tostring(root, encoding='utf-8')).toprettyxml(indent='  ')
+
+
+def admission_planning_enabled(spec, capability):
+    return bool(capability.get('admission_planning') and (
+        capability.get('startup_admission') and spec.get('admission',{}).get('enabled',True)
+        or capability.get('orca') or capability.get('coordinated') and spec.get('orca') is not None))
+
+
+def planning_report(spec, capability):
+    if not admission_planning_enabled(spec, capability):return ''
+    return ('\n\n入位规划已启用：分段绕行、逐车让行，目标被占用时可安排临时停车点；'
+            'ORCA负责途中互避，到齐后仍检查最终位置和朝向。临时路线可能超出起点/终点包围区域，'
+            '启动前须确认周围空场；当前没有墙壁、场地边界或未知障碍模型，也不能修复刚体标定或底盘转向问题。\n')
 
 
 def report(spec):
     capability = validate(spec)
     if capability.get('coordinated'):
-        return loop_report(spec)+mocap_control_report(spec)
+        return loop_report(spec)+mocap_control_report(spec)+planning_report(spec,capability)
     if capability.get('point'):
-        return point_report(spec)+mocap_control_report(spec)
+        return point_report(spec)+mocap_control_report(spec)+planning_report(spec,capability)
     lines = ['# 客户实验运行单', '', '实验：`{}`；入口：`{}`。'.format(spec['experiment'], capability['launch']),
              '设备顺序即角色：01 项为头车；triangle 的 02/03 跟头车，snake 为逐车跟前车。',
              '坐标单位 m/rad，均为 world 下轴心参考点；以下是人工摆位记录，不设置 TF、不移动到起点。', '',
@@ -309,7 +324,7 @@ def report(spec):
                  .replace('启动/重置','启动')
                  .replace('路径完成或故障后，重新启动 launch 可开始新一轮；可选 reset 会重建路径并自动运行。',
                           '路径完成或故障后，退出并重新启动launch，捕获新的起点；不增加手动启用步骤。') for line in lines]
-        return '\n'.join(lines)+mocap_control_report(spec)
+        return '\n'.join(lines)+mocap_control_report(spec)+planning_report(spec,capability)
     return '\n'.join(lines)
 
 

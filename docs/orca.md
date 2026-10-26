@@ -42,6 +42,16 @@ roslaunch abc_swarm demo_mocap_three_mini_orca_point_stabilization.launch format
 
 ## 参数和反馈
 
+现场存在约1秒的 odom 间断时，可选用 `config/orca_delayed_feedback.yaml`，将里程计接收/消息年龄容忍窗口设为1.5秒，其他参数保持默认。期间使用最后收到的实测速度；动捕 TF 仍需在0.5秒内有效，超过窗口全组停车并在反馈恢复后自动继续。2026-10-25 三车测试已跨过此前约0.7～0.9秒的断流，03位置误差约2.7cm；该轮因02刚体朝向与实际移动方向不一致而未完成全组到位，不能据此声称延迟反馈下的避碰保证。
+
+后台已运行时：
+
+```bash
+roslaunch abc_swarm demo_mocap_three_mini_orca_point_stabilization.launch formation:=triangle start_driver:=false start_vrpn:=false orca_config:=$(rospack find abc_swarm)/config/orca_delayed_feedback.yaml
+```
+
+圆形/正三角形任务也可传同一个 `orca_config`，同时显式设置 `avoidance:=orca`，只影响起点点镇定阶段。需确认刚体坐标 +X 与实际车头一致，否则控制器会按错误朝向计算目标运动。AI 生成交付仍使用客户配置中显式填写的 `orca.odom_timeout`，不会自动选择本现场配置。
+
 `config/orca.yaml` 是一层配置文件，启动时加载：
 
 | 参数 | 默认 | 含义 |
@@ -60,7 +70,11 @@ roslaunch abc_swarm demo_mocap_three_mini_orca_point_stabilization.launch format
 
 前置点有效半径为 R=robot_radius+front_distance+safety_margin，默认 0.23 m；有效圆心在每台车前方 0.08 m。起点、终点的有效包络需要足够间距，不能仅按底盘外观判断。默认同向蛇形间距 0.5 m 可容纳这一配置；不同朝向会改变有效圆心位置。
 
-所有三台需要 world→rigid_body_N 的有效 TF，和对应 `/robot_name_N/odom` 的**实际**车体 linear.x/angular.z。ORCA 使用实测速度，不把刚发出的 cmd_vel 当作反馈。原无避障点镇定仍不要求 odom。最大车体直线速度为 ±0.15 m/s，角速度默认 ±0.5 rad/s，接近目标、转弯和避让时会更低。
+所有三台需要 world→rigid_body_N 的有效 TF。`velocity_source:=odom` 保持原默认，使用对应 `/robot_name_N/odom` 的实际 linear.x/angular.z；`velocity_source:=mocap` 使用控制中心位姿约0.2秒窗口估计实测速度，约0.08秒样本积累后开始，不依赖底盘 odom。反馈缺失或时钟/时间窗失效时全组停车，恢复后继续。ORCA 使用实测速度，不把 cmd_vel 当作反馈；车辆仍需连接底盘驱动才能接收命令。原无避障点镇定仍不要求 odom。最大车体直线速度指令为 ±0.15 m/s，角速度默认 ±0.5 rad/s，接近目标、转弯和避让时会更低。
+
+动捕原点不是差速轴心，或刚体朝向不对应车头时，通过控制/目标 YAML 的 `mocap_calibration` 显式配置 yaw_offset 与 marker_offset。节点只转换内部控制位姿，不覆盖原始 TF。当前现场专用配置和命令见[现场用法](mocap-field-use.md)，不要把其中02的补偿复制给新设备。点镇定通过 goal_config 加载，圆/三角通过 control_config 加载。
+
+点镇定会先到最终位置容差的一半范围，再稳定调整朝向；位置小幅变化时保留转向阶段，超过两倍容差则重新靠近。只有位置与航向都进入原定容差才报告 arrived/completed，避免阈值附近反复切换，未扩大最终完成容差。
 
 几何/时域参数重启后生效；已有点镇定的 k_distance/k_heading 动态调参继续可用，修改增益不会改变目标或重新启动 completed 的任务。
 

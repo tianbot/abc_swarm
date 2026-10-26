@@ -7,7 +7,7 @@ ABC Swarm is the developer manual for ROS2GO, Tianbot Mini and RoboMaster TT ROS
 --------------------
 
 本分支从 ``origin/main`` 重新整理，保留原课程的文件布局和命令。
-``nodes/`` 保留原九个教学脚本，并集中放置四个新增可执行节点，
+``nodes/`` 保留原九个教学脚本，并集中放置新增可执行节点，
 不另设 scripts 入口目录。原 ``launch/includes/`` 不变，配置文件保持一层。
 
 * 原课程：继续按视频操作，原有无动捕实车和 Gazebo demo 不新增、不搬迁。
@@ -44,8 +44,9 @@ ABC Swarm is the developer manual for ROS2GO, Tianbot Mini and RoboMaster TT ROS
 一个文件组合驱动、VRPN、算法和所需交互，反馈有效后自动运行，无需手动启用服务。
 已有后台时传入 ``start_driver:=false start_vrpn:=false``。
 地址和端口只需在 ``config/mocap.yaml`` 配置，也可通过启动参数覆盖。
-准备好后使用统一服务开始、停止，具体摆位和路径范围先看文档。
+停止实验在 roslaunch 终端按 Ctrl+C；具体摆位和路径范围先看文档。
 
+* `三台 Mini 现场使用：圆形/三角形与标定配置 <docs/mocap-field-use.md>`_
 * `现场测试清单 <docs/field-test.md>`_
 * `动捕实验说明 <docs/mocap-demos.md>`_
 * `统一启动和 GUI 接口 <docs/demo-runtime.md>`_

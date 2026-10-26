@@ -1,0 +1,12 @@
+# Field profile for intermittent Mini odometry, tested 2026-10-25.
+# Holds the last measured body velocity for at most 1.5s; TF freshness remains 0.5s.
+# This tolerance does not provide a collision guarantee for delayed feedback.
+robot_radius: 0.13
+safety_margin: 0.02
+front_distance: 0.08
+time_horizon: 3.0
+right_bias: 0.01
+velocity_buffer: 0.002
+odom_timeout: 1.5
+odom_future_tolerance: 0.1
+stall_timeout: 30.0

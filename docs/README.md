@@ -6,6 +6,8 @@
 
 当前用户指南：
 
+- **[三台 Mini 现场使用：正式 launch 与当日标定配置](mocap-field-use.md)**
+
 - [三车动捕同圆绕行与正三角形逐边运动](coordinated-tracking.md)
 
 - [动捕点镇定中的 ORCA 车车避让](orca.md)

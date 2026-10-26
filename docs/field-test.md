@@ -1,5 +1,38 @@
 # 三车动捕现场测试清单
 
+## 2026-10-26 收口
+
+本轮不再启动实车。正式使用入口及配置见[现场用法](mocap-field-use.md)，已去掉运行时对 `/tmp` 脚本/标定JSON/临时控制TF的依赖：
+
+- `config/mocap_field_control.yaml`：当日标记架的显式校准、8cm最终位置容差；不默认加载。节点内部换算控制中心，`control_poses`供查看，原始TF保持原样。
+- `velocity_source=mocap`：从有效控制位姿约0.2秒窗口测量速度，支持无底盘odom的入位/ORCA与协调；默认odom模式保持兼容。反馈中断后重新积累速度窗口再运行。
+- 入位增加转向阶段滞回，最终完成仍检查原位置/航向容差；共用算法没有按设备复制，未新增可执行节点。
+- AI契约2新增可选mocap_control，能力表/生成器/正反例/Noetic展开/安装示例同步更新；ORCA包装入口的组合哈希也覆盖其点镇定include。CI新增安装后示例生成检查，旧课程基线和检查器未改。
+
+84项本地/catkin测试、Noetic构建测试安装通过；安装后两轨迹入口的现场YAML和新AI示例生成/只读检查/解析通过。私有ROS：点镇定 `/tmp/abc_swarm_point_ros_dzklb7ye`；ORCA `/tmp/abc_swarm_orca_ros_j2k15w5d`；五个协调用例 `/tmp/abc_swarm_loops_ros_9qji45qi`，包含完全无odom且带已知标记偏移/航向偏差的三角形模型。合成回归不接入现场master、不启动底盘/真实VRPN/UI。
+
+本机验证入口日志：`/tmp/abc_swarm_finalize_point_ros.log`、`/tmp/abc_swarm_finalize_orca_ros.log`、`/tmp/abc_swarm_finalize_loops_ros.log`；构建/测试/安装记录为 `/tmp/abc_swarm_finalize_build.log`、`/tmp/abc_swarm_finalize_catkin_tests_final.log`、`/tmp/abc_swarm_finalize_install_final.log`。未运行远端CI、未推送、未发布网站。
+
+现场证据分开记录：1.5m圆自动录包有completed；三角用户反馈已运行，最后一份自动记录为fault且edge_rounds_completed=0，未证明完整三边。正式合并配置之后的实车、2m及顺时针仍待后续验收，不在本轮追加。
+
+## 2026-10-25 现场准备与 ORCA 首轮记录
+
+- 三车切入多机模式后，UDP echo 与 TCP 连接确认：01=`192.168.2.104`、02=`192.168.2.100`、03=`192.168.2.103`，连接本机 `.106:11411`。这些是当天 DHCP 地址，不是固定设备配置；同一 IP 先后可能对应不同 MAC，不能沿用旧扫描结论。
+- 本机 shell 残留 `ROS_IP=192.168.2.102`，首轮 launch 自检失败，未启动控制。测试进程临时 unset ROS_HOSTNAME 并设置 ROS_IP=.106 后可启动；未修改系统配置。
+- 启动前10秒静止基线：三车 odom 最大接收间隔约0.12秒、消息最大时间戳延迟约0.063秒，TF 延迟约0.006秒，无其他 cmd_vel 发布者。
+- 复用后台执行默认 ORCA 三角点镇定（spacing=0.5，max_linear=0.15），02/03 初始目标误差约0.228/0.496m。运行不足一秒，03 odom 中断，节点转 waiting；独立观察进程结束该轮。最终三车 cmd_vel 和 odom 速度均为零。02 有小幅转动，03 未观察到非零 odom 速度；未完成点镇定，不能据此评估近目标误差或宣称 ORCA 实车通过。
+- 后续30秒不发运动指令，02/03 分别出现约0.936/0.684秒的接收间隔；01 最大约0.120秒。TCP 客户端端口相较初次连接均改变，说明期间重新建立过连接，具体重连时间和触发原因尚未定位。底盘驱动日志文件未找到，尚无对应 reset 告警记录，不能将各接收间隔逐一等同于 TCP reset。
+- 录包与统计：`/tmp/abc_swarm_field_20261025_153257/`（run.bag、summary.json、stationary.bag、stationary_summary.json）；首次地址错误记录在 `/tmp/abc_swarm_field_20261025_153231/`。这些是本机临时文件，需另行归档才能长期保留。
+- 首轮结束已退出算法，保留原驱动/VRPN/RViz。后续根据用户对延迟容忍的现场要求，按下一节记录的参数复测；断流原因尚未定位。
+
+### 现场授权延迟容忍复测
+
+用户明确要求容忍较大延迟后，使用1.5秒 odom 窗口复测，TF/几何/故障停车逻辑保留。本轮运行约20秒，未因 odom 中断结束；03从约0.496m误差收敛至约0.027m，最终航向误差约0.060rad。02误差增大，最终有效包络重叠故障，整组停机；最后三车指令与实测速度均为零。
+
+离线比较正向 odom 速度与动捕位置微分：03移动方向与动捕 yaw 平均相差约0.7°，02约110.7°，稳定移动区间约106～111°。因此02存在显著朝向/参考系不一致的证据，尚需现场核对刚体坐标，不把先前目测的“可能180°”当作结论。修正前未再次运行；没有用修改 ORCA 包络或 PID 来补偿这一问题。
+
+数据：`/tmp/abc_swarm_field_20261025_154131/` 下 run.bag、summary.json、direction_check.json。延迟容忍参数保存为 `config/orca_delayed_feedback.yaml`，默认基础配置不变；该配置本轮只验证了连续执行和03到位，三车任务/避让/圆形与三角形轨迹仍待验收。
+
 本轮代码在 `teaching/main-reorg` 分支，从原 main 重新整理。原九个教学脚本未改，新增节点合在 nodes，动捕实验集中到 launch/mocap。下面是现场复验步骤，不是已经完成的实车结果。
 
 原准备阶段已完成本地检查、安装检查及合成 ROS 回归；2026-10-24 调整为反馈有效后自动运行，现场效果待重新验收。待完成：本分支真实三车测试。GitHub CI 工作流已写好，但未推送运行，main 分支保护也未设置。原来另一分支测试过三角/逐车跟随，不能直接当作当前分支的验收。
@@ -47,6 +80,8 @@ export ROS_MASTER_URI=http://localhost:11311
 
 ## 2. 确认本次设备配置
 
+- Mini 必须先进入多机/集群模式。2026-10-25 现场确认的操作：按住配网（WIFI）键，点击 Reset，随后松开配网键，状态灯变蓝。原 Mini 教程另有“关机时按住 WIFI 键开机”的操作；按当前硬件实际方式进入。蓝灯只是模式提示，还需确认三车已连上驱动并持续发布 odom。
+- 电脑与三台车连接同一个局域网，rmip 指向运行底盘驱动的电脑实际 IPv4，rosserial TCP 端口默认 11411。动捕服务器 IP 与底盘 rmip 是两个不同地址。只看到动捕刚体不代表底盘已联网；无 odom 时先检查工作模式、网络及 TCP 连接。
 - 三台 Mini 的 ROS 名称及动捕刚体：`tianbot_mini_01`、`tianbot_mini_02`、`tianbot_mini_03`。
 - 场地配置：`config/mocap.yaml`，当前 server 为 `192.168.2.101`，port 为 `3883`；当天不同则改此文件或传 `vrpn_server_ip`、`vrpn_port`。
 - 动捕在 world 下持续发布刚体；刚体 x 向车头、y 向左、原点对应底盘控制参考点。

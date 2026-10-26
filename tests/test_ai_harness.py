@@ -68,6 +68,8 @@ class AIHarnessTests(unittest.TestCase):
                 self.assertEqual(args['rigid_body_1'], 'tianbot_mini_01')
                 self.assertNotIn('initial_pose', args)
                 self.assertNotIn('enabled', args)
+                if experiment in ('manual_triangle','manual_snake'):
+                    self.assertEqual(args['mode'],'manual')
 
     def test_rounded_rectangle_and_separate_backend_are_supported(self):
         spec = scenario('path_snake')

@@ -177,6 +177,8 @@ def render(spec):
         ET.SubElement(root, 'arg', name=key, default=text_value(value))
     include = ET.SubElement(root, 'include', file='$(find abc_swarm)/launch/mocap/' + capability['launch'])
     args = {'vrpn_server_ip': spec['vrpn']['server'], 'vrpn_port': spec['vrpn']['port']}
+    if capability.get('mode'):
+        args['mode']=capability['mode']
     if not capability.get('point') and not capability.get('coordinated'):
         args['spacing'] = spec['spacing']
     for key in spec['startup']:

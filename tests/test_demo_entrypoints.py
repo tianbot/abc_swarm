@@ -22,6 +22,37 @@ def load(path, argv=None):
 
 
 class DemoEntrypointTests(unittest.TestCase):
+    def test_follower_mode_selects_one_head_controller_and_keeps_roles(self):
+        for formation in ('triangle','snake'):
+            path=ROOT/('launch/mocap/demo_mocap_three_mini_leader_follower_'+formation+'.launch')
+            common=['start_driver:=false','start_vrpn:=false','use_rviz:=false',
+                    'robot_name_1:=customer_01','robot_name_2:=customer_02','robot_name_3:=customer_03',
+                    'rigid_body_1:=body_01','rigid_body_2:=body_02','rigid_body_3:=body_03']
+            manual=load(path,common+['mode:=manual'])
+            self.assertEqual(sum(n.type=='teleop_twist_keyboard.py' for n in manual.nodes),1)
+            self.assertFalse(any(n.type=='preset_path_tracker.py' for n in manual.nodes))
+            self.assertEqual(manual.params['/abc_swarm_demo/mode'].value,'manual')
+            auto=load(path,common+['mode:=auto','start_teleop:=true','radius:=.75','laps:=2',
+                                  'clockwise:=true','max_linear:=.12','max_angular:=.3','tf_timeout:=.8'])
+            self.assertEqual(sum(n.type=='preset_path_tracker.py' for n in auto.nodes),1)
+            self.assertFalse(any(n.type=='teleop_twist_keyboard.py' for n in auto.nodes))
+            self.assertEqual(sum(n.type=='demo_runtime.py' for n in auto.nodes),1)
+            self.assertEqual(sum(n.type=='leader_follower_tracker.py' for n in auto.nodes),2)
+            for key,value in [('shape','circle'),('radius',.75),('laps',2),('clockwise',True),
+                              ('speed',.12),('max_angular',.3),('tf_timeout',.8),('robot_frame','body_01'),
+                              ('cmd_topic','/customer_01/cmd_vel')]:
+                self.assertEqual(auto.params['/abc_swarm_path/'+key].value,value)
+            self.assertEqual(auto.params['/abc_swarm_demo/mode'].value,'path')
+            expected='body_02' if formation=='snake' else 'body_01'
+            self.assertEqual(auto.params['/customer_03_leader_follower/leader_frame'].value,expected)
+            self.assertEqual(auto.params['/customer_03_leader_follower/max_linear'].value,.12)
+            self.assertEqual(auto.params['/abc_swarm_path/edges'].value[-1]['leader'],expected)
+            for bad in ['mannual','AUTO','invalid']:
+                with self.subTest(formation=formation,mode=bad),self.assertRaises(roslaunch.xmlloader.XmlParseException):
+                    load(path,common+['mode:='+bad])
+            # roslaunch treats an empty CLI assignment as an omitted argument.
+            self.assertEqual(load(path,common+['mode:=']).params['/abc_swarm_demo/mode'].value,'manual')
+
     def setUp(self):
         env = patch.dict(os.environ, {'ABC_SWARM_VRPN_SERVER': ''})
         env.start()
@@ -141,6 +172,10 @@ class DemoEntrypointTests(unittest.TestCase):
         self.assertFalse(any(n.type in ('demo_runtime.py', 'socket_node', 'vrpn_client_node')
                              for n in config.nodes))
         self.assertNotIn('/abc_swarm_demo/enabled', config.params)
+        head=load(ROOT/'launch/common/leader_path_tracker.launch.xml',['formation:=triangle'])
+        self.assertEqual(len(head.nodes),1)
+        self.assertEqual(head.nodes[0].type,'preset_path_tracker.py')
+        self.assertNotIn('/abc_swarm_demo/enabled',head.params)
 
     def test_path_and_followers_share_configured_front_distance(self):
         for path in DEMOS:

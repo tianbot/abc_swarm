@@ -1,5 +1,10 @@
 <?xml version="1.0" ?>
 <launch>
+  <arg name="mode" default="manual"/>
+  <arg name="resolved_mode" value="$(eval {'manual': 'manual', 'auto': 'auto'}[arg('mode')])"/>
+  <arg name="radius" default="1.0"/>
+  <arg name="laps" default="1"/>
+  <arg name="clockwise" default="false"/>
   <arg name="use_rviz" default="false"/>
   <arg name="teleop_terminal" default="xterm -e"/>
   <arg name="start_teleop" default="true"/>
@@ -49,8 +54,26 @@
     <arg name="robot_name_3" value="$(arg robot_name_3)"/>
     <arg name="rigid_body_3" value="$(arg rigid_body_3)"/>
   </include>
+  <include if="$(eval arg('resolved_mode') == 'auto')" file="$(find abc_swarm)/launch/common/leader_path_tracker.launch.xml">
+    <arg name="formation" value="snake"/>
+    <arg name="shape" value="circle"/>
+    <arg name="radius" value="$(arg radius)"/>
+    <arg name="speed" value="$(arg max_linear)"/>
+    <arg name="laps" value="$(arg laps)"/>
+    <arg name="clockwise" value="$(arg clockwise)"/>
+    <arg name="spacing" value="$(arg spacing)"/>
+    <arg name="front_distance" value="$(arg front_distance)"/>
+    <arg name="max_angular" value="$(arg max_angular)"/>
+    <arg name="tf_timeout" value="$(arg tf_timeout)"/>
+    <arg name="robot_name_1" value="$(arg robot_name_1)"/>
+    <arg name="rigid_body_1" value="$(arg rigid_body_1)"/>
+    <arg name="robot_name_2" value="$(arg robot_name_2)"/>
+    <arg name="rigid_body_2" value="$(arg rigid_body_2)"/>
+    <arg name="robot_name_3" value="$(arg robot_name_3)"/>
+    <arg name="rigid_body_3" value="$(arg rigid_body_3)"/>
+  </include>
   <node pkg="abc_swarm" type="demo_runtime.py" name="abc_swarm_demo" output="screen" required="true" clear_params="false">
-    <param name="mode" value="manual"/>
+    <param name="mode" value="$(eval 'path' if arg('resolved_mode') == 'auto' else 'manual')"/>
     <param name="max_linear" value="$(arg max_linear)"/>
     <param name="odom_future_tolerance" value="$(arg odom_future_tolerance)"/>
     <param name="fixed_frame" value="world"/>
@@ -58,7 +81,7 @@
     <rosparam param="feedback_topics" subst_value="true">[&quot;/$(arg robot_name_1)/odom&quot;, &quot;/$(arg robot_name_2)/odom&quot;]</rosparam>
     <param name="cmd_topic" value="/$(arg robot_name_1)/cmd_vel"/>
   </node>
-  <node if="$(arg start_teleop)" pkg="teleop_twist_keyboard" type="teleop_twist_keyboard.py" name="leader_teleop" output="screen" launch-prefix="$(arg teleop_terminal)">
+  <node if="$(eval arg('resolved_mode') == 'manual' and arg('start_teleop'))" pkg="teleop_twist_keyboard" type="teleop_twist_keyboard.py" name="leader_teleop" output="screen" launch-prefix="$(arg teleop_terminal)">
     <remap from="cmd_vel" to="/abc_swarm_demo/teleop_cmd"/>
     <param name="speed" value="$(arg max_linear)"/>
     <param name="turn" value="0.15"/>

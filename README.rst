@@ -41,6 +41,10 @@ ABC Swarm is the developer manual for ROS2GO, Tianbot Mini and RoboMaster TT ROS
 
    roslaunch abc_swarm demo_mocap_formation_leader_follower_path_tracking.launch shape:=circle
 
+三角形/蛇形 leader-follower 入口均支持 ``mode:=manual`` （默认，键盘遥控）
+和 ``mode:=auto`` （头车自动画圆）。auto 默认半径 1m、一圈、速度上限 0.15m/s，
+可通过 ``radius``、``laps``、``clockwise``、``max_linear`` 配置；切换时退出旧实验后重启。
+
 一个文件组合驱动、VRPN、算法和所需交互，反馈有效后自动运行，无需手动启用服务。
 已有后台时传入 ``start_driver:=false start_vrpn:=false``。
 地址和端口只需在 ``config/mocap.yaml`` 配置，也可通过启动参数覆盖。

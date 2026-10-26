@@ -4,8 +4,8 @@ ROS1 Noetic；本页统一四个独立实验的准备、摆位、启动和停止
 
 | 项目 | 控制关系 | 操作方式 |
 | --- | --- | --- |
-| 三角形 leader–follower | 02、03分别跟随01 | 键盘遥控01 |
-| 蛇形 leader–follower | 01→02→03，逐车跟随前车 | 键盘遥控01 |
+| 三角形 leader–follower | 02、03分别跟随01 | manual键盘；auto头车画圆 |
+| 蛇形 leader–follower | 01→02→03，逐车跟随前车 | manual键盘；auto头车画圆 |
 | 三车同圆协调路径跟踪 | 同一个圆约120°间隔，同向绕行 | 自动入位后运行 |
 | 三车正三角形协调路径跟踪 | 每车从一个顶点沿直边去下一顶点，到齐再转向 | 自动入位后运行 |
 
@@ -40,22 +40,38 @@ roslaunch "$(rospack find abc_swarm)/launch/common/mocap_backend.launch.xml" vrp
 三车同向，以01车头为前方：02放在01后方0.5m、左侧0.5m；03放在后方0.5m、右侧0.5m。spacing表示纵/横偏移，不是等边三角形边长。先接近这个队形摆好，反馈有效后后车会自动调整。
 
 ```bash
-roslaunch abc_swarm demo_mocap_three_mini_leader_follower_triangle.launch spacing:=0.5 max_linear:=0.15 start_driver:=false start_vrpn:=false
+roslaunch abc_swarm demo_mocap_three_mini_leader_follower_triangle.launch mode:=manual spacing:=0.5 max_linear:=0.15 start_driver:=false start_vrpn:=false
 ```
 
 默认弹出键盘终端，在里面操作01。02、03都直接跟随01，不依次跟随。先走缓慢直线，再做缓弯。
+
+改为自动领航，01走圆，02、03继续分别跟01：
+
+```bash
+roslaunch abc_swarm demo_mocap_three_mini_leader_follower_triangle.launch mode:=auto radius:=1.0 laps:=1 max_linear:=0.15 start_driver:=false start_vrpn:=false
+```
 
 ## 2. 蛇形 leader–follower
 
 三车同向排成一列：02在01后方0.5m，03在02后方0.5m（距01约1m）。
 
 ```bash
-roslaunch abc_swarm demo_mocap_three_mini_leader_follower_snake.launch spacing:=0.5 max_linear:=0.15 start_driver:=false start_vrpn:=false
+roslaunch abc_swarm demo_mocap_three_mini_leader_follower_snake.launch mode:=manual spacing:=0.5 max_linear:=0.15 start_driver:=false start_vrpn:=false
 ```
 
 键盘遥控01，02跟01、03跟02。键盘操作：i前进，u/o左右缓弯，k停止头车请求；松开后请求超时也会停止。k之后后车仍可能收敛，整组结束必须在启动demo的roslaunch终端Ctrl+C。
 
-两项跟随都没有指定圈数，不自动结束；它们保持原来的底盘odom反馈要求，当前运行管理默认0.5秒反馈窗口。后两项新增的动捕速度模式没有自动应用到跟随节点。
+manual跟随没有指定圈数，不自动结束；两种模式都保持原来的底盘odom反馈要求，当前运行管理默认0.5秒反馈窗口。后两项新增的动捕速度模式没有自动应用到跟随节点。
+
+蛇形自动领航：
+
+```bash
+roslaunch abc_swarm demo_mocap_three_mini_leader_follower_snake.launch mode:=auto radius:=1.0 laps:=1 max_linear:=0.15 start_driver:=false start_vrpn:=false
+```
+
+mode仅支持manual和auto，省略时仍为manual，其他拼写报错。manual默认启动key teleop，可用start_teleop=false供GUI复用；auto不启动键盘，即使start_teleop=true也不会产生键盘节点。模式在启动时选择，切换先Ctrl+C退出，再改mode重启。
+
+auto默认radius=1.0m（头车圆直径2m）、laps=1、clockwise=false，max_linear同时控制头车路径速度上限和后车限速，默认0.15m/s。radius可设0.75得到头车直径1.5m的圆。头车圆心在其启动朝向左侧一个半径处，clockwise=true改为右侧；后车扫掠范围更大。auto在反馈就绪、编队收敛后出发，路径完成后整组停车，无人工启用步骤。它仍是leader–follower编队，三个机器人不会按120°分布在同一个圆上。
 
 ## 本次现场配置
 
@@ -95,7 +111,7 @@ roslaunch abc_swarm demo_mocap_three_mini_triangle_tracking.launch side_length:=
 rostopic echo /abc_swarm_demo/status
 ```
 
-前两项看到 mode=manual、state=running，键盘请求才会传给01；waiting时查看reason。后两项的stage顺序为 assembling → tracking_circle/ tracking_edge → turning/finishing → completed；按现场命令运行会看到velocity_source=mocap，mocap_calibrated表示是否显式启用了补偿，校准后清空补偿则为false。mocap速度模式使用约0.2秒控制中心位姿窗口估计实测速度，不等待底盘odom；odom仍可单独用于驱动诊断。动捕过期仍全组输出零，恢复后继续冻结的任务。车辆本身仍需连接底盘驱动接收命令。
+前两项manual模式的状态为mode=manual、state=running时，键盘请求才会传给01；auto模式的运行状态使用mode=path，完成为completed。waiting/fault时查看reason。第3/4项的stage顺序为 assembling → tracking_circle/ tracking_edge → turning/finishing → completed；按现场命令运行会看到velocity_source=mocap，mocap_calibrated表示是否显式启用了补偿，校准后清空补偿则为false。mocap速度模式使用约0.2秒控制中心位姿窗口估计实测速度，不等待底盘odom；odom仍可单独用于驱动诊断。动捕过期仍全组输出零，恢复后继续冻结的任务。车辆本身仍需连接底盘驱动接收命令。
 
 完成后持续停车。在实验终端 Ctrl+C 退出，确认三车静止；后台保留。下一轮重新启动同一命令。出现 fault 先检查 reason，再退出/摆位/重启。不要同时运行旧测试脚本、另一套轨迹或直接发布 cmd_vel 的遥控。
 

@@ -9,13 +9,15 @@
       "robots": 3,
       "formation": "triangle",
       "path": false,
-      "launch": "demo_mocap_three_mini_leader_follower_triangle.launch"
+      "launch": "demo_mocap_three_mini_leader_follower_triangle.launch",
+      "mode": "manual"
     },
     "manual_snake": {
       "robots": 3,
       "formation": "snake",
       "path": false,
-      "launch": "demo_mocap_three_mini_leader_follower_snake.launch"
+      "launch": "demo_mocap_three_mini_leader_follower_snake.launch",
+      "mode": "manual"
     },
     "path_single": {
       "robots": 1,

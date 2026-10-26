@@ -1,5 +1,13 @@
 # 三车动捕现场测试清单
 
+## 2026-10-26 跟随入口的 manual/auto 模式
+
+两个 leader-follower demo 新增 mode=manual/auto，默认manual，拼写错误拒绝。manual启动键盘；auto复用preset_path_tracker作为唯一头车速度发布者，半径默认1m、一圈，后车跟随关系保持三角或逐车蛇形。共用头车片段为 `launch/common/leader_path_tracker.launch.xml`，原自动路径入口也复用它；没有新增Python节点。模式在启动时选择，退出后重启切换。
+
+85项catkin测试、构建安装与安装后四种组合解析通过；AI生成器为manual实验显式传mode=manual，自动实验继续使用原path_triangle/path_snake类型，生成/只读检查/Noetic解析通过。原课程48资源保持兼容，未修改检查器/基线/例外。
+
+私有ROS回归 `/tmp/abc_swarm_path_ros_fyqi_zqp` 覆盖原六入口与新增两种mode=auto：合成TF/odom、启动/编队等待、头车单一发布者、路径完成/重置、反馈中断停车以及manual恢复。日志 `/tmp/abc_swarm_modes_private_ros.log`；构建/测试/安装日志为 `/tmp/abc_swarm_modes_build.log`、`/tmp/abc_swarm_modes_tests.log`、`/tmp/abc_swarm_modes_install.log`。不接入现场master，不启动硬件或UI，没有追加实车/Gazebo测试或远端CI。
+
 ## 2026-10-26 收口
 
 本轮不再启动实车。正式使用入口及配置见[现场用法](mocap-field-use.md)，已去掉运行时对 `/tmp` 脚本/标定JSON/临时控制TF的依赖：

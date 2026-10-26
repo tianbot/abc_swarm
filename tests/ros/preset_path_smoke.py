@@ -95,15 +95,17 @@ def main():
             recent = [r for r in commands[i] if r[0] > time.monotonic() - 0.25]
             assert recent and all(v == 0 and w == 0 for _, v, w in recent), recent
 
-        def launch(formation):
+        def launch(formation,via_mode=False):
             root = Path(__file__).resolve().parents[2]
             filenames = {'single': 'demo_mocap_path_tracking.launch',
                          'triangle': 'demo_mocap_formation_leader_follower_path_tracking.launch',
                          'snake': 'demo_mocap_snake_leader_follower_path_tracking.launch'}
-            return start(['roslaunch', str(root / 'launch/mocap' / filenames[formation]),
+            filename=('demo_mocap_three_mini_leader_follower_'+formation+'.launch' if via_mode else filenames[formation])
+            return start(['roslaunch', str(root / 'launch/mocap' / filename),
                           'robot_name_1:=path_test_01', 'robot_name_2:=path_test_02',
                           'robot_name_3:=path_test_03', 'radius:=0.4',
-                          'start_driver:=false', 'start_vrpn:=false', 'use_rviz:=false'], formation)
+                          'start_driver:=false', 'start_vrpn:=false', 'use_rviz:=false']
+                         +(['mode:=auto','start_teleop:=true'] if via_mode else []),formation+('_auto_mode' if via_mode else ''))
 
         process = launch('single')
         pump(3)
@@ -147,15 +149,17 @@ def main():
         zeros()
         stop(process)
         # Each three-robot launch uses only synthetic frames/topics.
-        for formation in ('triangle', 'snake'):
+        for formation,via_mode in [('triangle',False),('snake',False),('triangle',True),('snake',True)]:
             states.clear()
             poses.update({1: (0, 0, 0), 2: (-0.5, 0.5 if formation == 'triangle' else 0, 0),
                           3: (-0.5, -0.5, 0) if formation == 'triangle' else (-1, 0, 0)})
-            process = launch(formation)
+            process = launch(formation,via_mode)
             pump(3)
             assert process.poll() is None, 'required ROS node exited; inspect logs in ' + str(folder)
             assert states[-1] == 'tracking', states
             assert commands[1][-1][1] > 0
+            head_publishers=dict(rosgraph.Master('/smoke').getSystemState()[0])['/path_test_01/cmd_vel']
+            assert head_publishers==['/abc_swarm_path'],head_publishers
             # Feedback loss stops every controller through the shared enable.
             pump(0.9, missing_odom=1 if formation == 'triangle' else 2)
             assert not rospy.get_param('/abc_swarm_demo/enabled')

@@ -71,6 +71,8 @@ python3 ai/generate_launch.py /tmp/customer-demo/experiment.json --output /tmp/c
 - `startup` 的四个字段均为真正的布尔值。start_driver/start_vrpn 为 true 表示本实验启动，为 false 表示复用现场已有后台。两者不表示运动开关；没有反馈不能 ready。use_rviz 控制界面，start_teleop 仅手动实验可为 true。自动实验禁止键盘并发控制。
 - 不提供手动 enabled 启动选项、无限圈数、任意文件/节点/命令扩展。业务需要新能力时走下述维护流程。
 
+三角/蛇形leader–follower的launch现在支持mode=manual/auto。AI仍用manual_triangle/manual_snake生成明确的mode=manual；自动领航继续使用已支持的path_triangle/path_snake及完整path字段，复用同一头车路径节点。没有新增JSON顶层mode字段，也没有改动原自动路径入口对圆形/圆角矩形的支持。
+
 ## 维护者如何扩展
 
 先完成设备/算法及公开 launch，再登记能力，不把未实现项写成 supported。新增设备须证明运动学、输入输出、参考点和停机行为；新增数量须验证编队拓扑、每车输出唯一、反馈链和统一停机。若不满足当前契约，应明确升级契约和迁移方式，保留既有客户输入。

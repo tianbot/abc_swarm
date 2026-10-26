@@ -47,33 +47,25 @@
     <arg name="rigid_body_3" value="$(arg rigid_body_3)"/>
     <arg name="formation" value="snake"/>
   </include>
-  <node pkg="abc_swarm" type="preset_path_tracker.py" name="abc_swarm_path" output="screen" required="true">
-    <rosparam command="load" file="$(find abc_swarm)/config/path_tracking.yaml"/>
-    <param name="front_distance" value="$(arg front_distance)"/>
-    <param name="shape" value="$(arg shape)"/>
-    <param name="radius" value="$(arg radius)"/>
-    <param name="width" value="$(arg width)"/>
-    <param name="height" value="$(arg height)"/>
-    <param name="speed" value="$(arg speed)"/>
-    <param name="laps" value="$(arg laps)"/>
-    <param name="clockwise" value="$(arg clockwise)"/>
-    <rosparam param="edges">[]</rosparam>
-    <rosparam param="follower_status_topics">[]</rosparam>
-    <param name="robot_frame" value="$(arg rigid_body_1)"/>
-    <param name="cmd_topic" value="/$(arg robot_name_1)/cmd_vel"/>
-  </node>
-  <group if="$(eval arg('formation') == 'triangle')">
-    <rosparam param="/abc_swarm_path/follower_status_topics" subst_value="true">[&quot;/$(arg robot_name_2)_leader_follower/status&quot;, &quot;/$(arg robot_name_3)_leader_follower/status&quot;]</rosparam>
-    <rosparam param="/abc_swarm_path/edges" subst_value="true">- {leader: &quot;$(arg rigid_body_1)&quot;, follower: &quot;$(arg rigid_body_2)&quot;, x: $(arg backward_spacing), y: $(arg spacing)}
-- {leader: &quot;$(arg rigid_body_1)&quot;, follower: &quot;$(arg rigid_body_3)&quot;, x: $(arg backward_spacing), y: $(arg backward_spacing)}
-</rosparam>
-  </group>
-  <group if="$(eval arg('formation') == 'snake')">
-    <rosparam param="/abc_swarm_path/follower_status_topics" subst_value="true">[&quot;/$(arg robot_name_2)_leader_follower/status&quot;, &quot;/$(arg robot_name_3)_leader_follower/status&quot;]</rosparam>
-    <rosparam param="/abc_swarm_path/edges" subst_value="true">- {leader: &quot;$(arg rigid_body_1)&quot;, follower: &quot;$(arg rigid_body_2)&quot;, x: $(arg backward_spacing), y: 0.0}
-- {leader: &quot;$(arg rigid_body_2)&quot;, follower: &quot;$(arg rigid_body_3)&quot;, x: $(arg backward_spacing), y: 0.0}
-</rosparam>
-  </group>
+  <include file="$(find abc_swarm)/launch/common/leader_path_tracker.launch.xml">
+    <arg name="formation" value="$(arg formation)"/>
+    <arg name="shape" value="$(arg shape)"/>
+    <arg name="radius" value="$(arg radius)"/>
+    <arg name="width" value="$(arg width)"/>
+    <arg name="height" value="$(arg height)"/>
+    <arg name="speed" value="$(arg speed)"/>
+    <arg name="laps" value="$(arg laps)"/>
+    <arg name="clockwise" value="$(arg clockwise)"/>
+    <arg name="spacing" value="$(arg spacing)"/>
+    <arg name="front_distance" value="$(arg front_distance)"/>
+    <arg name="backward_spacing" value="$(arg backward_spacing)"/>
+    <arg name="robot_name_1" value="$(arg robot_name_1)"/>
+    <arg name="rigid_body_1" value="$(arg rigid_body_1)"/>
+    <arg name="robot_name_2" value="$(arg robot_name_2)"/>
+    <arg name="rigid_body_2" value="$(arg rigid_body_2)"/>
+    <arg name="robot_name_3" value="$(arg robot_name_3)"/>
+    <arg name="rigid_body_3" value="$(arg rigid_body_3)"/>
+  </include>
   <include if="$(eval arg('start_driver') or arg('start_vrpn'))" file="$(find abc_swarm)/launch/common/mocap_backend.launch.xml">
     <arg name="site_config" value="$(arg site_config)"/>
     <arg name="vrpn_server_ip" value="$(arg vrpn_server_ip)"/>

@@ -29,7 +29,7 @@ source ~/tianbot_mini_ws/devel/setup.bash
 unset ROS_HOSTNAME
 export ROS_IP=192.168.2.106
 export ROS_MASTER_URI=http://localhost:11311
-export ABC_SWARM_FIELD_CONTROL="$(rospack find abc_swarm)/config/mocap_field_control.yaml"
+export ABC_SWARM_FIELD_CONTROL="$(rospack find abc_swarm)/config/mocap_field_control_20261026.yaml"
 ```
 
 后台没有启动时，在一个终端运行：
@@ -91,10 +91,12 @@ auto默认radius=1.0m（头车圆直径2m）、laps=1、clockwise=false，max_li
 公共准备中已选择现场配置，也可在算法终端单独设置：
 
 ```bash
-export ABC_SWARM_FIELD_CONTROL="$(rospack find abc_swarm)/config/mocap_field_control.yaml"
+export ABC_SWARM_FIELD_CONTROL="$(rospack find abc_swarm)/config/mocap_field_control_20261026.yaml"
 ```
 
-这个配置是**当日三台车的专用配置**，显式保存8cm最终位置容差、02平面航向补偿以及三车标记原点到差速控制中心的偏移。它不是新客户的通用默认值，未默认加载，也不会覆盖原始动捕 TF。更换标记架、重新建立刚体、修改刚体坐标或更换车辆后需重新核对；已在动捕软件修正坐标时，去掉相应补偿，避免重复校正。
+当前示例使用**2026-10-26现场配置**：保持4cm最终位置容差，仅对02加载原地转动拟合得到的前方3.351cm、左侧0.209cm位置偏移；01/03为恒等转换，不表示已重新标定。三个yaw_offset都为0，不引入新的航向修正。该拟合尚待实车加载后验证，不是通用设备参数；不会覆盖原始动捕TF。
+
+旧的config/mocap_field_control.yaml保留10月25日记录，包含02约115°航向补偿和8cm容差，不应直接用于当前刚体定义。更换标记架、重新建立刚体或修改原点后需重新核对；若已在动捕软件将原点对准轴心，必须清空相应位置补偿，避免重复校正。
 
 节点内部使用校正后的水平控制位姿进行目标定位、速度估计和控制；`/abc_swarm_demo/control_poses` 按机器人顺序发布这些位姿，RViz可添加 PoseArray 查看。原 `rigid_body_N` 仍指向原始动捕刚体，不要再启动昨天的临时 `_field_control` TF 适配进程。
 

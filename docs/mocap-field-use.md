@@ -1,6 +1,17 @@
-# 三台 Mini 动捕实验：现场使用
+# 三台 Mini 动捕实验：四项现场使用
 
-ROS1 Noetic；本页整理2026-10-25现场使用的两个独立实验。现在直接使用仓库 launch，不再依赖 `/tmp` 测试脚本或额外的临时 TF 进程。
+ROS1 Noetic；本页统一四个独立实验的准备、摆位、启动和停止。直接使用仓库 launch，不依赖 `/tmp` 测试脚本或额外的临时 TF 进程。
+
+| 项目 | 控制关系 | 操作方式 |
+| --- | --- | --- |
+| 三角形 leader–follower | 02、03分别跟随01 | 键盘遥控01 |
+| 蛇形 leader–follower | 01→02→03，逐车跟随前车 | 键盘遥控01 |
+| 三车同圆协调路径跟踪 | 同一个圆约120°间隔，同向绕行 | 自动入位后运行 |
+| 三车正三角形协调路径跟踪 | 每车从一个顶点沿直边去下一顶点，到齐再转向 | 自动入位后运行 |
+
+后两项使用 Pure Pursuit 几何路径控制和组间同步；点镇定与可选 ORCA 是它们的入位步骤。
+
+**当前坐标适配边界：**前两项仍使用原始动捕 TF 和底盘 odom，不能加载后两项的 control_config/velocity_source 参数。若仍使用现场曾发现02航向偏差的刚体设置，先在动捕软件中校准刚体 +X 朝车头、原点对应差速控制中心，再运行跟随。后两项的现场配置含02旧航向和三车原点补偿；动捕中已完成修正后，须将现场 YAML 的 `mocap_calibration` 改为 `{}`，或逐项更新为新的标定值，避免重复校正。
 
 ## 准备一次后台
 
@@ -13,6 +24,7 @@ source /opt/ros/noetic/setup.bash
 source ~/tianbot_mini_ws/devel/setup.bash
 unset ROS_HOSTNAME
 export ROS_IP=192.168.2.106
+export ROS_MASTER_URI=http://localhost:11311
 ```
 
 后台没有启动时，在一个终端运行：
@@ -22,6 +34,28 @@ roslaunch "$(rospack find abc_swarm)/launch/common/mocap_backend.launch.xml" vrp
 ```
 
 默认机器人与刚体对应 `tianbot_mini_01/02/03`，动捕 server 为 `.101:3883`。底盘 rmip `.106` 与动捕 server `.101` 用途不同。退出旧运动算法，每次只运行一个实验。
+
+## 1. 三角形 leader–follower
+
+三车同向，以01车头为前方：02放在01后方0.5m、左侧0.5m；03放在后方0.5m、右侧0.5m。spacing表示纵/横偏移，不是等边三角形边长。先接近这个队形摆好，反馈有效后后车会自动调整。
+
+```bash
+roslaunch abc_swarm demo_mocap_three_mini_leader_follower_triangle.launch spacing:=0.5 max_linear:=0.15 start_driver:=false start_vrpn:=false
+```
+
+默认弹出键盘终端，在里面操作01。02、03都直接跟随01，不依次跟随。先走缓慢直线，再做缓弯。
+
+## 2. 蛇形 leader–follower
+
+三车同向排成一列：02在01后方0.5m，03在02后方0.5m（距01约1m）。
+
+```bash
+roslaunch abc_swarm demo_mocap_three_mini_leader_follower_snake.launch spacing:=0.5 max_linear:=0.15 start_driver:=false start_vrpn:=false
+```
+
+键盘遥控01，02跟01、03跟02。键盘操作：i前进，u/o左右缓弯，k停止头车请求；松开后请求超时也会停止。k之后后车仍可能收敛，整组结束必须在启动demo的roslaunch终端Ctrl+C。
+
+两项跟随都没有指定圈数，不自动结束；它们保持原来的底盘odom反馈要求，当前运行管理默认0.5秒反馈窗口。后两项新增的动捕速度模式没有自动应用到跟随节点。
 
 ## 本次现场配置
 
@@ -35,7 +69,7 @@ export ABC_SWARM_FIELD_CONTROL="$(rospack find abc_swarm)/config/mocap_field_con
 
 节点内部使用校正后的水平控制位姿进行目标定位、速度估计和控制；`/abc_swarm_demo/control_poses` 按机器人顺序发布这些位姿，RViz可添加 PoseArray 查看。原 `rigid_body_N` 仍指向原始动捕刚体，不要再启动昨天的临时 `_field_control` TF 适配进程。
 
-## 三车同圆，一圈
+## 3. 三车同圆协调路径跟踪，一圈
 
 直径1.5m，圆心固定在 world `(0.5,0.5)`，第一起点 `(0.5,-0.25)`，逆时针：
 
@@ -43,7 +77,7 @@ export ABC_SWARM_FIELD_CONTROL="$(rospack find abc_swarm)/config/mocap_field_con
 roslaunch abc_swarm demo_mocap_three_mini_circle_tracking.launch diameter:=1.5 speed:=0.15 laps:=1 reference:=world origin_x:=0.5 origin_y:=-0.25 origin_yaw:=0.0 control_config:="$ABC_SWARM_FIELD_CONTROL" velocity_source:=mocap avoidance:=orca start_driver:=false start_vrpn:=false
 ```
 
-## 三车正三角形，一圈
+## 4. 三车正三角形协调路径跟踪，一圈
 
 边长1.5m，三个顶点约为 `(-0.25,-0.25)`、`(1.25,-0.25)`、`(0.5,1.049)`：
 
@@ -61,7 +95,7 @@ roslaunch abc_swarm demo_mocap_three_mini_triangle_tracking.launch side_length:=
 rostopic echo /abc_swarm_demo/status
 ```
 
-`stage` 顺序为 assembling → tracking_circle/ tracking_edge → turning/finishing → completed。状态中应看到 `velocity_source: mocap`、`mocap_calibrated: true`。mocap 速度模式使用约0.2秒控制中心位姿窗口估计实测速度，不等待底盘 odom；odom 仍可单独用于驱动诊断。动捕过期仍全组输出零，恢复后继续冻结的任务。接收不到速度指令的车辆本身仍需要有效的驱动连接，动捕速度模式不会替代这一连接。
+前两项看到 mode=manual、state=running，键盘请求才会传给01；waiting时查看reason。后两项的stage顺序为 assembling → tracking_circle/ tracking_edge → turning/finishing → completed；按现场命令运行会看到velocity_source=mocap，mocap_calibrated表示是否显式启用了补偿，校准后清空补偿则为false。mocap速度模式使用约0.2秒控制中心位姿窗口估计实测速度，不等待底盘odom；odom仍可单独用于驱动诊断。动捕过期仍全组输出零，恢复后继续冻结的任务。车辆本身仍需连接底盘驱动接收命令。
 
 完成后持续停车。在实验终端 Ctrl+C 退出，确认三车静止；后台保留。下一轮重新启动同一命令。出现 fault 先检查 reason，再退出/摆位/重启。不要同时运行旧测试脚本、另一套轨迹或直接发布 cmd_vel 的遥控。
 

@@ -6,7 +6,7 @@
 
 当前用户指南：
 
-- **[三台 Mini 现场使用：正式 launch 与当日标定配置](mocap-field-use.md)**
+- **[三台 Mini 四项现场实验：跟随、圆形、三角路径与标定](mocap-field-use.md)**
 
 - [三车动捕同圆绕行与正三角形逐边运动](coordinated-tracking.md)
 

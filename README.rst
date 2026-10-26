@@ -46,7 +46,7 @@ ABC Swarm is the developer manual for ROS2GO, Tianbot Mini and RoboMaster TT ROS
 地址和端口只需在 ``config/mocap.yaml`` 配置，也可通过启动参数覆盖。
 停止实验在 roslaunch 终端按 Ctrl+C；具体摆位和路径范围先看文档。
 
-* `三台 Mini 现场使用：圆形/三角形与标定配置 <docs/mocap-field-use.md>`_
+* `三台 Mini 四项动捕现场实验与标定配置 <docs/mocap-field-use.md>`_
 * `现场测试清单 <docs/field-test.md>`_
 * `动捕实验说明 <docs/mocap-demos.md>`_
 * `统一启动和 GUI 接口 <docs/demo-runtime.md>`_

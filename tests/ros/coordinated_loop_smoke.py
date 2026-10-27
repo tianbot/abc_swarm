@@ -117,6 +117,10 @@ def main():
                 control['mocap_calibration']={'loops_test_%02d'%i:{'yaw_offset':.6,'marker_offset':[.03,.01]} for i in rows}
                 profile=folder/'calibrated_control.yaml';profile.write_text(yaml.safe_dump(control))
                 args+=['avoidance:=orca','velocity_source:=mocap','control_config:='+str(profile)]
+            else:
+                # These cases inject odometry loss; select that source explicitly.
+                # The final calibrated case covers the mocap-only default.
+                args+=['velocity_source:=odom']
             process=start(args,shape+'_'+str(size))
             deadline=time.monotonic()+10
             while time.monotonic()<deadline:
@@ -163,6 +167,10 @@ def main():
             for rr in rows.values():assert rr[-1][1:]==(0,0)
         print('PASS: mocap coordinated circles/triangles, assembly barriers, slow-robot coordination, vertex turns, frozen geometry, TF/odom stop/recovery, completion and shutdown')
         print('Logs: '+str(folder))
+    except Exception:
+        for log in folder.glob('*.log'):
+            print('\n--- '+log.name+' ---\n'+'\n'.join(log.read_text(errors='replace').splitlines()[-100:]),flush=True)
+        raise
     finally:
         for p in reversed(processes):stop(p)
         for stream in streams:stream.close()

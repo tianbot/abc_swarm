@@ -69,6 +69,12 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      - name: Verify frozen Git baseline in Noetic container
+        run: |
+          # Container tests run Git separately from checkout's temporary HOME.
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git -C "$GITHUB_WORKSPACE" cat-file -e 1708f332ae900384b9e84889b7ab3979aaae9f5f^{commit}
+          git -C "$GITHUB_WORKSPACE" ls-tree 1708f332ae900384b9e84889b7ab3979aaae9f5f -- nodes launch
       - name: Build test and install in Noetic
         run: |
           source /opt/ros/noetic/setup.bash

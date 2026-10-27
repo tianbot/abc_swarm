@@ -105,7 +105,7 @@ def main():
                           'robot_name_1:=path_test_01', 'robot_name_2:=path_test_02',
                           'robot_name_3:=path_test_03', 'radius:=0.4',
                           'start_driver:=false', 'start_vrpn:=false', 'use_rviz:=false']
-                         +(['mode:=auto','startup:=false','start_teleop:=true'] if via_mode else []),formation+('_auto_mode' if via_mode else ''))
+                         +(['mode:=auto','startup:=false','start_teleop:=false','velocity_source:=odom'] if via_mode else []),formation+('_auto_mode' if via_mode else ''))
 
         process = launch('single')
         pump(3)
@@ -151,23 +151,31 @@ def main():
         # Each three-robot launch uses only synthetic frames/topics.
         for formation,via_mode in [('triangle',False),('snake',False),('triangle',True),('snake',True)]:
             states.clear()
+            runtime_states.clear()
             poses.update({1: (0, 0, 0), 2: (-0.5, 0.5 if formation == 'triangle' else 0, 0),
                           3: (-0.5, -0.5, 0) if formation == 'triangle' else (-1, 0, 0)})
             process = launch(formation,via_mode)
             pump(3)
             assert process.poll() is None, 'required ROS node exited; inspect logs in ' + str(folder)
-            assert states[-1] == 'tracking', states
+            if via_mode:
+                assert runtime_states[-1]['stage'] == 'following', runtime_states[-1]
+                assert runtime_states[-1]['state'] == 'running', runtime_states[-1]
+            else:
+                assert states[-1] == 'tracking', states
             assert commands[1][-1][1] > 0
             head_publishers=dict(rosgraph.Master('/smoke').getSystemState()[0])['/path_test_01/cmd_vel']
-            assert head_publishers==['/abc_swarm_path'],head_publishers
+            assert head_publishers==['/abc_swarm_demo' if via_mode else '/abc_swarm_path'],head_publishers
             # Feedback loss stops every controller through the shared enable.
             pump(0.9, missing_odom=1 if formation == 'triangle' else 2)
             assert not rospy.get_param('/abc_swarm_demo/enabled')
-            pump(0.2)
+            pump(0.2, missing_odom=1 if formation == 'triangle' else 2)
             for i in commands:
                 zeros(i)
             # Reset and drive synthetic geometry through the completion state.
-            assert reset().success
+            if via_mode:
+                assert runtime_states[-1]['state'] == 'waiting', runtime_states[-1]
+            else:
+                assert reset().success
             pump(0.4)
             reference = preset_path(radius=0.4)
             for j, point in enumerate(reference):
@@ -179,10 +187,16 @@ def main():
                     poses[follower] = (x + math.cos(heading) * ox - math.sin(heading) * oy,
                                        y + math.sin(heading) * ox + math.cos(heading) * oy, heading)
                 pump(0.06)
-                if states[-1] == 'completed':
+                if (runtime_states[-1]['state'] if via_mode else states[-1]) == 'completed':
                     break
             pump(0.3)
-            assert states[-1] == 'completed', states
+            if via_mode:
+                # Unified missions finish with pose stabilization at published goals.
+                assert runtime_states[-1]['stage'] == 'settling', runtime_states[-1]
+                for i, robot in enumerate(runtime_states[-1]['robots'], 1):
+                    poses[i] = tuple(robot['goal'])
+                pump(1.0)
+            assert (runtime_states[-1]['state'] if via_mode else states[-1]) == 'completed', runtime_states[-1] if via_mode else states
             assert not rospy.get_param('/abc_swarm_demo/enabled')
             for i in commands:
                 zeros(i)
@@ -195,7 +209,8 @@ def main():
                              ('demo_mocap_three_mini_leader_follower_' + formation + '.launch')),
                              'robot_name_1:=path_test_01', 'robot_name_2:=path_test_02',
                              'robot_name_3:=path_test_03', 'start_driver:=false',
-                             'start_vrpn:=false', 'startup:=false', 'start_teleop:=false', 'use_rviz:=false'], 'manual_' + formation)
+                             'start_vrpn:=false', 'startup:=false', 'velocity_source:=odom',
+                             'start_teleop:=false', 'use_rviz:=false'], 'manual_' + formation)
             pump(3)
             assert process.poll() is None, 'required ROS node exited; inspect logs in ' + str(folder)
             assert runtime_states[-1]['state'] == 'running', runtime_states[-1]
@@ -207,7 +222,7 @@ def main():
             for i in range(8):
                 raw.publish(msg)
                 pump(0.05, odom_ahead=0.05)
-            assert abs(commands[1][-1][1] - 0.15) < 1e-6, commands[1][-1]
+            assert commands[1][-1][1:] == (msg.linear.x, msg.angular.z), commands[1][-1]
             assert runtime_states[-1]['state'] == 'running', runtime_states[-1]
             pump(0.6)
             zeros()  # Expired input stops the head.
@@ -247,6 +262,10 @@ def main():
         stop(process)
         print('PASS: private ROS automatic startup, stale-feedback stop, path reset/completion, manual recovery, clock-jitter tolerance and PID comparison; no arming service')
         print('Logs: ' + str(folder))
+    except Exception:
+        for log in folder.glob('*.log'):
+            print('\n--- '+log.name+' ---\n'+'\n'.join(log.read_text(errors='replace').splitlines()[-100:]), flush=True)
+        raise
     finally:
         for process in reversed(processes):
             stop(process)

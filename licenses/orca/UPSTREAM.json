@@ -1,0 +1,9 @@
+{
+  "source": "https://github.com/snape/RVO2",
+  "commit": "75822bba14462c2e872ca96423825017ecd24764",
+  "reference_file": "src/Agent.cc",
+  "reference_sha256": "3febd8325b485bf866e7567f49767ada74eec7041c6973436dc21d43f16e8548",
+  "license": "Apache-2.0",
+  "implementation": "Pair half-plane construction translated to Python in src/abc_swarm/orca.py; local exact 2-D projection, body constraints, envelope, deterministic bias and fail-closed handling. No C++ library or static-obstacle code is bundled.",
+  "paper": "https://gamma-web.iacs.umd.edu/ORCA-DD/ORCA-DD.pdf"
+}

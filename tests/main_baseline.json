@@ -1,0 +1,235 @@
+{
+  "base_commit": "1708f332ae900384b9e84889b7ab3979aaae9f5f",
+  "previous_work_commit": "ef58eeb",
+  "renames": {
+    "launch/demo/demo_mc_tf_tt_circle_mini.launch": "launch/mocap/demo_mocap_tf_tt_circle_mini.launch",
+    "launch/demo/demo_mc_tf_tt_follow_mini.launch": "launch/mocap/demo_mocap_tf_tt_follow_mini.launch"
+  },
+  "allowed_original_content_fixes": {},
+  "originals": {
+    "config/tf_pid.cfg": {
+      "sha256": "499e50d5b6c14bf2123074a6c2a8363717e10923309c52e9050b4c2d18728be7",
+      "current_path": "config/tf_pid.cfg"
+    },
+    "docs/.readthedocs.yaml": {
+      "sha256": "6d73562f41e444bb776571b29ae38b298dbd87ba3873e725352a80a985874b5c",
+      "current_path": "docs/.readthedocs.yaml"
+    },
+    "docs/Makefile": {
+      "sha256": "e33bf74d59130029ba24168a813112dd923d7044d780ce942db6645d93f56acf",
+      "current_path": "docs/Makefile"
+    },
+    "docs/image/001MobileRobotKinematicsModel.png": {
+      "sha256": "5ede88ff7411643646aebae4f2dd05520ff78e8e684f89fcad0e3a2d5897a747",
+      "current_path": "docs/image/001MobileRobotKinematicsModel.png"
+    },
+    "docs/image/002LeaderFollowerFormation.png": {
+      "sha256": "7ac2ca1e15ee16d4706a4a63e6cc639c50567e60d4c9379e217a906dfb1ba948",
+      "current_path": "docs/image/002LeaderFollowerFormation.png"
+    },
+    "docs/make.bat": {
+      "sha256": "e7302d938728984369c2a45c22e67016c7472a1d46ebd4fee145261aa4bb7e9d",
+      "current_path": "docs/make.bat"
+    },
+    "docs/source/algorithm.rst": {
+      "sha256": "bd0b678a1ae0a4f531d21664869691f692ae22ebced2144999cdec49b4751dc5",
+      "current_path": "docs/source/algorithm.rst"
+    },
+    "docs/source/conf.py": {
+      "sha256": "125d07f60117b1caf01544f9ad15d14c57a6a894e3a403eda77850ff66632a68",
+      "current_path": "docs/source/conf.py"
+    },
+    "docs/source/index.rst": {
+      "sha256": "f5bc70a2a91042da84c16294246c52225603bb8c683636540e86e2ecf032d520",
+      "current_path": "docs/source/index.rst"
+    },
+    "docs/source/intro.rst": {
+      "sha256": "0d5d197e92dbbcdad75ba9beffefb5f84b7ec027d03efa4cfc336a0c4e4b8389",
+      "current_path": "docs/source/intro.rst"
+    },
+    "docs/source/rmtt.rst": {
+      "sha256": "353b4f170e88f56e5668d6dbe2e0ca63b4b97c7577a3a8ae4aff32fa9ac53d06",
+      "current_path": "docs/source/rmtt.rst"
+    },
+    "docs/source/ros2go.rst": {
+      "sha256": "01b13cd1d02b50cc31a5d35ea2aed0344fb6e7343409850e7072732ffb73eea3",
+      "current_path": "docs/source/ros2go.rst"
+    },
+    "docs/source/simulation.rst": {
+      "sha256": "c1f4a1852752f0068c03a1a784d765c0fb9c9d2c765ebf03b7e03282e142c3de",
+      "current_path": "docs/source/simulation.rst"
+    },
+    "docs/source/tbmn.rst": {
+      "sha256": "bb358c28c95a9c0b4c477a09aada67f86a9ef8b64ecf99135794d2cd66f77a9d",
+      "current_path": "docs/source/tbmn.rst"
+    },
+    "launch/add_drone.launch": {
+      "sha256": "eb3c9b73bfa8eaa6b590174fec8b84e8c43defbd33f3d397b0f74c94b63dd82d",
+      "current_path": "launch/add_drone.launch"
+    },
+    "launch/add_robot.launch": {
+      "sha256": "87b1c3345ccb1f36b847c5d2e75867d527b010cc53c4e3702bf4ecde4a0c2b7d",
+      "current_path": "launch/add_robot.launch"
+    },
+    "launch/demo/demo_formation_leader_follower_path_tracking.launch": {
+      "sha256": "2d2f51a34775d0180130be03bc34d5367dd23e6356b7de72554f8a9fd2f39e69",
+      "current_path": "launch/demo/demo_formation_leader_follower_path_tracking.launch"
+    },
+    "launch/demo/demo_formation_two_robots.launch": {
+      "sha256": "7e16f46c27366e15b2334442b325a1abd56d5295ad9dc72ae09dfd7e3749d465",
+      "current_path": "launch/demo/demo_formation_two_robots.launch"
+    },
+    "launch/demo/demo_mc_tf_tt_circle_mini.launch": {
+      "sha256": "5b366fb2c195dc0f43d9827e27e12af1154d86d0e044d8b2992772b8d1ad172a",
+      "current_path": "launch/mocap/demo_mocap_tf_tt_circle_mini.launch"
+    },
+    "launch/demo/demo_mc_tf_tt_follow_mini.launch": {
+      "sha256": "456e7872123cc7d646170736daf136536a94a7a3047dc2140e6f112c16c36b72",
+      "current_path": "launch/mocap/demo_mocap_tf_tt_follow_mini.launch"
+    },
+    "launch/demo/demo_sim_formation.launch": {
+      "sha256": "0d08022dee6d536afa9e3745d408a7d29011587ded29e3030e852687fe373558",
+      "current_path": "launch/demo/demo_sim_formation.launch"
+    },
+    "launch/demo/demo_sim_leader_follower.launch": {
+      "sha256": "83aa26f0624e84c19ce593f0bf7a5852925047b1a8807746401bd22b0faedef4",
+      "current_path": "launch/demo/demo_sim_leader_follower.launch"
+    },
+    "launch/demo/demo_sim_tf.launch": {
+      "sha256": "6448aa7e38faeba14ea91e89f691a9a1f63247fcdd9afbb95c1ab6abff61eb1e",
+      "current_path": "launch/demo/demo_sim_tf.launch"
+    },
+    "launch/demo/demo_sim_two_robots_navigation.launch": {
+      "sha256": "89c979b4d6c928935eb38c7a0528175c6e40a84b0a3715a6df0b44ffc471309d",
+      "current_path": "launch/demo/demo_sim_two_robots_navigation.launch"
+    },
+    "launch/demo/demo_tf_drone.launch": {
+      "sha256": "aecac0adca69cee92c90df3e73d9cc82017a67d52dd47a7cad4ce1d302243c58",
+      "current_path": "launch/demo/demo_tf_drone.launch"
+    },
+    "launch/demo/demo_tf_robot.launch": {
+      "sha256": "073c68477efde86c35d6963ddfeaf41cdc05f482d00c2ed548e77d8a6dfff418",
+      "current_path": "launch/demo/demo_tf_robot.launch"
+    },
+    "launch/demo/demo_two_drones.launch": {
+      "sha256": "3d0944c97a219055151b8dce40577e566709ee3f79bef5da89f201f10b96db71",
+      "current_path": "launch/demo/demo_two_drones.launch"
+    },
+    "launch/demo/demo_two_robots.launch": {
+      "sha256": "cf06e3f0e7f944eb13da14c41974bee52b9e7f6a4f92a95c32b515712468db24",
+      "current_path": "launch/demo/demo_two_robots.launch"
+    },
+    "launch/demo/demo_two_robots_slam.launch": {
+      "sha256": "f9244ba31bc12a3101b8a58ce4b02b23fe85803576bd8a699b605a647da504d3",
+      "current_path": "launch/demo/demo_two_robots_slam.launch"
+    },
+    "launch/drone_follower.launch": {
+      "sha256": "7246a85d85d75adf1e59a76effbb4513daa0824fd9ffd62e2c1b7ed4daf6be9e",
+      "current_path": "launch/drone_follower.launch"
+    },
+    "launch/includes/add_robot.launch.xml": {
+      "sha256": "bdf513d7d8240f9beb8830456f49aa15ccede7e56c20e50c91b686a77e94145b",
+      "current_path": "launch/includes/add_robot.launch.xml"
+    },
+    "launch/includes/two_robots.launch.xml": {
+      "sha256": "5afe495ff64a5cd30aa34f53eec239d34b794f9334320ee6e026fe953cbebdc4",
+      "current_path": "launch/includes/two_robots.launch.xml"
+    },
+    "launch/map_merge.launch": {
+      "sha256": "72e90366facf6c92d8ad8018e52f84151d5e561b7156cd4397c26fab8cefc7f9",
+      "current_path": "launch/map_merge.launch"
+    },
+    "launch/path_tracking.launch": {
+      "sha256": "2f774f4e2fd58a679185c2fbc5351abbc045ffda3ae64d96fc8069d68868e55c",
+      "current_path": "launch/path_tracking.launch"
+    },
+    "launch/robot_follower.launch": {
+      "sha256": "d4ec88f0b43134eb44d5910732b2c38c0cd5902dd3ba517f5de4c2b56122d78e",
+      "current_path": "launch/robot_follower.launch"
+    },
+    "launch/spawn_robot.launch": {
+      "sha256": "198d322a9f95a16774f70d1cc9ea59245bb9da2d24c2d4a96612aeecf0a9cf05",
+      "current_path": "launch/spawn_robot.launch"
+    },
+    "nodes/leader_follower.py": {
+      "sha256": "379ded6154d82f7e16a93c1df1d9737fa3bd2f842fef4e106a6cfbe7af55ceaa",
+      "current_path": "nodes/leader_follower.py"
+    },
+    "nodes/path_planning.py": {
+      "sha256": "41060a3d04e87cefa18da19da81fbd48c09dc8e8ea67ced332f9bf50af74ad92",
+      "current_path": "nodes/path_planning.py"
+    },
+    "nodes/path_tracking.py": {
+      "sha256": "a27d49a7aade99ad39a8b742ea46c37b107e7f4e73c91c11a439d407e24a3964",
+      "current_path": "nodes/path_tracking.py"
+    },
+    "nodes/rmtt_tf.py": {
+      "sha256": "671777749ce85ac303afcba309d92ff58eeb6e121b8a7d560aa779ea6d0291fa",
+      "current_path": "nodes/rmtt_tf.py"
+    },
+    "nodes/tianbot_mini_scan_ip.py": {
+      "sha256": "e7f20c0a4fd97e18ba3b925b4be3e9efa3101a764a011268382c15e4985fe8b2",
+      "current_path": "nodes/tianbot_mini_scan_ip.py"
+    },
+    "nodes/tianbot_mini_tf.py": {
+      "sha256": "2643a1f891200526de582f2a9c08be3a097e5730e7b4cbbad498b188ae5b3587",
+      "current_path": "nodes/tianbot_mini_tf.py"
+    },
+    "nodes/two_robots_nav_goals.py": {
+      "sha256": "6c818f683ace2aa309a456d64cfd568c0fd79d38aaadea51041985c95dc8ed92",
+      "current_path": "nodes/two_robots_nav_goals.py"
+    },
+    "nodes/virtual_leader.py": {
+      "sha256": "b29557bc51932c49677308fb02aec33d930cc69d160e10b26c8b0704f1e23857",
+      "current_path": "nodes/virtual_leader.py"
+    },
+    "nodes/virtual_targets.py": {
+      "sha256": "18d754ae30d68d83e801bc5e652f9c0ed57256e8646d83f03496055a1ea02d62",
+      "current_path": "nodes/virtual_targets.py"
+    },
+    "rviz/demo_formation.rviz": {
+      "sha256": "5ab17b2de569d8c92a3d93dfd2976bc282cd27d7b24151233e8a5f9d0f33d458",
+      "current_path": "rviz/demo_formation.rviz"
+    },
+    "rviz/demo_tf.rviz": {
+      "sha256": "8d2a9a1881360e424f11ab5f12300461ffcc830953777fed885363a96558b613",
+      "current_path": "rviz/demo_tf.rviz"
+    },
+    "rviz/demo_two_robots_navigation.rviz": {
+      "sha256": "50487bd87d55982ab0edfe2412cf6c0782662beed38aeff8ccd424ff77c1bbb7",
+      "current_path": "rviz/demo_two_robots_navigation.rviz"
+    }
+  },
+  "selected_files": {
+    "nodes/pid_tracker.py": "nodes/pid_tracker.py",
+    "src/target_tracker/leader_follower_tracker.py": "nodes/leader_follower_tracker.py",
+    "src/abc_swarm/ros/preset_path.py": "nodes/preset_path_tracker.py",
+    "src/abc_swarm/ros/demo_runtime.py": "nodes/demo_runtime.py",
+    "src/abc_swarm/controllers/leader_follower.py": "src/abc_swarm/leader_follower_control.py",
+    "src/abc_swarm/algorithms/paths.py": "src/abc_swarm/preset_paths.py",
+    "src/abc_swarm/algorithms/pure_pursuit.py": "src/abc_swarm/pure_pursuit.py",
+    "src/abc_swarm/simulation/planar.py": "tests/_kinematics.py",
+    "config/sites/default_mocap.yaml": "config/mocap.yaml",
+    "config/experiments/path_following.yaml": "config/path_tracking.yaml",
+    "launch/includes/mocap_backend.launch.xml": "launch/common/mocap_backend.launch.xml",
+    "launch/leader_follower_tracker.launch": "launch/common/leader_follower_tracker.launch.xml",
+    "launch/includes/three_mini_leader_follower.launch.xml": "launch/common/three_mini_leader_follower.launch.xml",
+    "launch/includes/path_following_experiment.launch.xml": "launch/common/path_tracking_experiment.launch.xml",
+    "launch/mocap/mocap_backend.launch": "launch/mocap/mocap_backend.launch",
+    "launch/mocap/leader_follower/demo_real_three_mini_leader_follower_triangle.launch": "launch/mocap/demo_mocap_three_mini_leader_follower_triangle.launch",
+    "launch/mocap/leader_follower/demo_real_three_mini_leader_follower_snake.launch": "launch/mocap/demo_mocap_three_mini_leader_follower_snake.launch",
+    "launch/mocap/pid_following/demo_real_three_mini_vrpn.launch": "launch/mocap/demo_mocap_three_mini_pid_tracking.launch",
+    "launch/mocap/path_following/mocap_single.launch": "launch/mocap/demo_mocap_path_tracking.launch",
+    "launch/mocap/path_following/mocap_triangle.launch": "launch/mocap/demo_mocap_formation_leader_follower_path_tracking.launch",
+    "launch/mocap/path_following/mocap_snake.launch": "launch/mocap/demo_mocap_snake_leader_follower_path_tracking.launch",
+    "rviz/path_following.rviz": "rviz/path_following.rviz",
+    "tests/test_preset_path.py": "tests/test_preset_path.py",
+    "tests/test_demo_entrypoints.py": "tests/test_demo_entrypoints.py",
+    "tests/ros/preset_path_smoke.py": "tests/ros/preset_path_smoke.py",
+    "docs/demo-runtime.md": "docs/demo-runtime.md",
+    "docs/ROS机器人集群仿真与实践.pptx": "docs/ROS机器人集群仿真与实践.pptx",
+    "dependencies.repos": "dependencies.repos",
+    "dependencies-rmtt.repos": "dependencies-rmtt.repos",
+    "requirements.txt": "requirements.txt"
+  }
+}

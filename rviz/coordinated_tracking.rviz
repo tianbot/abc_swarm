@@ -1,0 +1,48 @@
+Panels:
+  - Class: rviz/Displays
+    Name: Displays
+Visualization Manager:
+  Class: ""
+  Global Options:
+    Fixed Frame: world
+    Background Color: 48; 48; 48
+  Displays:
+    - Class: rviz/Grid
+      Name: Grid
+      Enabled: true
+      Cell Size: 0.5
+      Plane Cell Count: 20
+    - Class: rviz/TF
+      Name: Motion capture poses
+      Enabled: true
+      Show Names: true
+    - Class: rviz/Path
+      Name: Robot 01 path
+      Enabled: true
+      Topic: /abc_swarm_demo/paths/tianbot_mini_01
+      Color: 255; 80; 80
+    - Class: rviz/Path
+      Name: Robot 02 path
+      Enabled: true
+      Topic: /abc_swarm_demo/paths/tianbot_mini_02
+      Color: 80; 255; 80
+    - Class: rviz/Path
+      Name: Robot 03 path
+      Enabled: true
+      Topic: /abc_swarm_demo/paths/tianbot_mini_03
+      Color: 80; 180; 255
+    - Class: rviz/PoseArray
+      Name: Current stage goals
+      Enabled: true
+      Topic: /abc_swarm_demo/goals
+    - Class: rviz/PoseArray
+      Name: Calibrated control centers
+      Enabled: true
+      Topic: /abc_swarm_demo/control_poses
+  Views:
+    Current:
+      Class: rviz/TopDownOrtho
+      Name: Top view
+      Scale: 150
+      X: 0
+      Y: 1

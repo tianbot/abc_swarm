@@ -1,0 +1,23 @@
+# Explicit current-field profile; load with control_config, never applied globally.
+# Mini 02 offset fitted from zero-linear-command rotation on 2026-10-26:
+# marker radius 0.03358 m; XY residual RMS 0.00066 m over ~72 deg.
+# This estimates the planar rotation center, not the vehicle forward yaw offset.
+# 01/03 remain identity transforms, NOT newly calibrated axle poses.
+max_linear: 0.15
+max_angular: 0.5
+position_tolerance: 0.04
+position_hysteresis: 0.01  # 精定位进入位置容差内1cm后再转最终朝向
+yaw_tolerance: 0.08
+k_distance: 0.9
+k_heading: 2.0
+align_angle: 0.7853981633974483  # rad; larger heading error turns in place
+mocap_calibration:
+  tianbot_mini_01:
+    yaw_offset: 0.0
+    marker_offset: [0.0, 0.0]
+  tianbot_mini_02:
+    yaw_offset: 0.0
+    marker_offset: [0.033511768984840616, 0.0020928827817474627]
+  tianbot_mini_03:
+    yaw_offset: 0.0
+    marker_offset: [0.0, 0.0]

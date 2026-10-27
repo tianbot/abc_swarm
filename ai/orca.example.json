@@ -1,0 +1,78 @@
+{
+  "contract_version": 3,
+  "name": "three_mini_orca",
+  "localization": "mocap_vrpn",
+  "fixed_frame": "world",
+  "vrpn": {
+    "server": "192.168.2.101",
+    "port": 3883
+  },
+  "robots": [
+    {
+      "name": "tianbot_mini_01",
+      "model": "tianbot_mini",
+      "rigid_body": "tianbot_mini_01",
+      "initial_pose": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "tianbot_mini_02",
+      "model": "tianbot_mini",
+      "rigid_body": "tianbot_mini_02",
+      "initial_pose": [
+        -0.5,
+        0.5,
+        0.0
+      ]
+    },
+    {
+      "name": "tianbot_mini_03",
+      "model": "tianbot_mini",
+      "rigid_body": "tianbot_mini_03",
+      "initial_pose": [
+        -0.5,
+        -0.5,
+        0.0
+      ]
+    }
+  ],
+  "experiment": "point_stabilization_orca",
+  "path": null,
+  "startup": {
+    "start_driver": true,
+    "start_vrpn": true,
+    "use_rviz": true,
+    "start_teleop": false
+  },
+  "targets": {
+    "reference": "initial_leader",
+    "poses": [
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        -0.5,
+        0.5,
+        0
+      ],
+      [
+        -0.5,
+        -0.5,
+        0
+      ]
+    ]
+  },
+  "orca": {
+    "robot_radius": 0.075,
+    "safety_margin": 0.01,
+    "front_distance": 0.04,
+    "time_horizon": 3.0,
+    "right_bias": 0.01,
+    "velocity_buffer": 0.002
+  }
+}

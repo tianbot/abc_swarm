@@ -14,6 +14,10 @@
   <!-- Commonly used license strings: -->
   <!--   BSD, MIT, Boost Software License, GPLv2, GPLv3, LGPLv2.1, LGPLv3 -->
   <license>BSD</license>
+  <!-- Bundled simple-pid; see src/simple_pid/LICENSE.md. -->
+  <license>MIT</license>
+  <!-- ORCA pair constraints adapted from RVO2; licenses/orca. -->
+  <license>Apache-2.0</license>
 
 
   <!-- Url tags are optional, but multiple are allowed, one per tag -->
@@ -59,6 +63,36 @@
   <exec_depend>rospy</exec_depend>
   <exec_depend>std_msgs</exec_depend>
 
+
+
+  <depend>dynamic_reconfigure</depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>nav_msgs</exec_depend>
+  <exec_depend>std_srvs</exec_depend>
+  <exec_depend>tf</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+  <exec_depend>roslaunch</exec_depend>
+  <exec_depend>rosserial_server</exec_depend>
+  <exec_depend>vrpn_client_ros</exec_depend>
+  <exec_depend>rviz</exec_depend>
+  <exec_depend>teleop_twist_keyboard</exec_depend>
+  <exec_depend>xterm</exec_depend>
+  <exec_depend>xacro</exec_depend>
+  <exec_depend>gazebo_ros</exec_depend>
+  <exec_depend>joint_state_publisher</exec_depend>
+  <exec_depend>robot_state_publisher</exec_depend>
+  <exec_depend>python3-numpy</exec_depend>
+  <exec_depend>python3-scipy</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
+  <exec_depend>actionlib</exec_depend>
+  <exec_depend>move_base_msgs</exec_depend>
+  <exec_depend>move_base</exec_depend>
+  <exec_depend>amcl</exec_depend>
+  <exec_depend>map_server</exec_depend>
+  <exec_depend>multirobot_map_merge</exec_depend>
+  <test_depend>python3-nose</test_depend>
+  <test_depend>python3-rospkg</test_depend>
+  <test_depend>rosgraph_msgs</test_depend>
 
   <!-- The export tag contains other, unspecified, tags -->
   <export>

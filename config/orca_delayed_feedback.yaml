@@ -1,0 +1,9 @@
+# Historical geometry alias; identical to orca.yaml.
+# Feedback windows now belong to feedback_config (config/feedback.yaml).
+# This file no longer changes feedback timeouts.
+robot_radius: 0.075
+safety_margin: 0.01
+front_distance: 0.04
+time_horizon: 3.0
+right_bias: 0.01
+velocity_buffer: 0.002

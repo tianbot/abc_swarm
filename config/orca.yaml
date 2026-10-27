@@ -1,0 +1,10 @@
+# ORCA settings for point stabilization; participant-to-participant avoidance only.
+# Mini body diameter 0.15 m, confirmed by the operator on 2026-10-26.
+# Radius is about the axle/control center; check markers/payload and reference offset.
+# Front-point radius = 0.075 + 0.01 + 0.04 = 0.125 m (pair threshold 0.25 m).
+robot_radius: 0.075
+safety_margin: 0.01
+front_distance: 0.04
+time_horizon: 3.0
+right_bias: 0.01
+velocity_buffer: 0.002

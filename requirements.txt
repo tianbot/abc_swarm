@@ -1,0 +1,3 @@
+# No external pip dependencies are required by abc_swarm.
+# simple-pid 2.0.0 is vendored in src/simple_pid; catkin installs it.
+# ROS, NumPy and SciPy come from the Noetic/ROS2GO system environment.

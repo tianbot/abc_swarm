@@ -1,0 +1,12 @@
+# 三车目标，顺序与launch中的robots一致；算法参数见 point_control.yaml。
+target_reference: initial_leader
+target_poses:
+- - 0.0
+  - 0.0
+  - 0.0
+- - -0.5
+  - 0.5
+  - 0.0
+- - -0.5
+  - -0.5
+  - 0.0

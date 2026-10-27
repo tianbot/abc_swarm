@@ -1,0 +1,121 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- 实验选项：startup只控制是否先入位；manual/auto始终使用同一个任务节点。 -->
+  <arg name="startup" default="true"/>
+  <arg name="mode" default="manual"/>
+  <arg name="spacing" default="0.5"/>
+  <arg name="backward_spacing" value="$(eval -float(arg('spacing')))"/>
+  <arg name="shape" default="circle"/>
+  <arg name="radius" default="1.0"/>
+  <arg name="width" default="2.5"/>
+  <arg name="height" default="2.0"/>
+  <arg name="speed" default="0.08"/>
+  <arg name="laps" default="1"/>
+  <arg name="clockwise" default="false"/>
+  <arg name="planning" default="true"/>
+
+  <!-- 参数归属：点镇定/反馈、跟随公式、入位条件、ORCA几何各有一份YAML。 -->
+  <arg name="feedback_config" default="$(find abc_swarm)/config/feedback.yaml"/>
+  <arg name="control_config" default="$(find abc_swarm)/config/point_control.yaml"/>
+  <arg name="follow_config" default="$(find abc_swarm)/config/leader_follower.yaml"/>
+  <arg name="admission_config" default="$(find abc_swarm)/config/admission.yaml"/>
+  <arg name="orca_config" default="$(find abc_swarm)/config/orca.yaml"/>
+  <arg name="velocity_source" default="mocap"/>
+  <arg name="command_timeout" default="0.3"/>
+  <!-- 可选覆盖：空值使用YAML；max_*只覆盖跟随，point_max_angular只覆盖点镇定。 -->
+  <arg name="max_linear" default=""/>
+  <arg name="max_angular" default=""/>
+  <arg name="point_max_angular" default=""/>
+  <arg name="tf_timeout" default=""/>
+  <arg name="odom_timeout" default=""/>
+  <arg name="odom_future_tolerance" default=""/>
+
+  <!-- 人工输入：显示值就是teleop_cmd请求；不再用算法限值截断键盘参数。 -->
+  <arg name="teleop_linear" default="0.15"/>
+  <arg name="teleop_angular" default="0.6"/>
+  <arg name="start_teleop" default="true"/>
+  <arg name="teleop_terminal" default="xterm -e"/>
+  <!-- 默认显示动捕位姿和当前目标；auto模式还显示头车计划路径。 -->
+  <arg name="use_rviz" default="true"/>
+
+  <!-- 设备和后台：ROS名称决定话题，刚体名决定TF；已有后台时关闭相应start参数。 -->
+  <arg name="robot_name_1" default="tianbot_mini_01"/>
+  <arg name="robot_name_2" default="tianbot_mini_02"/>
+  <arg name="robot_name_3" default="tianbot_mini_03"/>
+  <arg name="rigid_body_1" default="$(arg robot_name_1)"/>
+  <arg name="rigid_body_2" default="$(arg robot_name_2)"/>
+  <arg name="rigid_body_3" default="$(arg robot_name_3)"/>
+  <arg name="site_config" default="$(find abc_swarm)/config/mocap.yaml"/>
+  <arg name="vrpn_server_ip" default="$(optenv ABC_SWARM_VRPN_SERVER)"/>
+  <arg name="vrpn_port" default=""/>
+  <arg name="start_driver" default="true"/>
+  <arg name="start_vrpn" default="true"/>
+  <arg name="use_sim_time" default=""/>
+  <include file="$(find abc_swarm)/launch/common/mocap_backend.launch.xml">
+    <arg name="site_config" value="$(arg site_config)"/>
+    <arg name="vrpn_server_ip" value="$(arg vrpn_server_ip)"/>
+    <arg name="vrpn_port" value="$(arg vrpn_port)"/>
+    <arg name="start_driver" value="$(arg start_driver)"/>
+    <arg name="start_vrpn" value="$(arg start_vrpn)"/>
+    <arg name="use_sim_time" value="$(arg use_sim_time)"/>
+  </include>
+
+  <!-- 任务节点：输入实测位姿/速度和teleop_cmd，三车cmd_vel分别只有这一个发布者。 -->
+  <node pkg="abc_swarm" type="point_stabilization.py" name="abc_swarm_demo" output="screen" required="true" clear_params="true">
+    <rosparam command="load" file="$(arg feedback_config)"/>
+    <rosparam command="load" file="$(arg control_config)"/>
+    <rosparam command="load" file="$(arg follow_config)" param="follow"/>
+    <rosparam command="load" file="$(arg admission_config)" param="admission"/>
+    <rosparam command="load" file="$(arg orca_config)" param="orca"/>
+    <param name="config_sources/feedback" value="$(arg feedback_config)"/>
+    <param name="config_sources/control" value="$(arg control_config)"/>
+    <param name="config_sources/follow" value="$(arg follow_config)"/>
+    <param name="config_sources/admission" value="$(arg admission_config)"/>
+    <param name="config_sources/orca" value="$(arg orca_config)"/>
+    <param name="task" value="leader_follower"/>
+    <param name="formation" value="snake"/>
+    <param name="startup" value="$(arg startup)" type="bool"/>
+    <param name="planning" value="$(arg planning)" type="bool"/>
+    <param name="avoidance" value="$(eval 'orca' if arg('startup') else 'none')"/>
+    <param name="velocity_source" value="$(arg velocity_source)"/>
+    <param name="command_timeout" value="$(arg command_timeout)"/>
+    <param if="$(eval arg('max_linear') != '')" name="follow/max_linear" value="$(arg max_linear)" type="double"/>
+    <param if="$(eval arg('max_angular') != '')" name="follow/max_angular" value="$(arg max_angular)" type="double"/>
+    <param if="$(eval arg('point_max_angular') != '')" name="max_angular" value="$(arg point_max_angular)" type="double"/>
+    <param if="$(eval arg('tf_timeout') != '')" name="tf_timeout" value="$(arg tf_timeout)" type="double"/>
+    <param if="$(eval arg('odom_timeout') != '')" name="odom_timeout" value="$(arg odom_timeout)" type="double"/>
+    <param if="$(eval arg('odom_future_tolerance') != '')" name="odom_future_tolerance" value="$(arg odom_future_tolerance)" type="double"/>
+    <param name="follow/mode" value="$(arg mode)"/>
+    <param name="follow/shape" value="$(arg shape)"/>
+    <param name="follow/radius" value="$(arg radius)"/>
+    <param name="follow/width" value="$(arg width)"/>
+    <param name="follow/height" value="$(arg height)"/>
+    <param name="follow/speed" value="$(arg speed)"/>
+    <param name="follow/laps" value="$(arg laps)" type="int"/>
+    <param name="follow/clockwise" value="$(arg clockwise)" type="bool"/>
+    <!-- 角色与目标：只编辑本段即可看清谁跟谁；目标在各自前车车体系下。 -->
+    <rosparam param="follow/edges" subst_value="true">
+      - {leader: "$(arg robot_name_1)", follower: "$(arg robot_name_2)", x: $(arg backward_spacing), y: 0.0}
+      - {leader: "$(arg robot_name_2)", follower: "$(arg robot_name_3)", x: $(arg backward_spacing), y: 0.0}
+    </rosparam>
+    <rosparam param="robots" subst_value="true">
+      - {name: "$(arg robot_name_1)", frame: "$(arg rigid_body_1)"}
+      - {name: "$(arg robot_name_2)", frame: "$(arg rigid_body_2)"}
+      - {name: "$(arg robot_name_3)", frame: "$(arg rigid_body_3)"}
+    </rosparam>
+  </node>
+
+  <!-- 键盘与显示：GUI可关闭键盘并发布同一teleop_cmd；状态和中间速度话题由任务节点提供。 -->
+  <node if="$(eval arg('mode') == 'manual' and arg('start_teleop'))" pkg="teleop_twist_keyboard" type="teleop_twist_keyboard.py" name="leader_teleop" output="screen" launch-prefix="$(arg teleop_terminal)">
+    <remap from="cmd_vel" to="/abc_swarm_demo/teleop_cmd"/>
+    <param name="speed" value="$(arg teleop_linear)"/>
+    <param name="turn" value="$(arg teleop_angular)"/>
+    <param name="repeat_rate" value="20.0"/>
+    <param name="key_timeout" value="$(arg command_timeout)"/>
+  </node>
+  <node if="$(arg use_rviz)" pkg="rviz" type="rviz" name="demo_rviz" args="-d $(find abc_swarm)/rviz/coordinated_tracking.rviz">
+    <remap from="/abc_swarm_demo/paths/tianbot_mini_01" to="/abc_swarm_demo/paths/$(arg robot_name_1)"/>
+    <remap from="/abc_swarm_demo/paths/tianbot_mini_02" to="/abc_swarm_demo/paths/$(arg robot_name_2)"/>
+    <remap from="/abc_swarm_demo/paths/tianbot_mini_03" to="/abc_swarm_demo/paths/$(arg robot_name_3)"/>
+  </node>
+</launch>

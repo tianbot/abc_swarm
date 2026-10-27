@@ -1,0 +1,8 @@
+# 跟随公式和auto头车路径的算法参数。键盘的初始请求在launch中独立设置。
+front_distance: 0.1
+k_x: 0.5
+k_y: 0.5
+max_linear: 0.15
+max_angular: 0.6
+lookahead: 0.25
+max_error: 0.5

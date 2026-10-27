@@ -1,0 +1,63 @@
+{
+  "contract_version": 3,
+  "name": "three_mini_triangle",
+  "localization": "mocap_vrpn",
+  "fixed_frame": "world",
+  "vrpn": {
+    "server": "192.168.2.101",
+    "port": 3883
+  },
+  "robots": [
+    {
+      "name": "tianbot_mini_01",
+      "model": "tianbot_mini",
+      "rigid_body": "tianbot_mini_01",
+      "initial_pose": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "tianbot_mini_02",
+      "model": "tianbot_mini",
+      "rigid_body": "tianbot_mini_02",
+      "initial_pose": [
+        -0.5,
+        0.5,
+        0.0
+      ]
+    },
+    {
+      "name": "tianbot_mini_03",
+      "model": "tianbot_mini",
+      "rigid_body": "tianbot_mini_03",
+      "initial_pose": [
+        -0.5,
+        -0.5,
+        0.0
+      ]
+    }
+  ],
+  "experiment": "coordinated_triangle",
+  "path": null,
+  "startup": {
+    "start_driver": true,
+    "start_vrpn": true,
+    "use_rviz": true,
+    "start_teleop": false
+  },
+  "trajectory": {
+    "side_length": 2.0,
+    "speed": 0.15,
+    "laps": 1,
+    "clockwise": false,
+    "reference": "world",
+    "center": [
+      0,
+      0,
+      0
+    ]
+  },
+  "orca": null
+}

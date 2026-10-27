@@ -1,0 +1,30 @@
+# 2026-10-27现场候选配置；必须显式用control_config加载，不是通用设备标定。
+# 02沿用2026-10-26原地旋转拟合值，未改航向补偿。
+# 03候选offset由本轮摇摆的15条aligning状态反算控制位置后拟合：
+# yaw跨度0.496rad，平面拟合残差约0.24mm；假设零线速期间转轴位置固定。
+# 这是诊断候选，不等于独立完成03转轴/车头标定；实车效果尚待确认。
+# 01仍为identity，所有yaw_offset仍为0；不推断新的车头方向补偿。
+max_linear: 0.15
+max_angular: 0.5
+position_tolerance: 0.04
+position_hysteresis: 0.01
+yaw_tolerance: 0.08
+k_distance: 0.9
+k_heading: 2.0
+align_angle: 0.7853981633974483
+mocap_calibration:
+  tianbot_mini_01:
+    yaw_offset: 0.0
+    marker_offset:
+    - 0.0
+    - 0.0
+  tianbot_mini_02:
+    yaw_offset: 0.0
+    marker_offset:
+    - 0.033511768984840616
+    - 0.0020928827817474627
+  tianbot_mini_03:
+    yaw_offset: 0.0
+    marker_offset:
+    - 0.02297
+    - -0.00836

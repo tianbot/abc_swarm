@@ -1,0 +1,73 @@
+#!/usr/bin/env python3
+"""Verify the origin/main contract, not the discarded refactor layout."""
+import ast
+import hashlib
+import importlib.util
+import json
+import os
+from pathlib import Path
+import unittest
+import xml.etree.ElementTree as ET
+
+ROOT = Path(__file__).resolve().parents[1]
+BASELINE = json.loads((ROOT / 'tests/main_baseline.json').read_text())
+
+
+class MainLayoutTests(unittest.TestCase):
+    def test_original_files_are_preserved_except_two_explicit_mocap_moves(self):
+        self.assertEqual(len(BASELINE['renames']), 2)
+        for original, spec in BASELINE['originals'].items():
+            with self.subTest(original=original):
+                path = ROOT / spec['current_path']
+                self.assertTrue(path.is_file(), path)
+                self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(), spec['sha256'])
+                if original in BASELINE['renames']:
+                    self.assertFalse((ROOT / original).exists())
+
+    def test_original_nodes_and_includes_keep_their_paths(self):
+        for directory in ('nodes', 'launch/includes'):
+            expected = {p for p in BASELINE['originals'] if p.startswith(directory + '/')}
+            actual = {str(p.relative_to(ROOT)) for p in (ROOT / directory).rglob('*')
+                      if p.is_file() and '__pycache__' not in p.parts
+                      and not any(part.startswith('.') for part in p.relative_to(ROOT).parts)}
+            if directory == 'nodes':
+                expected |= {'nodes/' + name for name in ('demo_runtime.py', 'preset_path_tracker.py',
+                             'leader_follower_tracker.py', 'pid_tracker.py')}
+            if directory == 'nodes':
+                self.assertTrue(expected.issubset(actual))
+            else:
+                self.assertEqual(actual, expected)
+
+    def test_new_layout_is_flat_and_does_not_carry_refactor_directories(self):
+        self.assertFalse(any(p.is_dir() for p in (ROOT / 'config').iterdir()))
+        for p in (ROOT / 'nodes').glob('*.py'):
+            self.assertTrue(os.access(str(p), os.X_OK), p)
+            ast.parse(p.read_text(), filename=str(p))
+        for directory in ('scripts', 'demo', 'legacy', 'examples', 'launch/simulation',
+                          'launch/sim_demo', 'launch/experiments', 'src/target_tracker'):
+            self.assertFalse((ROOT / directory).exists(), directory)
+        for p in (ROOT / 'launch/mocap').glob('*.launch'):
+            self.assertTrue(p.name.startswith('demo_mocap_') or p.name == 'mocap_backend.launch')
+        self.assertFalse(any(p.is_dir() for p in (ROOT / 'launch/mocap').iterdir()))
+
+    def test_manifest_and_worktree_agree_with_authoritative_git_baseline(self):
+        spec = importlib.util.spec_from_file_location('main_course_checker',
+                ROOT / 'tests/check_course_compatibility.py')
+        checker = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(checker)
+        self.assertEqual(checker.check(ROOT, ROOT), [])
+
+    def test_new_launches_parse_and_unique_names_resolve(self):
+        from roslaunch.rlutil import resolve_launch_arguments
+        for directory in ('launch/mocap', 'launch/common'):
+            for path in (ROOT / directory).iterdir():
+                if path.suffix not in ('.launch', '.xml'):
+                    continue
+                ET.parse(str(path))
+                if path.suffix == '.launch':
+                    result = resolve_launch_arguments(['abc_swarm', path.name])[0]
+                    self.assertEqual(Path(result).resolve(), path)
+
+
+if __name__ == '__main__':
+    unittest.main()

@@ -1,0 +1,57 @@
+<?xml version="1.0" ?>
+<launch>
+  <!-- 界面与场地：RViz 可关闭，VRPN 地址和端口可从场地 YAML 覆盖。 -->
+  <arg name="use_rviz" default="true"/>
+  <arg name="vrpn_port" default=""/>
+  <arg name="site_config" default="$(find abc_swarm)/config/mocap.yaml"/>
+  <!-- 头车路径：圆形或圆角矩形，speed 是路径速度上限，laps 控制圈数。 -->
+  <arg name="follow_config" default="$(find abc_swarm)/config/leader_follower.yaml"/>
+  <arg name="feedback_config" default="$(find abc_swarm)/config/feedback.yaml"/>
+  <arg name="shape" default="circle"/>
+  <arg name="radius" default="0.8"/>
+  <arg name="width" default="2.5"/>
+  <arg name="height" default="2.0"/>
+  <arg name="speed" default="0.15"/>
+  <arg name="laps" default="1"/>
+  <arg name="clockwise" default="false"/>
+  <arg name="start_vrpn" default="true"/>
+  <arg name="start_driver" default="true"/>
+  <arg name="vrpn_server_ip" default="$(optenv ABC_SWARM_VRPN_SERVER)"/>
+  <arg name="spacing" default="0.5"/>
+  <arg name="front_distance" default=""/>
+  <!-- 设备映射：robot_name 用于速度和里程计话题，rigid_body 用于动捕 TF。 -->
+  <arg name="robot_name_1" default="tianbot_mini_01"/>
+  <arg name="rigid_body_1" default="$(arg robot_name_1)"/>
+  <arg name="robot_name_2" default="tianbot_mini_02"/>
+  <arg name="rigid_body_2" default="$(arg robot_name_2)"/>
+  <arg name="robot_name_3" default="tianbot_mini_03"/>
+  <arg name="rigid_body_3" default="$(arg robot_name_3)"/>
+  <!-- 实验组合：具体 formation 在此指定；公共片段组合路径、后车跟随、后台及运行状态。 -->
+  <include file="$(find abc_swarm)/launch/common/path_tracking_experiment.launch.xml">
+    <arg name="follow_config" value="$(arg follow_config)"/>
+    <arg name="feedback_config" value="$(arg feedback_config)"/>
+    <arg name="formation" value="snake"/>
+    <arg name="shape" value="$(arg shape)"/>
+    <arg name="radius" value="$(arg radius)"/>
+    <arg name="width" value="$(arg width)"/>
+    <arg name="height" value="$(arg height)"/>
+    <arg name="speed" value="$(arg speed)"/>
+    <arg name="laps" value="$(arg laps)"/>
+    <arg name="clockwise" value="$(arg clockwise)"/>
+    <arg name="start_vrpn" value="$(arg start_vrpn)"/>
+    <arg name="start_driver" value="$(arg start_driver)"/>
+    <arg name="vrpn_server_ip" value="$(arg vrpn_server_ip)"/>
+    <arg name="spacing" value="$(arg spacing)"/>
+    <arg name="front_distance" value="$(arg front_distance)"/>
+    <arg name="robot_name_1" value="$(arg robot_name_1)"/>
+    <arg name="rigid_body_1" value="$(arg rigid_body_1)"/>
+    <arg name="robot_name_2" value="$(arg robot_name_2)"/>
+    <arg name="rigid_body_2" value="$(arg rigid_body_2)"/>
+    <arg name="robot_name_3" value="$(arg robot_name_3)"/>
+    <arg name="rigid_body_3" value="$(arg rigid_body_3)"/>
+    <arg name="site_config" value="$(arg site_config)"/>
+    <arg name="vrpn_port" value="$(arg vrpn_port)"/>
+  </include>
+  <!-- 显示模块：观察头车计划路径、实际轨迹和 TF。 -->
+  <node if="$(arg use_rviz)" pkg="rviz" type="rviz" name="demo_rviz" args="-d $(find abc_swarm)/rviz/path_following.rviz"/>
+</launch>

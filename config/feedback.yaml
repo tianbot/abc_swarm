@@ -1,0 +1,8 @@
+# 所有动捕实验的反馈参考系和有效期；速度来源由launch的velocity_source选择。
+fixed_frame: world
+tf_timeout: 0.5
+odom_timeout: 0.5
+odom_future_tolerance: 0.1
+mocap_velocity:
+  window: 0.2
+  min_interval: 0.08

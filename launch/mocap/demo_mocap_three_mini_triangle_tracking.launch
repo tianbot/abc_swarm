@@ -1,0 +1,84 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- 后台与显示：按需启动 Mini 驱动、VRPN 和 RViz，已有后台时关闭对应 start 参数。 -->
+  <arg name="site_config" default="$(find abc_swarm)/config/mocap.yaml"/>
+  <arg name="vrpn_server_ip" default="$(optenv ABC_SWARM_VRPN_SERVER)"/>
+  <arg name="vrpn_port" default=""/>
+  <arg name="start_driver" default="true"/>
+  <arg name="start_vrpn" default="true"/>
+  <arg name="use_rviz" default="true"/>
+  <!-- 配置来源：控制增益/标定、轨迹协调、入队条件与 ORCA 参数分开加载。 -->
+  <arg name="feedback_config" default="$(find abc_swarm)/config/feedback.yaml"/>
+  <arg name="control_config" default="$(find abc_swarm)/config/point_control.yaml"/>
+  <arg name="tracking_config" default="$(find abc_swarm)/config/coordinated_tracking.yaml"/>
+  <arg name="admission_config" default="$(find abc_swarm)/config/admission.yaml"/>
+  <arg name="orca_config" default="$(find abc_swarm)/config/orca.yaml"/>
+  <!-- 入位方式：none 为普通点镇定，orca 增加登记车辆互避；velocity_source 选择速度反馈来源。 -->
+  <arg name="avoidance" default="none"/>
+  <arg name="planning" default="true"/>
+  <arg name="velocity_source" default="mocap"/>
+  <!-- 任务几何：origin是三角形重心及整体转角，默认重心位于world原点。
+       2m边长、逆时针时：01(-1,-0.577)、02(1,-0.577)、03(0,1.155)，单位m。 -->
+  <arg name="side_length" default="2.0"/>
+  <arg name="speed" default="0.15"/>
+  <arg name="laps" default="1"/>
+  <arg name="clockwise" default="false"/>
+  <arg name="reference" default="world"/>
+  <arg name="origin_x" default="0.0"/>
+  <arg name="origin_y" default="0.0"/>
+  <arg name="origin_yaw" default="0.0"/>
+  <!-- 设备与角色顺序：三车按此顺序分配各自起点和速度话题。 -->
+  <arg name="robot_name_1" default="tianbot_mini_01"/>
+  <arg name="robot_name_2" default="tianbot_mini_02"/>
+  <arg name="robot_name_3" default="tianbot_mini_03"/>
+  <arg name="rigid_body_1" default="$(arg robot_name_1)"/>
+  <arg name="rigid_body_2" default="$(arg robot_name_2)"/>
+  <arg name="rigid_body_3" default="$(arg robot_name_3)"/>
+  <!-- 后台模块：可选启动底盘驱动和动捕客户端。 -->
+  <include file="$(find abc_swarm)/launch/common/mocap_backend.launch.xml">
+    <arg name="site_config" value="$(arg site_config)"/>
+    <arg name="vrpn_server_ip" value="$(arg vrpn_server_ip)"/>
+    <arg name="vrpn_port" value="$(arg vrpn_port)"/>
+    <arg name="start_driver" value="$(arg start_driver)"/>
+    <arg name="start_vrpn" value="$(arg start_vrpn)"/>
+  </include>
+  <!-- 任务模块：同一节点先点镇定入位，再三车走路径；跟踪结果直接发布，三角形保留顶点到齐条件。 -->
+  <node pkg="abc_swarm" type="point_stabilization.py" name="abc_swarm_demo" output="screen" required="true" clear_params="true">
+    <!-- 参数优先级：先加载 YAML，再由下方 param 覆盖几何、速度和圈数等实验选项。 -->
+    <rosparam command="load" file="$(arg feedback_config)"/>
+    <rosparam command="load" file="$(arg control_config)"/>
+    <!-- 仅记录参数来源供 effective_config 显示；不会改写控制指令。 -->
+    <param name="config_sources/feedback" value="$(arg feedback_config)"/>
+    <param name="config_sources/control" value="$(arg control_config)"/>
+    <param name="config_sources/admission" value="$(arg admission_config)"/>
+    <param name="config_sources/tracking" value="$(arg tracking_config)"/>
+    <param if="$(eval arg('avoidance') == 'orca')" name="config_sources/orca" value="$(arg orca_config)"/>
+
+    <rosparam command="load" file="$(arg tracking_config)" param="coordinated"/>
+    <param name="task" value="triangle"/>
+    <param name="formation" value="config"/>
+    <param name="avoidance" value="$(arg avoidance)"/>
+    <rosparam command="load" file="$(arg admission_config)" param="admission"/>
+    <param name="planning" value="$(arg planning)" type="bool"/>
+    <param name="velocity_source" value="$(arg velocity_source)"/>
+    <rosparam if="$(eval arg('avoidance') == 'orca')" command="load" file="$(arg orca_config)" param="orca"/>
+    <param name="coordinated/diameter" value="2.0" type="double"/>
+    <param name="coordinated/side_length" value="$(arg side_length)" type="double"/>
+    <param name="coordinated/speed" value="$(arg speed)" type="double"/>
+    <param name="coordinated/laps" value="$(arg laps)" type="int"/>
+    <param name="coordinated/clockwise" value="$(arg clockwise)" type="bool"/>
+    <param name="coordinated/reference" value="$(arg reference)" type="str"/>
+    <rosparam param="coordinated/origin" subst_value="true">[$(arg origin_x), $(arg origin_y), $(arg origin_yaw)]</rosparam>
+    <rosparam param="robots" subst_value="true">
+      - {name: "$(arg robot_name_1)", frame: "$(arg rigid_body_1)"}
+      - {name: "$(arg robot_name_2)", frame: "$(arg rigid_body_2)"}
+      - {name: "$(arg robot_name_3)", frame: "$(arg rigid_body_3)"}
+    </rosparam>
+  </node>
+  <!-- 显示模块：分别显示三车路径、目标和校正后的控制位姿。 -->
+  <node if="$(arg use_rviz)" pkg="rviz" type="rviz" name="demo_rviz" args="-d $(find abc_swarm)/rviz/coordinated_tracking.rviz">
+    <remap from="/abc_swarm_demo/paths/tianbot_mini_01" to="/abc_swarm_demo/paths/$(arg robot_name_1)"/>
+    <remap from="/abc_swarm_demo/paths/tianbot_mini_02" to="/abc_swarm_demo/paths/$(arg robot_name_2)"/>
+    <remap from="/abc_swarm_demo/paths/tianbot_mini_03" to="/abc_swarm_demo/paths/$(arg robot_name_3)"/>
+  </node>
+</launch>

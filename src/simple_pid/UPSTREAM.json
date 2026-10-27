@@ -1,0 +1,13 @@
+{
+  "name": "simple-pid",
+  "version": "2.0.0",
+  "source": "https://github.com/m-lundberg/simple-pid/tree/v2.0.0",
+  "copied_from": "installed simple-pid 2.0.0 Python distribution",
+  "license": "MIT",
+  "local_changes": [],
+  "sha256": {
+    "__init__.py": "f604f7d744afe1113422d79c057079eb8048cdd0c4e059b5df81dfbfba63112e",
+    "pid.py": "5579f8432ecbc9808a1b9c9e271bb363699dbba2f43d2bf4b5c4dcb9d93a72b5",
+    "LICENSE.md": "f20b7942f8164cd9c20797daf4e819c193009305977c83e4f759921cc34f0765"
+  }
+}

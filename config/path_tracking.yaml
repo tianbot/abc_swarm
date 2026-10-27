@@ -1,0 +1,8 @@
+# Shared tracking parameters. Path geometry, speed and laps belong to demo launch args.
+lookahead: 0.25
+max_angular: 0.5
+goal_tolerance: 0.05
+max_error: 0.5
+start_tolerance: 0.15
+settle_tolerance: 0.1
+settle_timeout: 30.0

@@ -1,0 +1,39 @@
+# Explicit 2026-10-25 three-Mini field profile; never loaded by default.
+# Valid only for this marker mounting/body mapping; recalibrate after changing them.
+# yaw_offset: raw planar yaw -> vehicle forward heading (rad).
+# marker_offset: axle -> raw marker origin, in corrected vehicle forward/left axes (m).
+target_reference: initial_leader
+target_poses:
+- - 0.0
+  - 0.0
+  - 0.0
+- - -0.5
+  - 0.5
+  - 0.0
+- - -0.5
+  - -0.5
+  - 0.0
+fixed_frame: world
+tf_timeout: 0.5
+max_linear: 0.15
+max_angular: 0.5
+position_tolerance: 0.08
+yaw_tolerance: 0.08
+k_distance: 0.9
+k_heading: 2.0
+mocap_calibration:
+  tianbot_mini_01:
+    yaw_offset: 0.0
+    marker_offset:
+    - 0.02868130400366814
+    - 0.010896347559220282
+  tianbot_mini_02:
+    yaw_offset: 2.0113174299982655
+    marker_offset:
+    - 0.03343247844180835
+    - 0.004851514747563512
+  tianbot_mini_03:
+    yaw_offset: 0.0
+    marker_offset:
+    - 0.02196361286805152
+    - -0.0037542830200208988

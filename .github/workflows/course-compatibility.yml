@@ -1,0 +1,162 @@
+name: ABC Swarm checks
+
+"on": [push, pull_request, workflow_dispatch]
+
+permissions:
+  contents: read
+
+jobs:
+  course_compatibility:
+    name: Course compatibility
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Compare with frozen pre-refactor main
+        run: python3 tests/check_course_compatibility.py
+      - name: Verify the guard rejects broken compatibility
+        run: python3 -m unittest discover -s tests -p test_course_guard.py -v
+      - name: Verify AI experiment generation contract
+        run: python3 -m unittest discover -s tests -p test_ai_harness.py -v
+      - name: Check bundled PID without site packages
+        run: python3 -m unittest discover -s tests -p test_vendored_pid.py -v
+      - name: Check change whitespace
+        run: git diff --check 1708f332ae900384b9e84889b7ab3979aaae9f5f...HEAD
+      - name: Check Python syntax
+        run: python3 -m compileall -q nodes src ai
+      - name: Run hardware-independent control regressions
+        env:
+          PYTHONPATH: src
+        run: python3 -m unittest discover -s tests -p test_preset_path.py -v
+
+      - name: Check ORCA geometry without ROS
+        env:
+          PYTHONPATH: src
+        run: python3 -m unittest discover -s tests -p test_orca.py -v
+
+      - name: Check coordinated loop geometry and barriers without ROS
+        env:
+          PYTHONPATH: src
+        run: python3 -m unittest discover -s tests -p test_coordinated_loop.py -v
+
+      - name: Check admission and formation handoffs without ROS
+        env:
+          PYTHONPATH: src
+        run: python3 -m unittest discover -s tests -p test_formation_control.py -v
+
+  noetic_build_tests:
+    name: Noetic build and tests
+    needs: course_compatibility
+    runs-on: ubuntu-24.04
+    container: ros:noetic-ros-base-focal
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+    env:
+      DEBIAN_FRONTEND: noninteractive
+      SETUPTOOLS_USE_DISTUTILS: stdlib
+    steps:
+      # Git must exist before checkout so full history is actually available.
+      - name: Install build and test dependencies
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends git python3-nose python3-numpy python3-yaml ros-noetic-tf ros-noetic-nav-msgs ros-noetic-std-srvs ros-noetic-dynamic-reconfigure
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify frozen Git baseline in Noetic container
+        run: |
+          # Container tests run Git separately from checkout's temporary HOME.
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git -C "$GITHUB_WORKSPACE" cat-file -e 1708f332ae900384b9e84889b7ab3979aaae9f5f^{commit}
+          git -C "$GITHUB_WORKSPACE" ls-tree 1708f332ae900384b9e84889b7ab3979aaae9f5f -- nodes launch
+      - name: Build test and install in Noetic
+        run: |
+          source /opt/ros/noetic/setup.bash
+          test_ws="$RUNNER_TEMP/abc_swarm_ws"
+          mkdir -p "$test_ws/src"
+          ln -s "$GITHUB_WORKSPACE" "$test_ws/src/abc_swarm"
+          catkin_make -C "$test_ws" --only-pkg-with-deps abc_swarm -DPYTHON_EXECUTABLE=/usr/bin/python3
+          catkin_make -C "$test_ws" run_tests_abc_swarm
+          catkin_test_results "$test_ws/build/test_results/abc_swarm"
+          catkin_make -C "$test_ws" install
+      - name: Check installed executable discovery
+        run: |
+          source "$RUNNER_TEMP/abc_swarm_ws/install/setup.bash"
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib
+          import json
+          import rospkg
+          import roslib.packages
+          root = Path(rospkg.RosPack().get_path('abc_swarm'))
+          assert root.name == 'abc_swarm' and root.parent.name == 'share', root
+          for script in Path('nodes').glob('*.py'):
+              matches = roslib.packages.find_node('abc_swarm', script.name)
+              assert len(matches) == 1, script.name
+              assert Path(matches[0]).read_text().splitlines()[1:] == script.read_text().splitlines()[1:], script.name
+          from roslaunch.rlutil import resolve_launch_arguments
+          manifest = json.loads(Path('tests/main_baseline.json').read_text())
+          for original, entry in manifest['originals'].items():
+              if original.startswith(('launch/', 'config/', 'rviz/')):
+                  path = root / entry['current_path']
+                  assert path.is_file(), original
+                  assert hashlib.sha256(path.read_bytes()).hexdigest() == entry['sha256'], original
+                  if path.suffix == '.launch':
+                      assert Path(resolve_launch_arguments(['abc_swarm', path.name])[0]) == path, original
+          assert (root / 'config/mocap.yaml').is_file()
+          import simple_pid
+          assert root.parent.parent in Path(simple_pid.__file__).resolve().parents, simple_pid.__file__
+          assert (root / 'licenses/simple_pid/LICENSE.md').is_file()
+          assert (root / 'licenses/simple_pid/UPSTREAM.json').is_file()
+          print('Installed nodes and configuration verified')
+          PY
+      - name: Check installed AI delivery tool
+        run: |
+          source "$RUNNER_TEMP/abc_swarm_ws/install/setup.bash"
+          ai_dir="$(rospack find abc_swarm)/ai"
+          python3 "$ai_dir/generate_launch.py" "$ai_dir/experiment.example.json" --output "$RUNNER_TEMP/customer-demo"
+          python3 "$ai_dir/generate_launch.py" "$RUNNER_TEMP/customer-demo/experiment.json" --output "$RUNNER_TEMP/customer-demo" --check
+          python3 "$ai_dir/generate_launch.py" "$ai_dir/point-stabilization.example.json" --output "$RUNNER_TEMP/customer-point-demo"
+          python3 "$ai_dir/generate_launch.py" "$RUNNER_TEMP/customer-point-demo/experiment.json" --output "$RUNNER_TEMP/customer-point-demo" --check
+          python3 "$ai_dir/generate_launch.py" "$ai_dir/orca.example.json" --output "$RUNNER_TEMP/customer-orca-demo"
+          python3 "$ai_dir/generate_launch.py" "$RUNNER_TEMP/customer-orca-demo/experiment.json" --output "$RUNNER_TEMP/customer-orca-demo" --check
+          for loop_shape in circle triangle
+          do
+            python3 "$ai_dir/generate_launch.py" "$ai_dir/coordinated-$loop_shape.example.json" --output "$RUNNER_TEMP/customer-$loop_shape-demo"
+            python3 "$ai_dir/generate_launch.py" "$RUNNER_TEMP/customer-$loop_shape-demo/experiment.json" --output "$RUNNER_TEMP/customer-$loop_shape-demo" --check
+          done
+          python3 "$ai_dir/generate_launch.py" "$ai_dir/mocap-control.example.json" --output "$RUNNER_TEMP/customer-mocap-control"
+          python3 "$ai_dir/generate_launch.py" "$RUNNER_TEMP/customer-mocap-control/experiment.json" --output "$RUNNER_TEMP/customer-mocap-control" --check
+          python3 "$ai_dir/generate_launch.py" "$ai_dir/formation-admission.example.json" --output "$RUNNER_TEMP/customer-formation-admission"
+          python3 "$ai_dir/generate_launch.py" "$RUNNER_TEMP/customer-formation-admission/experiment.json" --output "$RUNNER_TEMP/customer-formation-admission" --check
+      - name: Run isolated synthetic ROS integration
+        run: |
+          source "$RUNNER_TEMP/abc_swarm_ws/install/setup.bash"
+          # The harness forces loopback master and synthetic names; hardware/UI disabled.
+          python3 tests/ros/preset_path_smoke.py
+      - name: Run isolated point stabilization closed loop
+        run: |
+          source "$RUNNER_TEMP/abc_swarm_ws/install/setup.bash"
+          # Private loopback master 11434, synthetic names, hardware/VRPN/UI off.
+          python3 tests/ros/point_stabilization_smoke.py
+      - name: Run isolated mocap ORCA point stabilization
+        run: |
+          source "$RUNNER_TEMP/abc_swarm_ws/install/setup.bash"
+          # Private loopback master 11435; synthetic TF/odom; driver/VRPN/UI off.
+          python3 tests/ros/orca_point_smoke.py
+      - name: Run isolated mocap three-robot coordinated loops
+        run: |
+          source "$RUNNER_TEMP/abc_swarm_ws/install/setup.bash"
+          # Private loopback master 11436, synthetic TF/odom, driver/VRPN/UI off.
+          python3 tests/ros/coordinated_loop_smoke.py
+      - name: Run isolated complete formation startup and follow missions
+        run: |
+          source "$RUNNER_TEMP/abc_swarm_ws/install/setup.bash"
+          # Private 11438 master and clock, calibrated synthetic TF, no odom/hardware/UI.
+          python3 tests/ros/formation_mission_smoke.py

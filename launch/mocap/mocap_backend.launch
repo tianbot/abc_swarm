@@ -1,0 +1,17 @@
+<?xml version="1.0" ?>
+<launch>
+  <!-- 独立后台入口：只管理驱动与定位，不启动编队或轨迹控制。 -->
+  <arg name="start_vrpn" default="true"/>
+  <arg name="start_driver" default="true"/>
+  <arg name="vrpn_port" default=""/>
+  <arg name="vrpn_server_ip" default="$(optenv ABC_SWARM_VRPN_SERVER)"/>
+  <arg name="site_config" default="$(find abc_swarm)/config/mocap.yaml"/>
+  <!-- 后台组合：Mini socket 驱动使用本机11411端口；VRPN 根据场地配置接收动捕数据。 -->
+  <include file="$(find abc_swarm)/launch/common/mocap_backend.launch.xml">
+    <arg name="site_config" value="$(arg site_config)"/>
+    <arg name="vrpn_server_ip" value="$(arg vrpn_server_ip)"/>
+    <arg name="vrpn_port" value="$(arg vrpn_port)"/>
+    <arg name="start_driver" value="$(arg start_driver)"/>
+    <arg name="start_vrpn" value="$(arg start_vrpn)"/>
+  </include>
+</launch>

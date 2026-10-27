@@ -164,7 +164,10 @@ def main():
                 assert states[-1] == 'tracking', states
             assert commands[1][-1][1] > 0
             head_publishers=dict(rosgraph.Master('/smoke').getSystemState()[0])['/path_test_01/cmd_vel']
-            assert head_publishers==['/abc_swarm_demo' if via_mode else '/abc_swarm_path'],head_publishers
+            assert ('/abc_swarm_demo' if via_mode else '/abc_swarm_path') in head_publishers,head_publishers
+            # A just-stopped node may remain in the master's registry; verify the
+            # actual TCPROS connections as well as the expected registered owner.
+            assert subscribers[2].get_num_connections() == 1, head_publishers
             # Feedback loss stops every controller through the shared enable.
             pump(0.9, missing_odom=1 if formation == 'triangle' else 2)
             assert not rospy.get_param('/abc_swarm_demo/enabled')

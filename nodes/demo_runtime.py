@@ -97,7 +97,7 @@ class DemoRuntime:
                 return False, 'waiting for odometry: ' + topic
             stamp, received, v, w = sample
             issue = odometry_error(stamp.to_sec(), now.to_sec(), time.monotonic() - received,
-                                   v, w, self.tf_timeout, self.odom_timeout, self.future_tolerance)
+                                   v, w, self.odom_timeout, self.future_tolerance)
             if issue:
                 return False, topic + ': ' + issue
         if self.mode == 'path' and not self.path_status.startswith(

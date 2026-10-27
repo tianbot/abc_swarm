@@ -6,6 +6,7 @@ import runpy
 import threading
 import time
 import unittest
+import rospy
 from unittest.mock import Mock, patch
 
 
@@ -13,6 +14,16 @@ Runtime = runpy.run_path(str(Path(__file__).resolve().parents[1]/'nodes/demo_run
 
 
 class ManualCommandTests(unittest.TestCase):
+    def test_readiness_uses_odometry_timeout_independently_of_tf_timeout(self):
+        node=Runtime.__new__(Runtime)
+        node.frames=[];node.topics=['/test_robot/odom'];node.mode='manual'
+        node.tf_timeout=.1;node.odom_timeout=.7;node.future_tolerance=.08
+        node.feedback={'/test_robot/odom':(rospy.Time.from_sec(99.5),time.monotonic(),0.,0.)}
+        with patch('rospy.Time.now',return_value=rospy.Time.from_sec(100.)):
+            self.assertTrue(node.readiness()[0])
+            node.feedback['/test_robot/odom']=(rospy.Time.from_sec(99.2),time.monotonic(),0.,0.)
+            self.assertIn('timestamp age',node.readiness()[1])
+
     def runtime(self):
         node=Runtime.__new__(Runtime)
         node.lock=threading.RLock();node.mode='manual';node.active=True

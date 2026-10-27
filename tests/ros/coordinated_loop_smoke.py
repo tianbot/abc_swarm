@@ -49,13 +49,16 @@ def main():
             time.sleep(.1)
         rospy.init_node('coordinated_mocap_test',disable_signals=True)
         package=Path(rospkg.RosPack().get_path('abc_swarm'))
-        rows={i:[] for i in range(3)};states=[];paths={};poses={};visited=[];violations=[];minimum=100.;max_spread=0
+        rows={i:[] for i in range(3)};states=[];paths={};poses={};visited=[];violations=[];direct_outputs=[];minimum=100.;max_spread=0
         def command(msg,i):rows[i].append((time.monotonic(),msg.linear.x,msg.angular.z))
         def status(msg):
             nonlocal max_spread
             s=json.loads(msg.data);states.append(s);max_spread=max(max_spread,s.get('progress_spread',0))
             if not visited or visited[-1]!=s['stage']:visited.append(s['stage'])
             if s['stage']=='turning' and not all(r['command'][0]==0 for r in s['robots']):violations.append(s)
+            for robot in s['robots']:
+                if robot['phase']=='tracking_circle':
+                    direct_outputs.append(robot['command']==robot['raw_command'])
         subscribers=[rospy.Subscriber('/loops_test_%02d/cmd_vel'%i,Twist,command,callback_args=i) for i in rows]
         subscribers += [rospy.Subscriber('/abc_swarm_demo/status',String,status)]
         for i in rows:
@@ -101,7 +104,7 @@ def main():
             origin=(1,2,.3)
             expected,_=loop_geometry(shape,size,size,cw,origin)
             poses=dict(enumerate(expected));p=poses[2];poses[2]=(p[0]+.12,p[1]-.1,p[2]+.25)
-            states.clear();paths.clear();visited.clear();violations.clear();minimum=100;max_spread=0
+            states.clear();paths.clear();visited.clear();violations.clear();direct_outputs.clear();minimum=100;max_spread=0
             for rr in rows.values():rr.clear()
             path=package/('launch/mocap/demo_mocap_three_mini_'+shape+'_tracking.launch')
             args=['roslaunch',str(path),'start_driver:=false','start_vrpn:=false','use_rviz:=false',
@@ -112,15 +115,19 @@ def main():
                 args+=['reference:=world','origin_x:=1','origin_y:=2','origin_yaw:=0.3']
             args += ['robot_name_%d:=loops_test_%02d'%(i+1,i) for i in rows]
             if index==0:args+=['avoidance:=orca']
+            # Keep this regression's existing 5.5cm completion assertion even
+            # though the teaching launch now defaults to a relaxed 10cm capture.
+            control=yaml.safe_load((package/'config/point_control.yaml').read_text())
+            control.update(position_tolerance=.04,position_hysteresis=.01)
             if index==4:
-                control=yaml.safe_load((package/'config/point_control.yaml').read_text())
                 control['mocap_calibration']={'loops_test_%02d'%i:{'yaw_offset':.6,'marker_offset':[.03,.01]} for i in rows}
-                profile=folder/'calibrated_control.yaml';profile.write_text(yaml.safe_dump(control))
-                args+=['avoidance:=orca','velocity_source:=mocap','control_config:='+str(profile)]
+                args+=['avoidance:=orca','velocity_source:=mocap']
             else:
                 # These cases inject odometry loss; select that source explicitly.
                 # The final calibrated case covers the mocap-only default.
                 args+=['velocity_source:=odom']
+            profile=folder/('control_%d.yaml'%index);profile.write_text(yaml.safe_dump(control))
+            args+=['control_config:='+str(profile)]
             process=start(args,shape+'_'+str(size))
             deadline=time.monotonic()+10
             while time.monotonic()<deadline:
@@ -155,7 +162,10 @@ def main():
                 assert states[-1]['edge_rounds_completed']==3,states[-1]
             else:
                 assert 'tracking_circle' in visited and 'finishing' in visited,visited
-                assert max_spread<.15,max_spread
+                # Each tracker is published directly: a slower robot may drift
+                # in phase, rather than silently scaling the other outputs.
+                assert direct_outputs and all(direct_outputs),direct_outputs
+                assert max_spread>.15,max_spread
             for i,start_pose in enumerate(expected):
                 assert math.hypot(poses[i][0]-start_pose[0],poses[i][1]-start_pose[1])<.055,(i,poses[i],start_pose)
                 assert abs(angle(poses[i][2]-start_pose[2]))<.09,(i,poses[i],start_pose)

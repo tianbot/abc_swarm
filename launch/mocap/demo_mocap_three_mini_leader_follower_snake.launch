@@ -35,7 +35,8 @@
   <arg name="teleop_angular" default="0.6"/>
   <arg name="start_teleop" default="true"/>
   <arg name="teleop_terminal" default="xterm -e"/>
-  <arg name="use_rviz" default="false"/>
+  <!-- 默认显示动捕位姿和当前目标；auto模式还显示头车计划路径。 -->
+  <arg name="use_rviz" default="true"/>
 
   <!-- 设备和后台：ROS名称决定话题，刚体名决定TF；已有后台时关闭相应start参数。 -->
   <arg name="robot_name_1" default="tianbot_mini_01"/>

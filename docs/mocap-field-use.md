@@ -60,6 +60,8 @@ roslaunch abc_swarm demo_mocap_three_mini_leader_follower_snake.launch start_dri
 
 这两个入口可加`mode:=auto`让头车按圆形路径领航。auto头车固定路径参数speed默认0.08m/s，跟随算法的线速度上限默认0.15m/s；外侧后车需要更高速度，参数应由人配置，程序不暗中修改头车速度。`startup:=false`只跳过启动入位，仍用同一节点、标定和速度来源。
 
+三角/蛇形跟随默认打开RViz，复用圆形/三角路径实验的俯视显示：动捕TF、控制位姿和当前目标；auto模式还显示头车计划路径。无需显示时加`use_rviz:=false`，GUI也可复用这些话题。
+
 ## 3. 三车同圆
 
 默认直径2m、初始120°间隔，各车独立跟踪同圆路径，一圈结束。起点/切线默认由01启动位姿确定；origin表示第一台的起点，不是圆心。
